@@ -1,13 +1,23 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-app_env = os.getenv("APP_ENV", "").lower()
-if app_env == "staging":
-    load_dotenv(".env.staging")
-else:
-    load_dotenv(".env.local")
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+
+
+def load_backend_env() -> None:
+    """Load one backend env file using an explicit, predictable precedence."""
+    app_env = os.getenv("APP_ENV", "").lower()
+    env_candidates = [BASE_DIR / ".env.staging"] if app_env == "staging" else [BASE_DIR / ".env", BASE_DIR / ".env.local"]
+
+    for env_path in env_candidates:
+        if env_path.exists():
+            load_dotenv(env_path)
+            break
+
+
+load_backend_env()
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
