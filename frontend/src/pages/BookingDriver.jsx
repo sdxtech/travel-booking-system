@@ -22,7 +22,7 @@ function BookingDriver() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [editingBookingId, setEditingBookingId] = useState('')
 
-  // Convert Firestore timestamps/ISO strings into a Date instance.
+  // Convert API timestamps into a Date instance.
   const toDate = (value) => {
     if (!value) return null
     if (value?.seconds) return new Date(value.seconds * 1000)

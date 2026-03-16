@@ -116,8 +116,6 @@ dist
 # DynamoDB Local files
 .dynamodb/
 
-# Firebase cache directory
-.firebase/
 # TernJS port file
 .tern-port
 
@@ -151,8 +149,3 @@ frontend/dist/
 backend/.env
 frontend/.env
 *.log
-firebase-admin-*.json
-backend/*firebase-adminsdk*.json
-backend/*adminsdk*.json
-backend/serviceAccount*.json
-firebase-adminsdk*.json

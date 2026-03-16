@@ -287,7 +287,7 @@ function AdminManageUser() {
     setEditError('')
   }
 
-  // Create a new user (auth + profile) from the create form.
+  // Create a new user account from the create form.
   const handleCreate = async (event) => {
     event.preventDefault()
     if (!token) return
@@ -373,7 +373,7 @@ function AdminManageUser() {
     }
   }
 
-  // Deactivate an account (disable in auth + profile).
+  // Deactivate an account and keep it unavailable for login.
   const handleDeactivate = async (user) => {
     if (!token || !user?.uid) return
 
@@ -484,12 +484,12 @@ function AdminManageUser() {
     }
   }
 
-  // Permanently delete a user from Firebase Auth and Firestore.
+  // Permanently delete a user account from the backend.
   const handleDelete = async (user) => {
     if (!token || !user?.uid) return
 
     const confirmed = window.confirm(
-      `Delete this account permanently?\n\nThis will remove the user from Firebase Auth.\n\n${user.email || user.name || user.uid}`
+      `Delete this account permanently?\n\nThis will remove the user record from MongoDB.\n\n${user.email || user.name || user.uid}`
     )
     if (!confirmed) return
 
@@ -585,7 +585,7 @@ function AdminManageUser() {
                   <div className="heading-icon">+</div>
                   <div>
                     <h2>Create Account</h2>
-                    <p className="muted">Create a new Firebase account and user profile</p>
+                    <p className="muted">Create a new account and store the profile in MongoDB</p>
                   </div>
                 </div>
 

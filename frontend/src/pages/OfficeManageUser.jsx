@@ -272,7 +272,7 @@ function OfficeManageUser() {
     setEditError('')
   }
 
-  // Create a new user (auth + profile) from the create form.
+  // Create a new user account from the create form.
   const handleCreate = async (event) => {
     event.preventDefault()
     if (!token) return
@@ -363,7 +363,7 @@ function OfficeManageUser() {
     }
   }
 
-  // Deactivate an account (disable in auth + profile).
+  // Deactivate an account and keep it unavailable for login.
   const handleDeactivate = async (user) => {
     if (!token || !user?.uid) return
 
@@ -533,7 +533,7 @@ function OfficeManageUser() {
                   <div className="heading-icon">+</div>
                   <div>
                     <h2>Create Account</h2>
-                    <p className="muted">Create a new Firebase account and user profile</p>
+                    <p className="muted">Create a new account and store the profile in MongoDB</p>
                   </div>
                 </div>
                 <div className="field-grid">
