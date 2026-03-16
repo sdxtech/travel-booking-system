@@ -27,6 +27,7 @@ Koneksi MongoDB diambil dari `MONGODB_URI` dan harus menyertakan nama database.
 
 ```bash
 cd backend
+pip install -r requirements.txt
 python -m uvicorn main:app --reload
 ```
 
@@ -44,6 +45,42 @@ VITE_API_BASE_URL=http://localhost:8000
 cd frontend
 npm install
 npm run dev
+```
+
+## Seed Superadmin
+
+Kalau database masih kosong, buat akun superadmin pertama:
+
+```bash
+cd backend
+python seed_superadmin.py --email admin@example.com --password admin123
+```
+
+## Docker Setup
+
+Project ini sudah punya:
+- `backend/Dockerfile`
+- `frontend/Dockerfile`
+- `docker-compose.yml`
+
+### Local Dengan Docker + MongoDB di Compose
+
+```bash
+copy .env.example .env
+docker compose --profile local-db up --build
+```
+
+Frontend: `http://localhost:8080`
+Backend: `http://localhost:8000`
+
+### Local Dengan Docker + MongoDB External
+
+1. Copy `.env.example` jadi `.env`
+2. Ganti `MONGODB_URI` dengan URI MongoDB external
+3. Jalankan:
+
+```bash
+docker compose up --build
 ```
 
 ## Staging Deploy
@@ -67,3 +104,7 @@ npm run dev
 - Root Directory: `frontend`
 - Environment Variables:
   - `VITE_API_BASE_URL`: URL backend yang sudah ter-deploy
+
+## Deploy Notes
+
+Detail deploy container ada di `DEPLOY.md`.
