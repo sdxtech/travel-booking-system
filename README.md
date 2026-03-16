@@ -62,6 +62,7 @@ Project ini sudah punya:
 - `backend/Dockerfile`
 - `frontend/Dockerfile`
 - `docker-compose.yml`
+- healthcheck container untuk backend, frontend, dan MongoDB lokal
 
 ### Local Dengan Docker + MongoDB di Compose
 
@@ -108,3 +109,6 @@ docker compose up --build
 ## Deploy Notes
 
 Detail deploy container ada di `DEPLOY.md`.
+Contoh env production:
+- `backend/.env.production.example`
+- `frontend/.env.production.example`
