@@ -5,11 +5,9 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
-  { label: 'Dashboard', icon: 'bi-speedometer2' },
-  { label: 'Travel Requests', icon: 'bi-ticket-perforated' },
+  { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
   { label: 'Travel Assign', icon: 'bi-building' },
-  { label: 'Booking Driver Requests', icon: 'bi-car-front' },
   { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
   { label: 'Booking Driver Assign', icon: 'bi-person-check' },
   { label: 'Manage User', icon: 'bi-people' },
@@ -29,7 +27,6 @@ const initialCreate = {
 function AdminManageUser() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const [currentUid, setCurrentUid] = useState('')
 
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -76,30 +73,12 @@ function AdminManageUser() {
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
-    if (item === 'Dashboard') navigate('/admin/home')
-    if (item === 'Travel Requests') navigate('/office/ticket-requests')
+    if (item === 'Quick View') navigate('/admin/home')
     if (item === 'Travel Status & History') navigate('/office/ticket-history')
     if (item === 'Booking Driver Status & History') navigate('/office/driver-history')
     if (item === 'Travel Assign') navigate('/office/travel-accommodation')
-    if (item === 'Booking Driver Requests') navigate('/office/driver-requests')
     if (item === 'Booking Driver Assign') navigate('/office/assign-drivers')
     if (item === 'Manage User') navigate('/admin/manage-user')
-  }
-
-  // Load current user details (used to prevent self-delete in UI).
-  const loadMe = async () => {
-    if (!token) return
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) return
-      const data = await res.json()
-      if (data?.uid) setCurrentUid(data.uid)
-    } catch {
-      // ignore
-    }
   }
 
   // Fetch user profiles from the API.
@@ -140,7 +119,6 @@ function AdminManageUser() {
 
   // Initial data fetch.
   useEffect(() => {
-    loadMe()
     loadUsers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -531,7 +509,7 @@ function AdminManageUser() {
 
   return (
     <MainLayout title="Manage Users">
-      <div className={`office-dashboard fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
         <aside className="office-sidebar visible">
           <div className="sidebar-header">
             <span className="sidebar-role">Super Admin</span>
@@ -776,42 +754,40 @@ function AdminManageUser() {
                       <td>{user.phone || '-'}</td>
                       <td>{user.email || '-'}</td>
                       <td>
-                        <div className="office-row-actions">
+                        <div className="office-row-actions table-action-buttons">
                           <button
                             type="button"
                             className="btn btn-primary"
-                            disabled={actionLoadingId === user.uid || user.disabled}
+                            disabled={actionLoadingId === user.uid}
                             onClick={() => handleSelectUser(user)}
+                            title="Super Admin override: update user"
                           >
                             Update
                           </button>
                           <button
                             type="button"
                             className="btn btn-neutral"
-                            disabled={actionLoadingId === user.uid || user.disabled || user.uid === currentUid}
+                            disabled={actionLoadingId === user.uid}
                             onClick={() => openPasswordModal(user)}
-                            title={user.uid === currentUid ? 'You cannot reset your own password here.' : 'Reset password'}
+                            title="Super Admin override: reset password"
                           >
                             Reset Password
                           </button>
-                          {!user.disabled ? (
-                            <button
-                              type="button"
-                              className="btn btn-danger"
-                              disabled={actionLoadingId === user.uid}
-                              onClick={() => handleDeactivate(user)}
-                            >
-                              {actionLoadingId === user.uid ? 'Deactivating...' : 'Deactivate'}
-                            </button>
-                          ) : (
-                            <span className="status-badge status-cancelled">Deactivated</span>
-                          )}
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            disabled={actionLoadingId === user.uid}
+                            onClick={() => handleDeactivate(user)}
+                            title="Super Admin override: deactivate user"
+                          >
+                            Deactivate
+                          </button>
                           <button
                             type="button"
                             className="btn btn-outline-danger"
-                            disabled={actionLoadingId === user.uid || user.uid === currentUid}
+                            disabled={actionLoadingId === user.uid}
                             onClick={() => handleDelete(user)}
-                            title={user.uid === currentUid ? 'You cannot delete your own account' : 'Delete'}
+                            title="Super Admin override: delete user"
                           >
                             Delete
                           </button>

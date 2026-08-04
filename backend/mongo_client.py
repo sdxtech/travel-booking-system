@@ -73,4 +73,23 @@ def init_mongo():
         database["notifications"].create_index([("created_at", ASCENDING)])
     except Exception as exc:
         print(f"Mongo index setup skipped: {exc}")
+
+    # Populate request IDs for records created before this numbering regulation.
+    try:
+        from request_id_service import backfill_request_ids
+
+        backfill_request_ids(database)
+    except Exception as exc:
+        print(f"Request ID backfill skipped: {exc}")
+
+    # Enforce uniqueness after legacy records have received their request IDs.
+    try:
+        request_id_index_options = {
+            "unique": True,
+            "partialFilterExpression": {"request_id": {"$type": "string"}},
+        }
+        database["bookings"].create_index([("request_id", ASCENDING)], **request_id_index_options)
+        database["tickets"].create_index([("request_id", ASCENDING)], **request_id_index_options)
+    except Exception as exc:
+        print(f"Request ID index setup skipped: {exc}")
     return db

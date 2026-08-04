@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import BookingFormSelect from '../components/BookingFormSelect'
+import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
-  { label: 'Dashboard', icon: 'bi-speedometer2' },
+  { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Requests', icon: 'bi-ticket-perforated' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
   { label: 'Travel Assign', icon: 'bi-building' },
@@ -99,7 +101,11 @@ function OfficeDriverRequests() {
 
         const data = await res.json()
         const allUsers = Array.isArray(data) ? data : []
-        setDrivers(allUsers.filter((user) => user.role === 'driver'))
+        setDrivers(
+          allUsers.filter(
+            (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
+          )
+        )
       } catch (err) {
         setDriversError('Network error. Please try again.')
         setDrivers([])
@@ -109,7 +115,7 @@ function OfficeDriverRequests() {
     }
 
     loadDrivers()
-  }, [])
+  }, [isSuperadmin])
 
   // Load all pending driver bookings.
   useEffect(() => {
@@ -180,6 +186,9 @@ function OfficeDriverRequests() {
     try {
       const url = new URL(`${API_BASE_URL}/bookings/unavailable-drivers`)
       url.searchParams.set('departure_time', booking.departure_time)
+      if (booking.estimated_arrival_time) {
+        url.searchParams.set('estimated_arrival_time', booking.estimated_arrival_time)
+      }
 
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${token}` },
@@ -221,26 +230,43 @@ function OfficeDriverRequests() {
     }
   }
 
-  // Filter driver list to those not marked as unavailable.
-  const availableDrivers = useMemo(() => {
-    if (!drivers.length) return []
-    if (!unavailableDriverIds.length) return drivers
-    const unavailable = new Set(unavailableDriverIds)
-    return drivers.filter((driver) => !unavailable.has(driver.uid))
-  }, [drivers, unavailableDriverIds])
+  // Keep every active driver visible; busy drivers are labelled and disabled in the shared dropdown.
+  const availableDrivers = useMemo(() => drivers, [drivers])
+
+  const driverOptions = useMemo(
+    () =>
+      availableDrivers.map((driver) => {
+        const originalIndex = Math.max(0, drivers.findIndex((item) => item.uid === driver.uid))
+        const isUnavailable = unavailableDriverIds.includes(driver.uid)
+        const availabilityStatus = availabilityError ? 'Not checked' : isUnavailable ? 'Unavailable' : 'Available'
+        return {
+          value: driver.uid,
+          label: driver.name || driver.email || 'Driver',
+          status: availabilityStatus,
+          statusTone: availabilityStatus === 'Available' ? 'available' : availabilityStatus === 'Unavailable' ? 'unavailable' : 'neutral',
+          color: DRIVER_SELECT_COLORS[originalIndex % DRIVER_SELECT_COLORS.length],
+          disabled: !isSuperadmin && isUnavailable,
+        }
+      }),
+    [availabilityError, availableDrivers, drivers, isSuperadmin, unavailableDriverIds]
+  )
 
   // Clear selection if it becomes unavailable after a refresh.
   useEffect(() => {
     if (!selectedDriverId) return
-    if (unavailableDriverIds.includes(selectedDriverId)) {
+    if (
+      !isSuperadmin &&
+      unavailableDriverIds.includes(selectedDriverId) &&
+      selectedDriverId !== assignTarget?.driver_id
+    ) {
       setSelectedDriverId('')
     }
-  }, [selectedDriverId, unavailableDriverIds])
+  }, [assignTarget?.driver_id, isSuperadmin, selectedDriverId, unavailableDriverIds])
 
   // Open the assign modal and run availability check for the selected booking.
   const openAssignModal = (booking) => {
     setAssignTarget(booking)
-    setSelectedDriverId('')
+    setSelectedDriverId(booking?.driver_id || '')
     setUnavailableDriverIds([])
     setAvailabilityError('')
     setAssignModalOpen(true)
@@ -392,10 +418,10 @@ function OfficeDriverRequests() {
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
-    const dashboardRoute = isSuperadmin ? '/admin/home' : '/office/home'
+    const quickViewRoute = isSuperadmin ? '/admin/home' : '/office/home'
     const manageUserRoute = isSuperadmin ? '/admin/manage-user' : '/office/manage-user'
 
-    if (item === 'Dashboard') navigate(dashboardRoute)
+    if (item === 'Quick View') navigate(quickViewRoute)
     if (item === 'Travel Requests') navigate('/office/ticket-requests')
     if (item === 'Travel Status & History') navigate('/office/ticket-history')
     if (item === 'Booking Driver Status & History') navigate('/office/driver-history')
@@ -407,7 +433,7 @@ function OfficeDriverRequests() {
 
   return (
     <MainLayout title="Driver Requests">
-      <div className={`office-dashboard fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
         <aside className="office-sidebar visible">
           <div className="sidebar-header">
             <span className="sidebar-role">{isSuperadmin ? 'Super Admin' : 'Office Coordinator'}</span>
@@ -461,8 +487,11 @@ function OfficeDriverRequests() {
                   <th>Pickup Location</th>
                   <th>Destination</th>
                   <th>Total Passenger</th>
+                  <th>Requested Driver</th>
                   <th>Departure Date</th>
                   <th>Departure Time</th>
+                  <th>Estimated Arrival Date</th>
+                  <th>Estimated Arrival Time</th>
                   <th>Type of Trip</th>
                   <th>Status</th>
                   <th>Action</th>
@@ -471,19 +500,19 @@ function OfficeDriverRequests() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="14" className="muted">
+                    <td colSpan="17" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="14" className="error-text">
+                    <td colSpan="17" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : bookings.length === 0 ? (
                   <tr>
-                    <td colSpan="14" className="muted">
+                    <td colSpan="17" className="muted">
                       No driver requests found.
                     </td>
                   </tr>
@@ -502,27 +531,40 @@ function OfficeDriverRequests() {
                         <td>{booking.pickup_location || '-'}</td>
                         <td>{booking.destination || '-'}</td>
                         <td>{booking.passenger_count ?? '-'}</td>
+                        <td>{booking.driver_name || booking.driver_id || '-'}</td>
                         <td>{formatDate(booking.departure_time)}</td>
                         <td>{formatTime(booking.departure_time)}</td>
+                        <td>{formatDate(booking.estimated_arrival_time)}</td>
+                        <td>{formatTime(booking.estimated_arrival_time)}</td>
                         <td>{formatTripType(booking.trip_type)}</td>
                         <td>
                           <span className={`status-badge status-${statusValue}`}>{booking.status || 'pending'}</span>
                         </td>
                         <td>
-                          <div className="office-row-actions">
+                          <div className="office-row-actions table-action-buttons">
                             <button
                               type="button"
                               className="btn btn-primary"
-                              disabled={processing[booking.id]}
+                              disabled={(!isSuperadmin && statusValue !== 'pending') || processing[booking.id]}
                               onClick={() => openAssignModal(booking)}
+                              title={
+                                isSuperadmin || statusValue === 'pending'
+                                  ? 'Review this request'
+                                  : 'Only pending requests can be reviewed'
+                              }
                             >
-                              Assign Driver
+                              Review Request
                             </button>
                             <button
                               type="button"
                               className="btn btn-danger"
-                              disabled={processing[booking.id]}
+                              disabled={(!isSuperadmin && statusValue !== 'pending') || processing[booking.id]}
                               onClick={() => handleReject(booking.id)}
+                              title={
+                                isSuperadmin || statusValue === 'pending'
+                                  ? 'Reject this request'
+                                  : 'Only pending requests can be rejected'
+                              }
                             >
                               Reject
                             </button>
@@ -573,7 +615,7 @@ function OfficeDriverRequests() {
                 }}
               >
                 <div className="modal-header">
-                  <h2>Assign Driver</h2>
+                  <h2>Review Driver Request</h2>
                   <button
                     type="button"
                     className="modal-close"
@@ -586,46 +628,49 @@ function OfficeDriverRequests() {
                 </div>
 
                 <p className="muted" style={{ marginTop: 0 }}>
-                  Select a driver for this request. After assigning, the request will move to driver history.
+                  {isSuperadmin
+                    ? 'Super Admin override is active. Unavailable drivers remain labelled but can still be selected.'
+                    : "The employee's requested driver is selected by default. A busy driver can only be approved after the overlapping active booking is cancelled."}
                 </p>
 
                 {driversError ? <p className="error-text">{driversError}</p> : null}
                 {availabilityError ? <p className="error-text">{availabilityError}</p> : null}
                 {actionError ? <p className="error-text">{actionError}</p> : null}
 
-                <label className="inline-label">
+                <div className="inline-label">
                   <span>Driver</span>
-                  <select
+                  <BookingFormSelect
                     value={selectedDriverId}
-                    onChange={(e) => setSelectedDriverId(e.target.value)}
-                    disabled={driversLoading || availabilityLoading || processing[assignTarget?.id]}
-                    required
-                  >
-                    <option value="" disabled>
-                      {driversLoading
+                    options={driverOptions}
+                    placeholder={
+                      driversLoading
                         ? 'Loading drivers...'
                         : availabilityLoading
                           ? 'Checking availability...'
                           : availableDrivers.length
                             ? 'Select driver...'
-                            : 'No drivers available'}
-                    </option>
-                    {availableDrivers.map((driver) => (
-                      <option key={driver.uid} value={driver.uid}>
-                        {driver.name ? `${driver.name} (${driver.email})` : driver.email}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                            : 'No drivers available'
+                    }
+                    disabled={driversLoading || availabilityLoading || processing[assignTarget?.id]}
+                    ariaLabel="Select driver"
+                    onChange={setSelectedDriverId}
+                  />
+                </div>
 
                 <div className="modal-actions">
                   <button
                     type="button"
                     className="btn btn-primary"
                     onClick={handleAssign}
-                    disabled={driversLoading || availabilityLoading || !availableDrivers.length || processing[assignTarget?.id]}
+                    disabled={
+                      driversLoading ||
+                      availabilityLoading ||
+                      !availableDrivers.length ||
+                      (!isSuperadmin && unavailableDriverIds.includes(selectedDriverId)) ||
+                      processing[assignTarget?.id]
+                    }
                   >
-                    Assign
+                    Approve
                   </button>
                   <button
                     type="button"

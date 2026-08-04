@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import BookingFormSelect from '../components/BookingFormSelect'
+import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import { API_BASE_URL } from '../config'
 
+const tripTypeOptions = [
+  { value: 'antar', label: 'Drop-off', icon: 'bi-box-arrow-right' },
+  { value: 'jemput', label: 'Pick-up', icon: 'bi-box-arrow-in-left' },
+  { value: 'fulltrip', label: 'Full Trip', icon: 'bi-arrow-left-right' },
+]
+
 const initialForm = {
+  driver_id: '',
   pickup_location: '',
   destination: '',
   trip_type: '',
   departure_date: '',
   departure_time: '',
+  arrival_date: '',
+  arrival_time: '',
   passenger_count: 1,
 }
 
@@ -21,6 +32,13 @@ function BookingDriver() {
   const [errorMessage, setErrorMessage] = useState('')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [editingBookingId, setEditingBookingId] = useState('')
+  const [drivers, setDrivers] = useState([])
+  const [driversLoading, setDriversLoading] = useState(true)
+  const [unavailableDriverIds, setUnavailableDriverIds] = useState(() => new Set())
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [availabilityChecked, setAvailabilityChecked] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState('')
+  const [submissionStatus, setSubmissionStatus] = useState('')
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -54,6 +72,83 @@ function BookingDriver() {
     }))
   }
 
+  // Load active drivers for the employee's required driver selection.
+  useEffect(() => {
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      setDriversLoading(false)
+      return
+    }
+
+    const loadDrivers = async () => {
+      setDriversLoading(true)
+      try {
+        const response = await fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!response.ok) throw new Error('Failed to load drivers')
+        const data = await response.json()
+        setDrivers(Array.isArray(data) ? data.filter((driver) => driver.booking_enabled !== false) : [])
+      } catch {
+        setDrivers([])
+        setErrorMessage('Failed to load the driver list. Please refresh the page.')
+      } finally {
+        setDriversLoading(false)
+      }
+    }
+
+    loadDrivers()
+  }, [])
+
+  // Resolve driver status for the requested interval while still allowing conflicting requests to become pending.
+  useEffect(() => {
+    setAvailabilityChecked(false)
+    setAvailabilityError('')
+    setUnavailableDriverIds(new Set())
+
+    if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) return undefined
+
+    const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
+    const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
+    if (
+      Number.isNaN(departureDateTime.getTime()) ||
+      Number.isNaN(estimatedArrivalDateTime.getTime()) ||
+      estimatedArrivalDateTime <= departureDateTime
+    ) {
+      return undefined
+    }
+
+    const token = localStorage.getItem('authToken')
+    if (!token) return undefined
+
+    const controller = new AbortController()
+    const loadAvailability = async () => {
+      setAvailabilityLoading(true)
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/bookings/unavailable-drivers?departure_time=${encodeURIComponent(departureDateTime.toISOString())}&estimated_arrival_time=${encodeURIComponent(estimatedArrivalDateTime.toISOString())}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }
+        )
+        if (!response.ok) throw new Error('Failed to check driver availability')
+        const data = await response.json()
+        setUnavailableDriverIds(new Set(Array.isArray(data) ? data.map(String) : []))
+        setAvailabilityChecked(true)
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          setAvailabilityError('Unable to check driver availability. Please try again.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setAvailabilityLoading(false)
+      }
+    }
+
+    loadAvailability()
+    return () => controller.abort()
+  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time])
+
   // Prefill the form when navigating from history with an existing booking.
   useEffect(() => {
     const booking = location.state?.booking
@@ -65,14 +160,18 @@ function BookingDriver() {
 
     setEditingBookingId(booking.id)
     const departure = toDate(booking.departure_time)
+    const arrival = toDate(booking.estimated_arrival_time)
 
     setForm({
       ...initialForm,
+      driver_id: booking.driver_id || '',
       pickup_location: booking.pickup_location || '',
       destination: booking.destination || '',
       trip_type: booking.trip_type || '',
       departure_date: departure ? formatDateInput(departure) : '',
       departure_time: departure ? formatTimeInput(departure) : '',
+      arrival_date: arrival ? formatDateInput(arrival) : '',
+      arrival_time: arrival ? formatTimeInput(arrival) : '',
       passenger_count: booking.passenger_count ?? 1,
     })
     setErrorMessage('')
@@ -83,9 +182,16 @@ function BookingDriver() {
     event.preventDefault()
     setLoading(true)
     setErrorMessage('')
+    setSubmissionStatus('')
 
-    if (!form.departure_date || !form.departure_time) {
-      setErrorMessage('Departure date and time are required.')
+    if (!form.trip_type || !form.driver_id) {
+      setErrorMessage('Trip type and driver are required.')
+      setLoading(false)
+      return
+    }
+
+    if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) {
+      setErrorMessage('Departure and estimated arrival date/time are required.')
       setLoading(false)
       return
     }
@@ -98,17 +204,26 @@ function BookingDriver() {
     }
 
     const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
-    if (Number.isNaN(departureDateTime.getTime())) {
-      setErrorMessage('Invalid date or time format.')
+    const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
+    if (Number.isNaN(departureDateTime.getTime()) || Number.isNaN(estimatedArrivalDateTime.getTime())) {
+      setErrorMessage('Invalid departure or estimated arrival date/time.')
+      setLoading(false)
+      return
+    }
+
+    if (estimatedArrivalDateTime <= departureDateTime) {
+      setErrorMessage('Estimated arrival time must be later than departure time.')
       setLoading(false)
       return
     }
 
     const payload = {
+      driver_id: form.driver_id,
       pickup_location: form.pickup_location,
       destination: form.destination,
       trip_type: form.trip_type,
       departure_time: departureDateTime.toISOString(),
+      estimated_arrival_time: estimatedArrivalDateTime.toISOString(),
       passenger_count: Number(form.passenger_count) || 1,
     }
 
@@ -134,18 +249,20 @@ function BookingDriver() {
           if (data?.detail) {
             detail = data.detail
           }
-        } catch (error) {
+        } catch {
           // ignore parse error
         }
         setErrorMessage(detail)
       } else {
+        const result = await response.json()
+        setSubmissionStatus(String(result?.status || ''))
         if (!editingBookingId) {
           setForm(initialForm)
         }
         window.dispatchEvent(new Event('notifications:refresh'))
         setShowSuccessModal(true)
       }
-    } catch (error) {
+    } catch {
       setErrorMessage('Network error. Please try again.')
     } finally {
       setLoading(false)
@@ -174,11 +291,47 @@ function BookingDriver() {
               </div>
               <div>
                 <h2>Trip Details</h2>
-                <p className="muted">Pickup, destination, and departure schedule</p>
+                <p className="muted">Schedule, route, trip details, then driver selection</p>
               </div>
             </div>
 
             <div className="booking-grid">
+              <label className="form-field">
+                <span>Departure Date</span>
+                <input
+                  type="date"
+                  value={form.departure_date}
+                  onChange={handleChange('departure_date')}
+                  required
+                />
+              </label>
+              <label className="form-field">
+                <span>Estimated Arrival Date</span>
+                <input
+                  type="date"
+                  value={form.arrival_date}
+                  onChange={handleChange('arrival_date')}
+                  required
+                />
+              </label>
+              <label className="form-field">
+                <span>Departure Time</span>
+                <input
+                  type="time"
+                  value={form.departure_time}
+                  onChange={handleChange('departure_time')}
+                  required
+                />
+              </label>
+              <label className="form-field">
+                <span>Estimated Arrival Time</span>
+                <input
+                  type="time"
+                  value={form.arrival_time}
+                  onChange={handleChange('arrival_time')}
+                  required
+                />
+              </label>
               <label className="form-field">
                 <span>Pickup Location</span>
                 <input
@@ -199,35 +352,16 @@ function BookingDriver() {
                   required
                 />
               </label>
-              <label className="form-field">
+              <div className="form-field">
                 <span>Trip Type</span>
-                <select value={form.trip_type} onChange={handleChange('trip_type')} required>
-                  <option value="" disabled>
-                    Select type...
-                  </option>
-                  <option value="antar">Drop-off</option>
-                  <option value="jemput">Pick-up</option>
-                  <option value="fulltrip">Full Trip</option>
-                </select>
-              </label>
-              <label className="form-field">
-                <span>Departure Date</span>
-                <input
-                  type="date"
-                  value={form.departure_date}
-                  onChange={handleChange('departure_date')}
-                  required
+                <BookingFormSelect
+                  value={form.trip_type}
+                  options={tripTypeOptions}
+                  placeholder="Select type..."
+                  ariaLabel="Select trip type"
+                  onChange={(value) => setForm((prev) => ({ ...prev, trip_type: value }))}
                 />
-              </label>
-              <label className="form-field">
-                <span>Departure Time</span>
-                <input
-                  type="time"
-                  value={form.departure_time}
-                  onChange={handleChange('departure_time')}
-                  required
-                />
-              </label>
+              </div>
               <label className="form-field">
                 <span>Total Passenger</span>
                 <input
@@ -238,10 +372,44 @@ function BookingDriver() {
                   required
                 />
               </label>
+              <div className="form-field">
+                <span>Select Driver</span>
+                <BookingFormSelect
+                  value={form.driver_id}
+                  options={drivers.map((driver, index) => ({
+                    value: driver.driver_id,
+                    label: driver.driver_name || driver.driver_email || 'Driver',
+                    status: availabilityChecked
+                      ? unavailableDriverIds.has(String(driver.driver_id))
+                        ? 'Unavailable'
+                        : 'Available'
+                      : 'Not checked',
+                    statusTone: availabilityChecked
+                      ? unavailableDriverIds.has(String(driver.driver_id))
+                        ? 'unavailable'
+                        : 'available'
+                      : 'neutral',
+                    color: DRIVER_SELECT_COLORS[index % DRIVER_SELECT_COLORS.length],
+                  }))}
+                  placeholder={
+                    driversLoading
+                      ? 'Loading drivers...'
+                      : availabilityLoading
+                        ? 'Checking availability...'
+                        : drivers.length
+                          ? 'Select driver...'
+                          : 'No drivers available'
+                  }
+                  disabled={driversLoading || availabilityLoading}
+                  ariaLabel="Select driver"
+                  onChange={(value) => setForm((prev) => ({ ...prev, driver_id: value }))}
+                />
+              </div>
             </div>
           </section>
 
           {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
+          {availabilityError ? <p className="error-text">{availabilityError}</p> : null}
 
           <div className="form-actions">
             <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -260,12 +428,12 @@ function BookingDriver() {
                 <i className="bi bi-check-lg" />
               </div>
               <h2 id="booking-success-title" className="success-modal-title">
-                {editingBookingId ? 'Changes Saved' : 'Request Sent'}
+                {submissionStatus === 'approved' ? 'Booking Approved' : editingBookingId ? 'Changes Saved' : 'Request Sent'}
               </h2>
               <p className="success-modal-message">
-                {editingBookingId
-                  ? 'Your driver booking request was updated successfully.'
-                  : "Your driver booking request was sent successfully. We'll notify the office coordinator."}
+                {submissionStatus === 'approved'
+                  ? 'The selected driver is available, so your booking was approved automatically by the system.'
+                  : 'The selected driver has an overlapping booking. Your request is pending Office Coordinator review.'}
               </p>
               <div className="success-modal-actions">
                 <button

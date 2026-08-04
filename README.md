@@ -68,7 +68,7 @@ Project ini sudah punya:
 
 ```bash
 copy .env.example .env
-docker compose --profile local-db up --build
+docker compose up -d --build
 ```
 
 Frontend: `http://localhost:8080`
@@ -81,7 +81,7 @@ Backend: `http://localhost:8000`
 3. Jalankan:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 ## Staging Deploy

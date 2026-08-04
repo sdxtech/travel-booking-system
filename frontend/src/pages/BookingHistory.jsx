@@ -10,7 +10,10 @@ function BookingHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
   const [actionLoadingId, setActionLoadingId] = useState('')
+  const [selectedBooking, setSelectedBooking] = useState(null)
+  const [cancellationPolicy, setCancellationPolicy] = useState(null)
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
 
@@ -40,12 +43,57 @@ function BookingHistory() {
     return String(value).replace(/_/g, ' ')
   }
 
+  const getCancellationPolicyLabel = () => {
+    if (!cancellationPolicy) return ''
+    const value = Number(cancellationPolicy.value) || 1
+    if (cancellationPolicy.unit === 'hours') {
+      return `${value} ${value === 1 ? 'hour' : 'hours'} before departure`
+    }
+    return `${value} ${value === 1 ? 'day' : 'days'} before departure at ${cancellationPolicy.cutoff_time || '17:00'} WIB`
+  }
+
+  // Match the server-side cutoff so unavailable cancellation actions are disabled in advance.
+  const canCancelBooking = (booking) => {
+    if (getBookingStatus(booking) !== 'pending') return false
+    if (!cancellationPolicy) return true
+
+    const departureTime = toDate(booking?.departure_time)
+    if (!departureTime) return true
+
+    if (cancellationPolicy.unit === 'days') {
+      const dateParts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .formatToParts(departureTime)
+        .reduce((parts, item) => ({ ...parts, [item.type]: item.value }), {})
+      const [cutoffHour, cutoffMinute] = String(cancellationPolicy.cutoff_time || '17:00').split(':').map(Number)
+      const dayOffset = Number(cancellationPolicy.value) || 1
+      const deadline = Date.UTC(
+        Number(dateParts.year),
+        Number(dateParts.month) - 1,
+        Number(dateParts.day) - dayOffset,
+        cutoffHour - 7,
+        cutoffMinute
+      )
+      return Date.now() <= deadline
+    }
+
+    const cutoffMinutes = Number(cancellationPolicy.cutoff_minutes)
+    if (!Number.isFinite(cutoffMinutes)) return true
+    return departureTime.getTime() - Date.now() >= cutoffMinutes * 60 * 1000
+  }
+
   // Provide a stable sort value per table column.
   const getBookingSortValue = (booking, key) => {
     if (!booking) return ''
     switch (key) {
       case 'created_at':
         return toDate(booking.created_at)?.getTime() ?? null
+      case 'request_id':
+        return booking.request_id || ''
       case 'requester_name':
         return booking.requester_name || ''
       case 'requester_nik':
@@ -60,6 +108,8 @@ function BookingHistory() {
         return booking.pickup_location || ''
       case 'destination':
         return booking.destination || ''
+      case 'driver_name':
+        return booking.driver_name || booking.driver_id || ''
       case 'passenger_count':
         {
           const count = Number(booking.passenger_count)
@@ -69,6 +119,8 @@ function BookingHistory() {
         return booking.trip_type || ''
       case 'departure_time':
         return toDate(booking.departure_time)?.getTime() ?? null
+      case 'estimated_arrival_time':
+        return toDate(booking.estimated_arrival_time)?.getTime() ?? null
       case 'status':
         return getBookingStatus(booking)
       default:
@@ -124,6 +176,18 @@ function BookingHistory() {
     setPage((prev) => Math.min(prev, totalPages))
   }, [totalPages])
 
+  // Allow the details dialog to be closed with the Escape key.
+  useEffect(() => {
+    if (!selectedBooking) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSelectedBooking(null)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedBooking])
+
   // Load the current user's booking history.
   useEffect(() => {
     // Fetch bookings data from the API.
@@ -139,16 +203,26 @@ function BookingHistory() {
       }
 
       try {
-        const response = await fetch(`${API_BASE_URL}/bookings/my`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const [response, policyResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/bookings/my`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/settings/booking-cancellation`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ])
+
+        if (policyResponse.ok) {
+          const policyData = await policyResponse.json()
+          setCancellationPolicy(policyData)
+        }
 
         if (!response.ok) {
           let detail = 'Failed to load bookings.'
           try {
             const data = await response.json()
             if (data?.detail) detail = data.detail
-          } catch (err) {
+          } catch {
             // ignore parse error
           }
           setError(detail)
@@ -157,7 +231,7 @@ function BookingHistory() {
           const data = await response.json()
           setBookings(Array.isArray(data) ? data : [])
         }
-      } catch (err) {
+      } catch {
         setError('Network error. Please try again.')
         setBookings([])
       } finally {
@@ -168,7 +242,7 @@ function BookingHistory() {
     fetchBookings()
   }, [])
 
-  // Open the booking form with an existing booking for editing.
+  // Open the booking form with the selected request for editing.
   const handleEdit = (booking) => {
     navigate('/user/booking-driver', { state: { booking } })
   }
@@ -186,6 +260,7 @@ function BookingHistory() {
 
     setActionLoadingId(bookingId)
     setActionError('')
+    setActionMessage('')
 
     try {
       const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel`, {
@@ -198,7 +273,7 @@ function BookingHistory() {
         try {
           const data = await response.json()
           if (data?.detail) detail = data.detail
-        } catch (err) {
+        } catch {
           // ignore parse error
         }
         setActionError(detail)
@@ -208,7 +283,44 @@ function BookingHistory() {
       const updated = await response.json()
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? updated : b)))
       window.dispatchEvent(new Event('notifications:refresh'))
-    } catch (err) {
+    } catch {
+      setActionError('Network error. Please try again.')
+    } finally {
+      setActionLoadingId('')
+    }
+  }
+
+  // Confirm that the driver-reported trip completion is correct.
+  const handleValidateCompletion = async (booking) => {
+    const confirmed = window.confirm('Confirm that this trip has been completed?')
+    if (!confirmed) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      setActionError('Authentication token not found. Please login again.')
+      return
+    }
+
+    setActionLoadingId(booking.id)
+    setActionError('')
+    setActionMessage('')
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/${booking.id}/validate-completion`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setActionError(data?.detail || 'Failed to validate trip completion.')
+        return
+      }
+
+      const updated = await response.json()
+      setBookings((prev) => prev.map((item) => (item.id === booking.id ? updated : item)))
+      setSelectedBooking((current) => (current?.id === booking.id ? updated : current))
+      setActionMessage('Trip completion validated.')
+      window.dispatchEvent(new Event('notifications:refresh'))
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setActionLoadingId('')
@@ -284,11 +396,17 @@ function BookingHistory() {
         {loading ? <p className="muted">Loading bookings...</p> : null}
         {error ? <p className="error-text">{error}</p> : null}
         {actionError ? <p className="error-text">{actionError}</p> : null}
+        {actionMessage ? <p className="success-text">{actionMessage}</p> : null}
+        {cancellationPolicy ? (
+          <p className="muted booking-cancellation-policy">
+            Pending bookings can be cancelled until {getCancellationPolicyLabel()}.
+          </p>
+        ) : null}
 
         {!loading && !error ? (
           <>
             <div className="table-wrapper">
-              <table className="simple-table">
+              <table className="simple-table history-summary-table">
                 <thead>
                   <tr>
                     <th className="table-col-no">No</th>
@@ -298,57 +416,8 @@ function BookingHistory() {
                       </button>
                     </th>
                     <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('requester_name')}>
-                        Name {renderSortIcon('requester_name')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('requester_nik')}>
-                        National ID {renderSortIcon('requester_nik')}
-                      </button>
-                    </th>
-                    <th>
-                      <button
-                        type="button"
-                        className="table-sort"
-                        onClick={() => toggleSort('requester_dept_job_position')}
-                      >
-                        Dept/Job Position {renderSortIcon('requester_dept_job_position')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('requester_phone')}>
-                        Phone {renderSortIcon('requester_phone')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('requester_email')}>
-                        Email {renderSortIcon('requester_email')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('pickup_location')}>
-                        Pickup Location {renderSortIcon('pickup_location')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('destination')}>
-                        Destination {renderSortIcon('destination')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('passenger_count')}>
-                        Total Passenger {renderSortIcon('passenger_count')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('trip_type')}>
-                        Trip Type {renderSortIcon('trip_type')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('departure_time')}>
-                        Departure {renderSortIcon('departure_time')}
+                      <button type="button" className="table-sort" onClick={() => toggleSort('request_id')}>
+                        Request ID {renderSortIcon('request_id')}
                       </button>
                     </th>
                     <th>
@@ -362,7 +431,7 @@ function BookingHistory() {
                 <tbody>
                   {bookings.length === 0 ? (
                     <tr>
-                      <td colSpan="14" className="muted">
+                      <td colSpan="5" className="muted">
                         No driver bookings yet.
                       </td>
                     </tr>
@@ -370,47 +439,65 @@ function BookingHistory() {
                     pagedBookings.map((booking, index) => {
                       const statusValue = getBookingStatus(booking)
                       const isPending = statusValue === 'pending'
+                      const isAwaitingValidation = statusValue === 'awaiting_validation'
+                      const canCancel = canCancelBooking(booking)
 
                       return (
                         <tr key={booking.id}>
                           <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                           <td>{formatDateOnly(booking.created_at)}</td>
-                          <td className="cell-wrap">{booking.requester_name || '-'}</td>
-                          <td>{booking.requester_nik || '-'}</td>
-                          <td className="cell-wrap">{booking.requester_dept_job_position || '-'}</td>
-                          <td>{booking.requester_phone || '-'}</td>
-                          <td className="cell-wrap">{booking.requester_email || '-'}</td>
-                          <td className="cell-wrap">{booking.pickup_location || '-'}</td>
-                          <td className="cell-wrap">{booking.destination || '-'}</td>
-                          <td>{booking.passenger_count ?? '-'}</td>
-                          <td>{formatTripType(booking.trip_type)}</td>
-                          <td>{formatDateTime(booking.departure_time)}</td>
+                          <td className="request-id-cell">{booking.request_id || '-'}</td>
                           <td>
                             <span className={`status-badge status-${statusValue}`}>{formatStatusText(statusValue)}</span>
                           </td>
                           <td>
-                            {isPending ? (
-                              <div className="table-row-actions">
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-brand"
-                                  onClick={() => handleEdit(booking)}
-                                  disabled={actionLoadingId === booking.id}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-danger"
-                                  onClick={() => handleCancel(booking.id)}
-                                  disabled={actionLoadingId === booking.id}
-                                >
-                                  {actionLoadingId === booking.id ? 'Cancelling...' : 'Cancel'}
-                                </button>
-                              </div>
-                            ) : (
-                              '-'
-                            )}
+                            <div className="table-row-actions table-action-buttons">
+                              <button
+                                type="button"
+                                className="btn btn-outline-brand"
+                                onClick={() => handleEdit(booking)}
+                                disabled={!isPending || actionLoadingId === booking.id}
+                                title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => handleCancel(booking.id)}
+                                disabled={!canCancel || actionLoadingId === booking.id}
+                                title={
+                                  !isPending
+                                    ? 'Only pending requests can be cancelled'
+                                    : canCancel
+                                      ? 'Cancel this request'
+                                      : `Cancellation closes ${getCancellationPolicyLabel()}`
+                                }
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => handleValidateCompletion(booking)}
+                                disabled={!isAwaitingValidation || actionLoadingId === booking.id}
+                                title={
+                                  isAwaitingValidation
+                                    ? 'Validate this trip completion'
+                                    : 'Available after the driver submits the finish report'
+                                }
+                              >
+                                Validate
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline-brand"
+                                onClick={() => setSelectedBooking(booking)}
+                                disabled={actionLoadingId === booking.id}
+                              >
+                                Details
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -441,6 +528,151 @@ function BookingHistory() {
                 Next
               </button>
             </div>
+
+            {selectedBooking ? (
+              <div
+                className="modal-overlay"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="booking-details-title"
+                onClick={() => setSelectedBooking(null)}
+              >
+                <div className="modal ticket-details-modal" onClick={(event) => event.stopPropagation()}>
+                  <div className="modal-header">
+                    <div>
+                      <p className="eyebrow">Booking Driver Details</p>
+                      <h2 id="booking-details-title">{selectedBooking.request_id || 'Driver Booking'}</h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="modal-close"
+                      onClick={() => setSelectedBooking(null)}
+                      aria-label="Close details"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <div className="ticket-details-summary">
+                    <span>Submitted {formatDateOnly(selectedBooking.created_at)}</span>
+                    <span className={`status-badge status-${getBookingStatus(selectedBooking)}`}>
+                      {formatStatusText(getBookingStatus(selectedBooking))}
+                    </span>
+                  </div>
+
+                  <section className="ticket-details-section">
+                    <h3>Employee Information</h3>
+                    <dl className="ticket-details-grid">
+                      <div className="ticket-details-item">
+                        <dt>Name</dt>
+                        <dd>{selectedBooking.requester_name || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>National ID</dt>
+                        <dd>{selectedBooking.requester_nik || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Department / Job Position</dt>
+                        <dd>{selectedBooking.requester_dept_job_position || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Phone</dt>
+                        <dd>{selectedBooking.requester_phone || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item ticket-details-item--full">
+                        <dt>Email</dt>
+                        <dd>{selectedBooking.requester_email || '-'}</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <section className="ticket-details-section">
+                    <h3>Schedule & Route</h3>
+                    <dl className="ticket-details-grid">
+                      <div className="ticket-details-item">
+                        <dt>Departure</dt>
+                        <dd>{formatDateTime(selectedBooking.departure_time)}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Estimated Arrival</dt>
+                        <dd>{formatDateTime(selectedBooking.estimated_arrival_time)}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Pickup Location</dt>
+                        <dd>{selectedBooking.pickup_location || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Destination</dt>
+                        <dd>{selectedBooking.destination || '-'}</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <section className="ticket-details-section">
+                    <h3>Trip & Driver</h3>
+                    <dl className="ticket-details-grid">
+                      <div className="ticket-details-item">
+                        <dt>Trip Type</dt>
+                        <dd>{formatTripType(selectedBooking.trip_type)}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Total Passenger</dt>
+                        <dd>{selectedBooking.passenger_count ?? '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item ticket-details-item--full">
+                        <dt>Driver</dt>
+                        <dd>{selectedBooking.driver_name || selectedBooking.driver_id || '-'}</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  {selectedBooking.starting_mileage != null ||
+                  selectedBooking.ending_mileage != null ||
+                  selectedBooking.started_at ||
+                  selectedBooking.driver_finished_at ||
+                  selectedBooking.validated_at ||
+                  selectedBooking.validated_by_name ||
+                  selectedBooking.validated_by ||
+                  selectedBooking.completed_at ? (
+                    <section className="ticket-details-section">
+                      <h3>Trip Progress</h3>
+                      <dl className="ticket-details-grid">
+                        <div className="ticket-details-item">
+                          <dt>Started At</dt>
+                          <dd>{formatDateTime(selectedBooking.started_at)}</dd>
+                        </div>
+                        <div className="ticket-details-item">
+                          <dt>Driver Finished At</dt>
+                          <dd>{formatDateTime(selectedBooking.driver_finished_at || selectedBooking.completed_at)}</dd>
+                        </div>
+                        <div className="ticket-details-item">
+                          <dt>Validated At</dt>
+                          <dd>{formatDateTime(selectedBooking.validated_at)}</dd>
+                        </div>
+                        <div className="ticket-details-item">
+                          <dt>Validated By</dt>
+                          <dd>{selectedBooking.validated_by_name || selectedBooking.validated_by || '-'}</dd>
+                        </div>
+                        <div className="ticket-details-item">
+                          <dt>Starting Mileage</dt>
+                          <dd>{selectedBooking.starting_mileage ?? '-'}</dd>
+                        </div>
+                        <div className="ticket-details-item">
+                          <dt>Ending Mileage</dt>
+                          <dd>{selectedBooking.ending_mileage ?? '-'}</dd>
+                        </div>
+                      </dl>
+                    </section>
+                  ) : null}
+
+                  <div className="modal-actions">
+                    <button type="button" className="btn btn-neutral" onClick={() => setSelectedBooking(null)}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>

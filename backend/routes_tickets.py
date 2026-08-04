@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from main import get_current_user
 from mongo_client import db
 from notifications_service import create_user_notification, notify_roles
+from request_id_service import generate_request_id
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -43,6 +44,7 @@ class TicketUserCreate(TicketBase):
 
 class TicketResponse(TicketCreate):
     id: str
+    request_id: Optional[str] = None
     user_id: Optional[str] = None
     status: str = Field(default="pending")
     created_at: Optional[datetime] = None
@@ -58,6 +60,7 @@ def serialize_ticket(doc_snapshot) -> TicketResponse:
     data = doc_snapshot or {}
     return TicketResponse(
         id=str(data.get("_id")),
+        request_id=data.get("request_id"),
         user_id=data.get("user_id"),
         full_name=data.get("full_name"),
         dept_job_position=data.get("dept_job_position"),
@@ -129,7 +132,7 @@ def list_pending_tickets(current_user=Depends(get_current_user)):
 
 @router.get("/history", response_model=list[TicketResponse])
 def list_ticket_history(current_user=Depends(get_current_user)):
-    """List non-pending travel requests (history) for office coordinators and superadmins."""
+    """List every travel request status for the combined office request/history view."""
     uid = current_user["uid"]
     ensure_role(uid, ("office_coordinator", "superadmin"))
 
@@ -142,13 +145,7 @@ def list_ticket_history(current_user=Depends(get_current_user)):
             return value
         return datetime.min.replace(tzinfo=timezone.utc)
 
-    history_docs = []
-    for doc in snapshots:
-        data = doc or {}
-        if data.get("status", "pending") != "pending":
-            history_docs.append(doc)
-
-    sorted_docs = sorted(history_docs, key=created_at_value, reverse=True)
+    sorted_docs = sorted(snapshots, key=created_at_value, reverse=True)
     return [serialize_ticket(doc) for doc in sorted_docs]
 
 
@@ -184,6 +181,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
     if isinstance(departure_date_value, date) and not isinstance(departure_date_value, datetime):
         departure_date_value = datetime.combine(departure_date_value, time.min)
 
+    created_at = utc_now()
     data = {
         **payload.model_dump(),
         "departure_date": departure_date_value,
@@ -194,12 +192,13 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
         "national_id": str(national_id),
         "user_id": uid,
         "status": "pending",
-        "created_at": utc_now(),
-        "updated_at": utc_now(),
+        "created_at": created_at,
+        "updated_at": created_at,
     }
 
     ticket_id = uuid4().hex
     data["_id"] = ticket_id
+    data["request_id"] = generate_request_id(db, "TR", created_at)
     db["tickets"].insert_one(data)
 
     create_user_notification(
@@ -243,18 +242,20 @@ def create_travel_accommodation(payload: TicketCreate, current_user=Depends(get_
     if isinstance(departure_date_value, date) and not isinstance(departure_date_value, datetime):
         departure_date_value = datetime.combine(departure_date_value, time.min)
 
+    created_at = utc_now()
     data = {
         **payload.model_dump(),
         "departure_date": departure_date_value,
         "user_id": linked_user_id,
         "status": "pending",
         "created_by": uid,
-        "created_at": utc_now(),
-        "updated_at": utc_now(),
+        "created_at": created_at,
+        "updated_at": created_at,
     }
 
     ticket_id = uuid4().hex
     data["_id"] = ticket_id
+    data["request_id"] = generate_request_id(db, "TR", created_at)
     db["tickets"].insert_one(data)
 
     if linked_user_id:
@@ -413,7 +414,7 @@ def list_my_tickets(current_user=Depends(get_current_user)):
 
 @router.get("/stats")
 def ticket_stats(current_user=Depends(get_current_user)):
-    """Return simple ticket counts grouped by status for office dashboards."""
+    """Return simple ticket counts grouped by status for office quick views."""
     uid = current_user["uid"]
     ensure_role(uid, ("office_coordinator", "superadmin"))
 

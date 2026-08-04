@@ -1,239 +1,193 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import QuickViewScheduler from '../components/QuickViewScheduler'
+import {
+  addMinutes,
+  formatStatusLabel,
+  getBookingEventColor,
+  parseApiDate,
+} from '../components/quickViewSchedulerUtils'
 import { API_BASE_URL } from '../config'
 
-// User dashboard landing page.
+const driverCalendarColors = [
+  '#df3f45',
+  '#0b84d8',
+  '#13b86b',
+  '#d97706',
+  '#8b5cf6',
+  '#06b6d4',
+  '#e11d48',
+  '#84cc16',
+]
+
+function getErrorDetail(response, fallback) {
+  return response
+    .json()
+    .then((data) => data?.detail || fallback)
+    .catch(() => fallback)
+}
+
+function buildDriverBookingEvent(booking, calendarId, color) {
+  const start = parseApiDate(booking.departure_time)
+  if (!start) return null
+
+  const estimatedArrival = parseApiDate(booking.estimated_arrival_time)
+  const completedAt = parseApiDate(booking.completed_at)
+  const end =
+    estimatedArrival && estimatedArrival > start
+      ? estimatedArrival
+      : completedAt && completedAt > start
+        ? completedAt
+        : addMinutes(start, 120)
+
+  return {
+    id: `driver-calendar-${calendarId}-${booking.id}`,
+    calendarId,
+    title: 'Busy',
+    meta: formatStatusLabel(booking.status),
+    start,
+    end,
+    color: getBookingEventColor(booking.status, color),
+  }
+}
+
 function UserHome() {
   const navigate = useNavigate()
-  const [profile, setProfile] = useState({ name: '' })
-  const [loadingProfile, setLoadingProfile] = useState(true)
-  const [stats, setStats] = useState({
-    ticketPending: 0,
-    bookingPending: 0,
-    bookingActive: 0,
-  })
+  const [tickets, setTickets] = useState([])
+  const [bookings, setBookings] = useState([])
+  const [driverSchedules, setDriverSchedules] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Load profile header and high-level ticket/booking stats.
   useEffect(() => {
     const token = localStorage.getItem('authToken')
     if (!token) {
-      setLoadingProfile(false)
+      setLoading(false)
+      setError('Authentication token not found. Please login again.')
       return
     }
 
-    // Fetch the user's profile for the greeting.
-    const fetchProfile = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/users/me`, { headers: { Authorization: `Bearer ${token}` } })
-        if (response.ok) {
-          const data = await response.json()
-          setProfile({ name: data.name || data.email || '' })
-        }
-      } catch (error) {
-        console.error('Failed to load profile', error)
-      } finally {
-        setLoadingProfile(false)
-      }
-    }
+    const loadQuickView = async () => {
+      setLoading(true)
+      setError('')
 
-    // Fetch tickets and bookings to compute quick stats.
-    const fetchStats = async () => {
       try {
-        const [ticketsRes, bookingsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/tickets/my`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API_BASE_URL}/bookings/my`, { headers: { Authorization: `Bearer ${token}` } }),
+        const [ticketsRes, bookingsRes, driverCalendarRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/tickets/my`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/bookings/my`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ])
 
-        let ticketPending = 0
-        let bookingPending = 0
-        let bookingActive = 0
-
-        if (ticketsRes.ok) {
-          const tickets = await ticketsRes.json()
-          ticketPending = Array.isArray(tickets)
-            ? tickets.filter((t) => (t.status || '').toLowerCase() === 'pending').length
-            : 0
+        if (!ticketsRes.ok) {
+          setError(await getErrorDetail(ticketsRes, 'Failed to load travel requests.'))
+          setTickets([])
+          setBookings([])
+          setDriverSchedules([])
+          return
         }
 
-        if (bookingsRes.ok) {
-          const bookings = await bookingsRes.json()
-          if (Array.isArray(bookings)) {
-            bookingPending = bookings.filter((b) => (b.status || '').toLowerCase() === 'pending').length
-            bookingActive = bookings.filter((b) => (b.status || '').toLowerCase() === 'approved').length
-          }
+        if (!bookingsRes.ok) {
+          setError(await getErrorDetail(bookingsRes, 'Failed to load driver bookings.'))
+          setTickets([])
+          setBookings([])
+          setDriverSchedules([])
+          return
         }
 
-        setStats({ ticketPending, bookingPending, bookingActive })
-      } catch (error) {
-        console.error('Failed to load stats', error)
+        if (!driverCalendarRes.ok) {
+          setError(await getErrorDetail(driverCalendarRes, 'Failed to load driver calendars.'))
+          setTickets([])
+          setBookings([])
+          setDriverSchedules([])
+          return
+        }
+
+        const [ticketsData, bookingsData, driverCalendarData] = await Promise.all([
+          ticketsRes.json(),
+          bookingsRes.json(),
+          driverCalendarRes.json(),
+        ])
+        setTickets(Array.isArray(ticketsData) ? ticketsData : [])
+        setBookings(Array.isArray(bookingsData) ? bookingsData : [])
+        setDriverSchedules(Array.isArray(driverCalendarData) ? driverCalendarData : [])
+      } catch {
+        setError('Network error. Please try again.')
+        setTickets([])
+        setBookings([])
+        setDriverSchedules([])
+      } finally {
+        setLoading(false)
       }
     }
 
-    fetchProfile()
-    fetchStats()
+    loadQuickView()
   }, [])
 
-  // Navigate to the travel request form.
-  const handleTicketRequest = () => {
-    navigate('/user/ticket-request')
-  }
+  const driverCalendars = useMemo(
+    () =>
+      driverSchedules.map((driver, index) => ({
+        id: driver.driver_id,
+        name: driver.driver_name || driver.driver_email || `Driver ${index + 1}`,
+        color: driverCalendarColors[index % driverCalendarColors.length],
+      })),
+    [driverSchedules]
+  )
 
-  // Navigate to travel history/status.
-  const handleTicketHistory = () => {
-    navigate('/user/ticket-history')
-  }
+  const events = useMemo(
+    () =>
+      driverSchedules.flatMap((driver, index) => {
+        const calendarId = driver.driver_id
+        const color = driverCalendarColors[index % driverCalendarColors.length]
+        const driverBookings = Array.isArray(driver.bookings) ? driver.bookings : []
+        return driverBookings.map((booking) => buildDriverBookingEvent(booking, calendarId, color)).filter(Boolean)
+      }),
+    [driverSchedules]
+  )
 
-  // Navigate to the driver booking form.
-  const handleBookingDriver = () => {
-    navigate('/user/booking-driver')
-  }
+  const summaryItems = useMemo(() => {
+    const allItems = [...tickets, ...bookings]
+    const pending = allItems.filter((item) => String(item?.status || '').toLowerCase() === 'pending').length
+    const busySchedules = driverSchedules.reduce((total, driver) => {
+      const driverBookings = Array.isArray(driver.bookings) ? driver.bookings : []
+      return total + driverBookings.length
+    }, 0)
 
-  // Navigate to driver booking history/status.
-  const handleBookingHistory = () => {
-    navigate('/user/booking-history')
-  }
-
-  // Enable keyboard activation on clickable cards.
-  const handleCardKeyDown = (event, action) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      action()
-    }
-  }
+    return [
+      { label: 'Driver calendars', value: driverSchedules.length },
+      { label: 'Busy schedules', value: busySchedules },
+      { label: 'My pending requests', value: pending },
+    ]
+  }, [tickets, bookings, driverSchedules])
 
   return (
-    <MainLayout title="User Dashboard">
-      <div className="user-dashboard">
-        <div className="dashboard-header">
-          <div>
-            <p className="eyebrow">User Dashboard</p>
-            <h1>Hello, {profile.name || (loadingProfile ? '...' : 'User')}</h1>
-            <p className="muted">Summary of your trips and bookings</p>
-          </div>
-        </div>
-
-        <section className="stats-section">
-          <div className="stats-grid">
-            <article className="stat-card">
-              <div className="stat-icon stat-icon-blue" aria-hidden="true">
-                <i className="bi bi-ticket-perforated" />
-              </div>
-              <div>
-                <p className="stat-label">Pending Travel</p>
-                <p className="stat-value">{stats.ticketPending}</p>
-              </div>
-            </article>
-            <article className="stat-card">
-              <div className="stat-icon stat-icon-green" aria-hidden="true">
-                <i className="bi bi-car-front" />
-              </div>
-              <div>
-                <p className="stat-label">Pending Booking Driver</p>
-                <p className="stat-value">{stats.bookingPending}</p>
-              </div>
-            </article>
-            <article className="stat-card">
-              <div className="stat-icon stat-icon-amber" aria-hidden="true">
-                <i className="bi bi-activity" />
-              </div>
-              <div>
-                <p className="stat-label">Active Booking Driver</p>
-                <p className="stat-value">{stats.bookingActive}</p>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section className="menu-section">
-          <div className="section-heading">
-            <div className="heading-icon" aria-hidden="true">
-              <i className="bi bi-grid-3x3-gap-fill" />
-            </div>
-            <div>
-              <h2>Main Menu</h2>
-              <p className="muted">Choose the service you need</p>
-            </div>
-          </div>
-
-          <div className="actions-grid">
-            <article
-              className="action-card action-primary is-clickable"
-              role="link"
-              tabIndex={0}
-              onClick={handleTicketRequest}
-              onKeyDown={(event) => handleCardKeyDown(event, handleTicketRequest)}
-            >
-              <div className="action-icon" aria-hidden="true">
-                <i className="bi bi-plus-lg" />
-              </div>
-              <div className="action-content">
-                <h3>Make a Travel Request</h3>
-                <p className="muted">Submit a request for business or travel needs</p>
-                <span className="link-cta">
-                  Make Request <span aria-hidden="true">&rarr;</span>
-                </span>
-              </div>
-            </article>
-
-            <article
-              className="action-card action-success is-clickable"
-              role="link"
-              tabIndex={0}
-              onClick={handleBookingDriver}
-              onKeyDown={(event) => handleCardKeyDown(event, handleBookingDriver)}
-            >
-              <div className="action-icon" aria-hidden="true">
-                <i className="bi bi-plus-lg" />
-              </div>
-              <div className="action-content">
-                <h3>Book a Driver</h3>
-                <p className="muted">Request a driver for business travel or operational needs</p>
-                <span className="link-cta success">
-                  Make Request <span aria-hidden="true">&rarr;</span>
-                </span>
-              </div>
-            </article>
-
-            <article
-              className="action-card action-plain is-clickable"
-              role="link"
-              tabIndex={0}
-              onClick={handleTicketHistory}
-              onKeyDown={(event) => handleCardKeyDown(event, handleTicketHistory)}
-            >
-              <div className="action-icon icon-soft" aria-hidden="true">
-                <i className="bi bi-ticket-perforated" />
-              </div>
-              <div className="action-content">
-                <h3>Travel Status & History</h3>
-                <p className="muted">View all your Travel Accommodation requests</p>
-                <span className="link-cta">
-                  View <span aria-hidden="true">&rarr;</span>
-                </span>
-              </div>
-            </article>
-
-            <article
-              className="action-card action-plain is-clickable"
-              role="link"
-              tabIndex={0}
-              onClick={handleBookingHistory}
-              onKeyDown={(event) => handleCardKeyDown(event, handleBookingHistory)}
-            >
-              <div className="action-icon icon-soft" aria-hidden="true">
-                <i className="bi bi-car-front" />
-              </div>
-              <div className="action-content">
-                <h3>Booking Driver Status & History</h3>
-                <p className="muted">View all your driver bookings</p>
-                <span className="link-cta">
-                  View <span aria-hidden="true">&rarr;</span>
-                </span>
-              </div>
-            </article>
-          </div>
-        </section>
+    <MainLayout title="Employee Quick View">
+      <div className="user-quick-view user-quick-view--scheduler">
+        <QuickViewScheduler
+          title="Employee Quick View"
+          toolbarLabel=""
+          selectorLabel="Driver availability"
+          calendars={driverCalendars}
+          events={events}
+          calendarListLabel="Driver calendars"
+          actions={[
+            {
+              label: 'Go to my booking page',
+              icon: 'bi-car-front',
+              onClick: () => navigate('/user/booking-driver'),
+            },
+          ]}
+          summaryItems={summaryItems}
+          loading={loading}
+          error={error}
+          emptyMessage="No driver schedule for this work week."
+        />
       </div>
     </MainLayout>
   )

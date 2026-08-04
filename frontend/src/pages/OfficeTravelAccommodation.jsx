@@ -5,11 +5,9 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
-  { label: 'Dashboard', icon: 'bi-speedometer2' },
-  { label: 'Travel Requests', icon: 'bi-ticket-perforated' },
+  { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
   { label: 'Travel Assign', icon: 'bi-building' },
-  { label: 'Booking Driver Requests', icon: 'bi-car-front' },
   { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
   { label: 'Booking Driver Assign', icon: 'bi-person-check' },
   { label: 'Manage User', icon: 'bi-people' },
@@ -49,15 +47,13 @@ function OfficeTravelAccommodation() {
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
-    const dashboardRoute = isSuperadmin ? '/admin/home' : '/office/home'
+    const quickViewRoute = isSuperadmin ? '/admin/home' : '/office/home'
     const manageUserRoute = isSuperadmin ? '/admin/manage-user' : '/office/manage-user'
 
-    if (item === 'Dashboard') navigate(dashboardRoute)
-    if (item === 'Travel Requests') navigate('/office/ticket-requests')
+    if (item === 'Quick View') navigate(quickViewRoute)
     if (item === 'Travel Status & History') navigate('/office/ticket-history')
     if (item === 'Booking Driver Status & History') navigate('/office/driver-history')
     if (item === 'Travel Assign') navigate('/office/travel-accommodation')
-    if (item === 'Booking Driver Requests') navigate('/office/driver-requests')
     if (item === 'Booking Driver Assign') navigate('/office/assign-drivers')
     if (item === 'Manage User') navigate(manageUserRoute)
   }
@@ -128,7 +124,7 @@ function OfficeTravelAccommodation() {
 
   return (
     <MainLayout title="Travel Assign">
-      <div className={`office-dashboard fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
         <aside className="office-sidebar visible">
           <div className="sidebar-header">
             <span className="sidebar-role">{isSuperadmin ? 'Super Admin' : 'Office Coordinator'}</span>
@@ -163,7 +159,7 @@ function OfficeTravelAccommodation() {
           <header className="office-header">
             <p className="eyebrow">Travel Assign</p>
             <h1>Create Travel Accommodation</h1>
-            <p className="muted">Create a travel request on behalf of a user (will appear in Travel Requests for approval).</p>
+            <p className="muted">Create a travel request on behalf of a user; it will appear in Travel Status & History.</p>
           </header>
 
           <form className="ticket-form" onSubmit={handleSubmit}>
@@ -421,8 +417,8 @@ function OfficeTravelAccommodation() {
               <button type="submit" className="btn btn-primary" disabled={loading}>
                 {loading ? 'Submitting...' : 'Submit Request'}
               </button>
-              <button type="button" className="btn btn-neutral" onClick={() => navigate('/office/ticket-requests')}>
-                View Travel Requests
+              <button type="button" className="btn btn-neutral" onClick={() => navigate('/office/ticket-history')}>
+                View Travel Status & History
               </button>
             </div>
           </form>
@@ -437,7 +433,7 @@ function OfficeTravelAccommodation() {
                   Submitted
                 </h2>
                 <p className="success-modal-message">
-                  Travel request was submitted successfully. It will appear in Travel Requests for approval.
+                  Travel request was submitted successfully. It is now available in Travel Status & History.
                 </p>
                 <div className="success-modal-actions">
                   <button
@@ -445,10 +441,10 @@ function OfficeTravelAccommodation() {
                     className="btn btn-brand"
                     onClick={() => {
                       setShowSuccessModal(false)
-                      navigate('/office/ticket-requests')
+                      navigate('/office/ticket-history')
                     }}
                   >
-                    View Travel Requests
+                    View Travel Status & History
                   </button>
                   <button type="button" className="btn btn-outline-brand" onClick={() => setShowSuccessModal(false)}>
                     Back to Form

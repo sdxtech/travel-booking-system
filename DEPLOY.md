@@ -89,7 +89,7 @@ Script ini idempotent:
 
 ```bash
 copy .env.example .env
-docker compose --profile local-db up --build
+docker compose up -d --build
 ```
 
 ### Pakai MongoDB external
@@ -97,7 +97,7 @@ docker compose --profile local-db up --build
 Ubah `MONGODB_URI` di `.env`, lalu:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 Frontend akan tersedia di `http://localhost:8080` dan backend di `http://localhost:8000`.

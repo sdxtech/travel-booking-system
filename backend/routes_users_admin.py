@@ -53,6 +53,7 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     disabled: Optional[bool] = None
+    booking_enabled: bool = True
 
 
 class UserImportRequest(BaseModel):
@@ -100,6 +101,7 @@ def serialize_user(doc_snapshot) -> UserResponse:
         phone=data.get("phone") or data.get("phone_number"),
         email=data.get("email"),
         disabled=data.get("disabled", False),
+        booking_enabled=data.get("booking_enabled", True) is not False,
     )
 
 
@@ -753,7 +755,7 @@ def reset_password(user_id: str, payload: UserPasswordUpdate, current_user=Depen
     uid = current_user["uid"]
     current_role = ensure_role(uid, ("office_coordinator", "superadmin"))
 
-    if user_id == uid:
+    if user_id == uid and current_role != "superadmin":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot reset your own password")
 
     snapshot = db["users"].find_one({"_id": user_id})
@@ -782,7 +784,7 @@ def deactivate_user(user_id: str, current_user=Depends(get_current_user)):
     uid = current_user["uid"]
     current_role = ensure_role(uid, ("office_coordinator", "superadmin"))
 
-    if user_id == uid:
+    if user_id == uid and current_role != "superadmin":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot deactivate your own account")
 
     snapshot = db["users"].find_one({"_id": user_id})
@@ -807,9 +809,6 @@ def delete_user(user_id: str, current_user=Depends(get_current_user)):
     """Delete a user from MongoDB."""
     uid = current_user["uid"]
     ensure_role(uid, ("superadmin",))
-
-    if user_id == uid:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own account")
 
     result = db["users"].delete_one({"_id": user_id})
     if result.deleted_count == 0:

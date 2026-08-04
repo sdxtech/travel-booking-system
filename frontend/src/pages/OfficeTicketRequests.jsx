@@ -5,7 +5,7 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
-  { label: 'Dashboard', icon: 'bi-speedometer2' },
+  { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Requests', icon: 'bi-ticket-perforated' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
   { label: 'Travel Assign', icon: 'bi-building' },
@@ -136,10 +136,10 @@ function OfficeTicketRequests() {
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
-    const dashboardRoute = isSuperadmin ? '/admin/home' : '/office/home'
+    const quickViewRoute = isSuperadmin ? '/admin/home' : '/office/home'
     const manageUserRoute = isSuperadmin ? '/admin/manage-user' : '/office/manage-user'
 
-    if (item === 'Dashboard') navigate(dashboardRoute)
+    if (item === 'Quick View') navigate(quickViewRoute)
     if (item === 'Travel Requests') navigate('/office/ticket-requests')
     if (item === 'Travel Status & History') navigate('/office/ticket-history')
     if (item === 'Booking Driver Status & History') navigate('/office/driver-history')
@@ -153,7 +153,7 @@ function OfficeTicketRequests() {
 
   return (
     <MainLayout title="Travel Requests">
-      <div className={`office-dashboard fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
         <aside className="office-sidebar visible">
           <div className="sidebar-header">
             <span className="sidebar-role">{sidebarRoleLabel}</span>
@@ -268,20 +268,36 @@ function OfficeTicketRequests() {
                         )}
                       </td>
                       <td>
-                        <div className="office-row-actions">
+                        <div className="office-row-actions table-action-buttons">
                           <button
                             type="button"
                             className="btn btn-primary"
-                            disabled={processing[ticket.id]}
+                            disabled={
+                              (!isSuperadmin && String(ticket.status || 'pending').toLowerCase() !== 'pending') ||
+                              processing[ticket.id]
+                            }
                             onClick={() => handleStatusUpdate(ticket.id, 'approved')}
+                            title={
+                              isSuperadmin || String(ticket.status || 'pending').toLowerCase() === 'pending'
+                                ? 'Approve this request'
+                                : 'Only pending requests can be approved'
+                            }
                           >
                             Approve
                           </button>
                           <button
                             type="button"
                             className="btn btn-danger"
-                            disabled={processing[ticket.id]}
+                            disabled={
+                              (!isSuperadmin && String(ticket.status || 'pending').toLowerCase() !== 'pending') ||
+                              processing[ticket.id]
+                            }
                             onClick={() => handleStatusUpdate(ticket.id, 'rejected')}
+                            title={
+                              isSuperadmin || String(ticket.status || 'pending').toLowerCase() === 'pending'
+                                ? 'Reject this request'
+                                : 'Only pending requests can be rejected'
+                            }
                           >
                             Reject
                           </button>

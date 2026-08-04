@@ -5,11 +5,9 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
-  { label: 'Dashboard', icon: 'bi-speedometer2' },
-  { label: 'Travel Requests', icon: 'bi-ticket-perforated' },
+  { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
   { label: 'Travel Assign', icon: 'bi-building' },
-  { label: 'Booking Driver Requests', icon: 'bi-car-front' },
   { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
   { label: 'Booking Driver Assign', icon: 'bi-person-check' },
   { label: 'Manage User', icon: 'bi-people' },
@@ -23,10 +21,13 @@ function OfficeTicketHistory() {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [actionLoadingId, setActionLoadingId] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
   const [hasLoaded, setHasLoaded] = useState(false)
-  const [rangeModalOpen, setRangeModalOpen] = useState(true)
+  const [rangeModalOpen, setRangeModalOpen] = useState(false)
   const [rangeMode, setRangeMode] = useState('all')
   const [rangeStart, setRangeStart] = useState('')
   const [rangeEnd, setRangeEnd] = useState('')
@@ -227,6 +228,12 @@ function OfficeTicketHistory() {
     }
   }
 
+  // Load the combined request/history table immediately on entry.
+  useEffect(() => {
+    loadTickets({ mode: 'all', start: '', end: '' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Validate and apply the current range selection, then reload data.
   const applyRange = async () => {
     setRangeError('')
@@ -255,6 +262,45 @@ function OfficeTicketHistory() {
     setPage(1)
     setRangeModalOpen(false)
     await loadTickets(nextRange)
+  }
+
+  // Approve or reject directly from the combined request/history table.
+  const handleStatusUpdate = async (ticket, nextStatus) => {
+    if (!ticket?.id) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      setActionError('Authentication token not found.')
+      return
+    }
+
+    setActionLoadingId(ticket.id)
+    setActionError('')
+    setActionMessage('')
+    try {
+      const res = await fetch(`${API_BASE_URL}/tickets/${ticket.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setActionError(data?.detail || `Failed to ${nextStatus === 'approved' ? 'approve' : 'reject'} request.`)
+        return
+      }
+
+      const updated = await res.json()
+      setTickets((current) => current.map((item) => (item.id === ticket.id ? { ...item, ...updated } : item)))
+      setActionMessage(`Travel request ${nextStatus}.`)
+      window.dispatchEvent(new Event('notifications:refresh'))
+    } catch {
+      setActionError('Network error. Please try again.')
+    } finally {
+      setActionLoadingId('')
+    }
   }
 
   // Format a date-only value for table display.
@@ -381,22 +427,20 @@ function OfficeTicketHistory() {
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
-    const dashboardRoute = isSuperadmin ? '/admin/home' : '/office/home'
+    const quickViewRoute = isSuperadmin ? '/admin/home' : '/office/home'
     const manageUserRoute = isSuperadmin ? '/admin/manage-user' : '/office/manage-user'
 
-    if (item === 'Dashboard') navigate(dashboardRoute)
-    if (item === 'Travel Requests') navigate('/office/ticket-requests')
+    if (item === 'Quick View') navigate(quickViewRoute)
     if (item === 'Travel Status & History') navigate('/office/ticket-history')
     if (item === 'Booking Driver Status & History') navigate('/office/driver-history')
     if (item === 'Travel Assign') navigate('/office/travel-accommodation')
-    if (item === 'Booking Driver Requests') navigate('/office/driver-requests')
     if (item === 'Booking Driver Assign') navigate('/office/assign-drivers')
     if (item === 'Manage User') navigate(manageUserRoute)
   }
 
   return (
     <MainLayout title="Travel Status & History">
-      <div className={`office-dashboard fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
         <aside className="office-sidebar visible">
           <div className="sidebar-header">
             <span className="sidebar-role">{isSuperadmin ? 'Super Admin' : 'Office Coordinator'}</span>
@@ -430,8 +474,8 @@ function OfficeTicketHistory() {
         <section className="office-content">
           <header className="office-header">
             <p className="eyebrow">Travel Status & History</p>
-            <h1>List of all  travel status & history</h1>
-            <p className="muted">All processed travel requests (non-pending)</p>
+            <h1>Travel Requests & History</h1>
+            <p className="muted">All travel requests, statuses, and history in one table</p>
           </header>
 
           <div className="form-actions">
@@ -452,6 +496,8 @@ function OfficeTicketHistory() {
           </div>
 
           {hasLoaded ? <p className="muted">Date Range: {getActiveRangeLabel()}</p> : <p className="muted">Date Range: Not loaded</p>}
+          {!loading && actionMessage ? <p className="success-text">{actionMessage}</p> : null}
+          {!loading && actionError ? <p className="error-text">{actionError}</p> : null}
 
           <div className="office-table-wrapper">
             <table className="office-table">
@@ -548,30 +594,31 @@ function OfficeTicketHistory() {
                       Status {renderSortIcon('status')}
                     </button>
                   </th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="19" className="muted">
+                    <td colSpan="20" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="19" className="error-text">
+                    <td colSpan="20" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : !hasLoaded ? (
                   <tr>
-                    <td colSpan="19" className="muted">
+                    <td colSpan="20" className="muted">
                       Select a date range to load travel history.
                     </td>
                   </tr>
                 ) : tickets.length === 0 ? (
                   <tr>
-                    <td colSpan="19" className="muted">
+                    <td colSpan="20" className="muted">
                       No ticket history found.
                     </td>
                   </tr>
@@ -602,6 +649,44 @@ function OfficeTicketHistory() {
                         ) : (
                           '-'
                         )}
+                      </td>
+                      <td>
+                        <div className="table-action-buttons">
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => handleStatusUpdate(ticket, 'approved')}
+                            disabled={
+                              actionLoadingId === ticket.id ||
+                              loading ||
+                              (!isSuperadmin && String(ticket.status || 'pending').toLowerCase() !== 'pending')
+                            }
+                            title={
+                              isSuperadmin
+                                ? 'Super Admin override: approve this request'
+                                : 'Approve pending request'
+                            }
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            onClick={() => handleStatusUpdate(ticket, 'rejected')}
+                            disabled={
+                              actionLoadingId === ticket.id ||
+                              loading ||
+                              (!isSuperadmin && String(ticket.status || 'pending').toLowerCase() !== 'pending')
+                            }
+                            title={
+                              isSuperadmin
+                                ? 'Super Admin override: reject this request'
+                                : 'Reject pending request'
+                            }
+                          >
+                            Reject
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

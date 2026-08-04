@@ -11,6 +11,7 @@ function TicketHistory() {
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [actionLoadingId, setActionLoadingId] = useState('')
+  const [selectedTicket, setSelectedTicket] = useState(null)
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
 
@@ -32,6 +33,8 @@ function TicketHistory() {
     switch (key) {
       case 'created_at':
         return toDate(ticket.created_at)?.getTime() ?? null
+      case 'request_id':
+        return ticket.request_id || ''
       case 'full_name':
         return ticket.full_name || ''
       case 'national_id':
@@ -134,6 +137,18 @@ function TicketHistory() {
     setPage((prev) => Math.min(prev, totalPages))
   }, [totalPages])
 
+  // Allow the details dialog to be closed with the Escape key.
+  useEffect(() => {
+    if (!selectedTicket) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSelectedTicket(null)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedTicket])
+
   // Load the current user's ticket history.
   useEffect(() => {
     // Fetch ticket data from the API.
@@ -161,7 +176,7 @@ function TicketHistory() {
             if (data?.detail) {
               detail = data.detail
             }
-          } catch (err) {
+          } catch {
             // ignore parse error
           }
           setError(detail)
@@ -170,7 +185,7 @@ function TicketHistory() {
           const data = await response.json()
           setTickets(Array.isArray(data) ? data : [])
         }
-      } catch (err) {
+      } catch {
         setError('Network error. Please try again.')
         setTickets([])
       } finally {
@@ -181,7 +196,7 @@ function TicketHistory() {
     fetchTickets()
   }, [])
 
-  // Open the ticket form with the selected ticket for editing.
+  // Open the travel request form with the selected request for editing.
   const handleEdit = (ticket) => {
     navigate('/user/ticket-request', { state: { ticket } })
   }
@@ -211,7 +226,7 @@ function TicketHistory() {
         try {
           const data = await response.json()
           if (data?.detail) detail = data.detail
-        } catch (err) {
+        } catch {
           // ignore parse error
         }
         setActionError(detail)
@@ -221,7 +236,7 @@ function TicketHistory() {
       const updated = await response.json()
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)))
       window.dispatchEvent(new Event('notifications:refresh'))
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setActionLoadingId('')
@@ -301,7 +316,7 @@ function TicketHistory() {
         {!loading && !error ? (
           <>
             <div className="table-wrapper">
-              <table className="simple-table">
+              <table className="simple-table history-summary-table">
                 <thead>
                   <tr>
                     <th className="table-col-no">No</th>
@@ -311,78 +326,8 @@ function TicketHistory() {
                       </button>
                     </th>
                     <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('full_name')}>
-                        Name {renderSortIcon('full_name')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('national_id')}>
-                        National ID {renderSortIcon('national_id')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('dept_job_position')}>
-                        Dept/Job Position {renderSortIcon('dept_job_position')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('phone_number')}>
-                        Phone {renderSortIcon('phone_number')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('email')}>
-                        Email {renderSortIcon('email')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('departure_datetime')}>
-                        Departure Date {renderSortIcon('departure_datetime')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('departure_point')}>
-                        Departure Point {renderSortIcon('departure_point')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('destination')}>
-                        Destination {renderSortIcon('destination')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('trip_type')}>
-                        Type of Trip {renderSortIcon('trip_type')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('hotel_accommodation')}>
-                        Hotel Accommodation {renderSortIcon('hotel_accommodation')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('hotel_name')}>
-                        Hotel Name {renderSortIcon('hotel_name')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('hotel_location')}>
-                        Hotel Location {renderSortIcon('hotel_location')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('transportation_mode')}>
-                        Transportation {renderSortIcon('transportation_mode')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('superior_approval_note')}>
-                        Approval Note {renderSortIcon('superior_approval_note')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('additional_notes')}>
-                        Additional Notes {renderSortIcon('additional_notes')}
+                      <button type="button" className="table-sort" onClick={() => toggleSort('request_id')}>
+                        Request ID {renderSortIcon('request_id')}
                       </button>
                     </th>
                     <th>
@@ -396,7 +341,7 @@ function TicketHistory() {
                 <tbody>
                   {tickets.length === 0 ? (
                     <tr>
-                      <td colSpan="19" className="muted">
+                      <td colSpan="5" className="muted">
                         No ticket requests yet.
                       </td>
                     </tr>
@@ -409,47 +354,39 @@ function TicketHistory() {
                         <tr key={ticket.id}>
                           <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                           <td>{formatDate(ticket.created_at)}</td>
-                          <td className="cell-wrap">{ticket.full_name || '-'}</td>
-                          <td>{ticket.national_id || '-'}</td>
-                          <td className="cell-wrap">{ticket.dept_job_position || '-'}</td>
-                          <td>{ticket.phone_number || '-'}</td>
-                          <td className="cell-wrap">{ticket.email || '-'}</td>
-                          <td>{formatDateTime(ticket.departure_date, ticket.departure_time)}</td>
-                          <td className="cell-wrap">{ticket.departure_point || '-'}</td>
-                          <td>{ticket.destination || '-'}</td>
-                          <td>{ticket.trip_type || '-'}</td>
-                          <td>{formatBool(ticket.hotel_accommodation)}</td>
-                          <td className="cell-wrap">{ticket.hotel_name || '-'}</td>
-                          <td className="cell-wrap">{ticket.hotel_location || '-'}</td>
-                          <td>{ticket.transportation_mode || '-'}</td>
-                          <td className="cell-wrap">{ticket.superior_approval_note || '-'}</td>
-                          <td className="cell-wrap">{ticket.additional_notes || '-'}</td>
+                          <td className="request-id-cell">{ticket.request_id || '-'}</td>
                           <td>
                             <span className={`status-badge status-${statusValue}`}>{ticket.status || 'pending'}</span>
                           </td>
                           <td>
-                            {isPending ? (
-                              <div className="table-row-actions">
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-brand"
-                                  onClick={() => handleEdit(ticket)}
-                                  disabled={actionLoadingId === ticket.id}
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-danger"
-                                  onClick={() => handleCancel(ticket.id)}
-                                  disabled={actionLoadingId === ticket.id}
-                                >
-                                  {actionLoadingId === ticket.id ? 'Cancelling...' : 'Cancel'}
-                                </button>
-                              </div>
-                            ) : (
-                              '-'
-                            )}
+                            <div className="table-row-actions table-action-buttons">
+                              <button
+                                type="button"
+                                className="btn btn-outline-brand"
+                                onClick={() => handleEdit(ticket)}
+                                disabled={!isPending || actionLoadingId === ticket.id}
+                                title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger"
+                                onClick={() => handleCancel(ticket.id)}
+                                disabled={!isPending || actionLoadingId === ticket.id}
+                                title={isPending ? 'Cancel this request' : 'Only pending requests can be cancelled'}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline-brand"
+                                onClick={() => setSelectedTicket(ticket)}
+                                disabled={actionLoadingId === ticket.id}
+                              >
+                                Details
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -480,6 +417,138 @@ function TicketHistory() {
                 Next
               </button>
             </div>
+
+            {selectedTicket ? (
+              <div
+                className="modal-overlay"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="ticket-details-title"
+                onClick={() => setSelectedTicket(null)}
+              >
+                <div className="modal ticket-details-modal" onClick={(event) => event.stopPropagation()}>
+                  <div className="modal-header">
+                    <div>
+                      <p className="eyebrow">Travel Request Details</p>
+                      <h2 id="ticket-details-title">{selectedTicket.request_id || 'Travel Request'}</h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="modal-close"
+                      onClick={() => setSelectedTicket(null)}
+                      aria-label="Close details"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <div className="ticket-details-summary">
+                    <span>Submitted {formatDate(selectedTicket.created_at)}</span>
+                    <span className={`status-badge status-${(selectedTicket.status || 'pending').toLowerCase()}`}>
+                      {selectedTicket.status || 'pending'}
+                    </span>
+                  </div>
+
+                  <section className="ticket-details-section">
+                    <h3>Employee Information</h3>
+                    <dl className="ticket-details-grid">
+                      <div className="ticket-details-item">
+                        <dt>Name</dt>
+                        <dd>{selectedTicket.full_name || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>National ID</dt>
+                        <dd>{selectedTicket.national_id || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Department / Job Position</dt>
+                        <dd>{selectedTicket.dept_job_position || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Phone</dt>
+                        <dd>{selectedTicket.phone_number || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item ticket-details-item--full">
+                        <dt>Email</dt>
+                        <dd>{selectedTicket.email || '-'}</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <section className="ticket-details-section">
+                    <h3>Travel Details</h3>
+                    <dl className="ticket-details-grid">
+                      <div className="ticket-details-item">
+                        <dt>Departure Date & Time</dt>
+                        <dd>{formatDateTime(selectedTicket.departure_date, selectedTicket.departure_time)}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Type of Trip</dt>
+                        <dd>{selectedTicket.trip_type || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Departure Point</dt>
+                        <dd>{selectedTicket.departure_point || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Destination</dt>
+                        <dd>{selectedTicket.destination || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item ticket-details-item--full">
+                        <dt>Purpose of Travel</dt>
+                        <dd>{selectedTicket.purpose_of_travel || '-'}</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <section className="ticket-details-section">
+                    <h3>Accommodation & Transportation</h3>
+                    <dl className="ticket-details-grid">
+                      <div className="ticket-details-item">
+                        <dt>Hotel Accommodation</dt>
+                        <dd>{formatBool(selectedTicket.hotel_accommodation)}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Transportation</dt>
+                        <dd>{selectedTicket.transportation_mode || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Hotel Name</dt>
+                        <dd>{selectedTicket.hotel_name || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Hotel Location</dt>
+                        <dd>{selectedTicket.hotel_location || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item ticket-details-item--full">
+                        <dt>Other Transportation</dt>
+                        <dd>{selectedTicket.transportation_other || '-'}</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <section className="ticket-details-section">
+                    <h3>Approval & Notes</h3>
+                    <dl className="ticket-details-grid">
+                      <div className="ticket-details-item ticket-details-item--full">
+                        <dt>Approval Note</dt>
+                        <dd>{selectedTicket.superior_approval_note || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item ticket-details-item--full">
+                        <dt>Additional Notes</dt>
+                        <dd>{selectedTicket.additional_notes || '-'}</dd>
+                      </div>
+                    </dl>
+                  </section>
+
+                  <div className="modal-actions">
+                    <button type="button" className="btn btn-neutral" onClick={() => setSelectedTicket(null)}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>

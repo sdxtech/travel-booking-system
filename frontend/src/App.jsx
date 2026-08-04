@@ -7,8 +7,6 @@ import TicketRequest from './pages/TicketRequest'
 import TicketHistory from './pages/TicketHistory'
 import BookingDriver from './pages/BookingDriver'
 import BookingHistory from './pages/BookingHistory'
-import OfficeDriverRequests from './pages/OfficeDriverRequests'
-import OfficeTicketRequests from './pages/OfficeTicketRequests'
 import OfficeTicketHistory from './pages/OfficeTicketHistory'
 import OfficeDriverHistory from './pages/OfficeDriverHistory'
 import OfficeTravelAccommodation from './pages/OfficeTravelAccommodation'
@@ -16,6 +14,8 @@ import OfficeAssignDrivers from './pages/OfficeAssignDrivers'
 import OfficeManageUser from './pages/OfficeManageUser'
 import AdminManageUser from './pages/AdminManageUser'
 import AdminHome from './pages/AdminHome'
+import AdminSettings from './pages/AdminSettings'
+import AdminDriverAvailability from './pages/AdminDriverAvailability'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
@@ -86,7 +86,7 @@ function App() {
             path="/office/ticket-requests"
             element={
               <ProtectedRoute>
-                <OfficeTicketRequests />
+                <Navigate to="/office/ticket-history" replace />
               </ProtectedRoute>
             }
           />
@@ -94,7 +94,7 @@ function App() {
             path="/office/driver-requests"
             element={
               <ProtectedRoute>
-                <OfficeDriverRequests />
+                <Navigate to="/office/driver-history" replace />
               </ProtectedRoute>
             }
           />
@@ -151,6 +151,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminManageUser />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/admin/settings/cancel-booking" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings/cancel-booking"
+            element={
+              <ProtectedRoute>
+                <AdminSettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings/driver-availability"
+            element={
+              <ProtectedRoute>
+                <AdminDriverAvailability />
               </ProtectedRoute>
             }
           />

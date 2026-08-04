@@ -1,11 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
-
-const TABS = {
-  active: 'active',
-  completed: 'completed',
-}
 
 const STATUS_STEPS = [
   { key: 'approved', label: 'Approved' },
@@ -13,12 +8,11 @@ const STATUS_STEPS = [
   { key: 'completed', label: 'Completed' },
 ]
 
-// Driver task dashboard (calendar + status stepper + start/finish flow).
+// Driver task quick view (calendar + status stepper + start/finish flow).
 function DriverHome() {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState(TABS.active)
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const [processing, setProcessing] = useState({})
@@ -34,10 +28,6 @@ function DriverHome() {
   const [activeBooking, setActiveBooking] = useState(null)
   const [startingMileage, setStartingMileage] = useState('')
   const [endingMileage, setEndingMileage] = useState('')
-  const signatureCanvasRef = useRef(null)
-  const signatureDrawingRef = useRef(false)
-  const signatureLastPointRef = useRef({ x: 0, y: 0 })
-  const signatureHasInkRef = useRef(false)
 
   const completedDistance = useMemo(() => {
     const startingValue = Number(activeBooking?.starting_mileage)
@@ -86,7 +76,7 @@ function DriverHome() {
           const data = await res.json()
           setBookings(Array.isArray(data) ? data : [])
         }
-      } catch (err) {
+      } catch {
         setError('Network error. Please try again.')
         setBookings([])
       } finally {
@@ -132,125 +122,6 @@ function DriverHome() {
     setActiveBooking(null)
     setStartingMileage('')
     setEndingMileage('')
-    signatureDrawingRef.current = false
-    signatureHasInkRef.current = false
-  }
-
-  // Clear the signature canvas and reset ink tracking.
-  const resetSignatureCanvas = () => {
-    const canvas = signatureCanvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    signatureHasInkRef.current = false
-  }
-
-  // Initialize the signature canvas size and drawing settings.
-  const setupSignatureCanvas = () => {
-    const canvas = signatureCanvasRef.current
-    if (!canvas) return
-
-    const width = 700
-    const height = 200
-    canvas.width = width
-    canvas.height = height
-    resetSignatureCanvas()
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.lineWidth = 2.5
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.strokeStyle = '#111827'
-  }
-
-  // Prepare the signature canvas whenever the finish modal is shown.
-  useEffect(() => {
-    if (!finishModalOpen) return
-    setupSignatureCanvas()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finishModalOpen])
-
-  // Translate pointer events into canvas coordinates.
-  const getSignaturePoint = (event) => {
-    const canvas = signatureCanvasRef.current
-    if (!canvas) return null
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    return {
-      x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
-    }
-  }
-
-  // Start signature drawing on pointer down.
-  const handleSignaturePointerDown = (event) => {
-    if (event.button !== undefined && event.button !== 0) return
-    const canvas = signatureCanvasRef.current
-    if (!canvas) return
-
-    event.preventDefault()
-    const point = getSignaturePoint(event)
-    if (!point) return
-
-    signatureDrawingRef.current = true
-    signatureLastPointRef.current = point
-    const ctx = canvas.getContext('2d')
-    if (ctx) {
-      ctx.fillStyle = '#111827'
-      ctx.beginPath()
-      ctx.arc(point.x, point.y, 1.25, 0, Math.PI * 2)
-      ctx.fill()
-      signatureHasInkRef.current = true
-    }
-
-    try {
-      canvas.setPointerCapture?.(event.pointerId)
-    } catch {
-      // ignore capture errors
-    }
-  }
-
-  // Draw signature strokes as the pointer moves.
-  const handleSignaturePointerMove = (event) => {
-    if (!signatureDrawingRef.current) return
-    const canvas = signatureCanvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    event.preventDefault()
-    const next = getSignaturePoint(event)
-    if (!next) return
-
-    const prev = signatureLastPointRef.current
-    ctx.beginPath()
-    ctx.moveTo(prev.x, prev.y)
-    ctx.lineTo(next.x, next.y)
-    ctx.stroke()
-
-    signatureLastPointRef.current = next
-    signatureHasInkRef.current = true
-  }
-
-  // Stop signature drawing and release pointer capture.
-  const handleSignaturePointerEnd = (event) => {
-    if (!signatureDrawingRef.current) return
-    signatureDrawingRef.current = false
-
-    const canvas = signatureCanvasRef.current
-    if (!canvas) return
-    event.preventDefault()
-    try {
-      canvas.releasePointerCapture?.(event.pointerId)
-    } catch {
-      // ignore release errors
-    }
   }
 
   // Mark a booking as started and store starting mileage.
@@ -299,7 +170,7 @@ function DriverHome() {
       updateBookingInState(activeBooking.id, updated)
       setActionMessage('Trip started.')
       closeModals()
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setProcessing((prev) => {
@@ -310,7 +181,7 @@ function DriverHome() {
     }
   }
 
-  // Mark a booking as completed and upload mileage + signature proof.
+  // Submit the driver's finish report for Employee or Office validation.
   const handleFinish = async () => {
     if (!activeBooking?.id) return
 
@@ -331,23 +202,13 @@ function DriverHome() {
     setActionError('')
 
     try {
-      const canvas = signatureCanvasRef.current
-      const signature = signatureHasInkRef.current && canvas ? canvas.toDataURL('image/png') : ''
-      if (!signature) {
-        setActionError('Passenger signature is required.')
-        return
-      }
-
       const res = await fetch(`${API_BASE_URL}/bookings/${activeBooking.id}/complete`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ending_mileage: endingValue,
-          completion_proof: signature,
-        }),
+        body: JSON.stringify({ ending_mileage: endingValue }),
       })
 
       if (!res.ok) {
@@ -364,9 +225,9 @@ function DriverHome() {
 
       const updated = await res.json()
       updateBookingInState(activeBooking.id, updated)
-      setActionMessage('Trip completed.')
+      setActionMessage('Finish submitted. Waiting for completion validation.')
       closeModals()
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setProcessing((prev) => {
@@ -398,14 +259,17 @@ function DriverHome() {
   // Render the horizontal status stepper for a booking status value.
   const renderStatusStepper = (value) => {
     const statusValue = String(value || '').toLowerCase()
-    const activeIndex = STATUS_STEPS.findIndex((step) => step.key === statusValue)
+    const steps = statusValue === 'awaiting_validation'
+      ? [STATUS_STEPS[0], STATUS_STEPS[1], { key: 'awaiting_validation', label: 'Awaiting Validation' }]
+      : STATUS_STEPS
+    const activeIndex = steps.findIndex((step) => step.key === statusValue)
 
     if (activeIndex < 0) {
       return <span className={`status-badge status-${statusValue}`}>{formatStatusText(statusValue)}</span>
     }
 
     const nodes = []
-    STATUS_STEPS.forEach((step, index) => {
+    steps.forEach((step, index) => {
       const isDone = index < activeIndex
       const isActive = index === activeIndex
       const stateClass = isDone ? 'is-done' : isActive ? 'is-active' : 'is-upcoming'
@@ -417,14 +281,18 @@ function DriverHome() {
           role="listitem"
           aria-current={isActive ? 'step' : undefined}
         >
-          <span className="status-stepper__dot" aria-hidden="true">
-            {isDone ? <i className="bi bi-check-lg" aria-hidden="true" /> : index + 1}
-          </span>
           <span className="status-stepper__label">{step.label}</span>
+          <span className="status-stepper__dot" aria-hidden="true">
+            {isDone || (isActive && step.key === 'completed') ? (
+              <i className="bi bi-check-lg" aria-hidden="true" />
+            ) : (
+              index + 1
+            )}
+          </span>
         </div>
       )
 
-      if (index < STATUS_STEPS.length - 1) {
+      if (index < steps.length - 1) {
         nodes.push(
           <span
             key={`connector-${step.key}`}
@@ -456,29 +324,16 @@ function DriverHome() {
     [bookings]
   )
 
-  const counts = useMemo(() => {
-    const activeCount = normalizedBookings.filter((b) => b.status === 'approved' || b.status === 'in_progress').length
-    const completedCount = normalizedBookings.filter((b) => b.status === 'completed').length
-    return { active: activeCount, completed: completedCount }
-  }, [normalizedBookings])
-
   const items = useMemo(() => {
     const selectedKey = toDateKey(selectedDate)
 
-    const tabStatuses = tab === TABS.completed ? ['completed'] : ['approved', 'in_progress']
-
     const dateFiltered = normalizedBookings.filter((booking) => {
-      if (!tabStatuses.includes(booking.status)) return false
+      if (!['approved', 'in_progress', 'awaiting_validation', 'completed'].includes(booking.status)) return false
       if (!booking?.departure_time) return false
       const dt = new Date(booking.departure_time)
       if (Number.isNaN(dt.getTime())) return false
       return toDateKey(dt) === selectedKey
     })
-
-    const filtered =
-      tab === TABS.completed
-        ? dateFiltered.filter((b) => b.status === 'completed')
-        : dateFiltered.filter((b) => b.status !== 'completed')
 
     // Ensure invalid date values don't crash sorting.
     const safeTime = (value) => {
@@ -486,17 +341,22 @@ function DriverHome() {
       return Number.isNaN(dt.getTime()) ? null : dt
     }
 
-    const sorted = [...filtered].sort((a, b) => {
+    const sorted = [...dateFiltered].sort((a, b) => {
+      const statusRank = (status) => (status === 'completed' ? 2 : status === 'awaiting_validation' ? 1 : 0)
+      const aRank = statusRank(a.status)
+      const bRank = statusRank(b.status)
+      if (aRank !== bRank) return aRank - bRank
+
       const aTime = safeTime(a.departure_time)
       const bTime = safeTime(b.departure_time)
       if (!aTime && !bTime) return 0
       if (!aTime) return 1
       if (!bTime) return -1
-      return tab === TABS.completed ? bTime - aTime : aTime - bTime
+      return aTime - bTime
     })
 
     return sorted
-  }, [normalizedBookings, tab, selectedDate])
+  }, [normalizedBookings, selectedDate])
 
   const monthLabel = useMemo(() => {
     const label = calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -528,7 +388,7 @@ function DriverHome() {
   const taskMetaByDate = useMemo(() => {
     const map = new Map()
     normalizedBookings.forEach((booking) => {
-      if (!['approved', 'in_progress', 'completed'].includes(booking.status)) return
+      if (!['approved', 'in_progress', 'awaiting_validation', 'completed'].includes(booking.status)) return
       if (!booking?.departure_time) return
       const dt = new Date(booking.departure_time)
       if (Number.isNaN(dt.getTime())) return
@@ -560,15 +420,6 @@ function DriverHome() {
     return `${datePart} ${timePart}`
   }
 
-  // Convert trip type values into user-facing labels.
-  const formatTripType = (value) => {
-    if (!value) return '-'
-    if (value === 'antar') return 'Drop-off'
-    if (value === 'jemput') return 'Pick-up'
-    if (value === 'fulltrip') return 'Full Trip'
-    return value
-  }
-
   // Move the calendar to the next/previous month and adjust selected day.
   const changeMonth = (delta) => {
     const targetMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1)
@@ -583,24 +434,7 @@ function DriverHome() {
     setCalendarMonth(targetMonth)
     setSelectedDate(nextSelectedDate)
 
-    const key = toDateKey(nextSelectedDate)
-    const meta = taskMetaByDate.get(key)
-    if (meta) {
-      if (tab === TABS.active && meta.incomplete === 0 && meta.completed > 0) {
-        setTab(TABS.completed)
-      }
-      if (tab === TABS.completed && meta.completed === 0 && meta.incomplete > 0) {
-        setTab(TABS.active)
-      }
-    }
   }
-
-  const isActiveTab = tab === TABS.active
-  const tabLabel = isActiveTab ? 'active' : 'completed'
-  const otherTabLabel = isActiveTab ? 'completed' : 'active'
-  const selectedMeta = taskMetaByDate.get(selectedKey)
-  const hasAnyTasksForDate = (selectedMeta?.total || 0) > 0
-  const otherTabHasTasksForDate = isActiveTab ? (selectedMeta?.completed || 0) > 0 : (selectedMeta?.incomplete || 0) > 0
 
   const selectedDateLabel =
     selectedDate instanceof Date && !Number.isNaN(selectedDate.getTime())
@@ -610,31 +444,6 @@ function DriverHome() {
   return (
     <MainLayout title="Driver Tasks">
       <div className="driver-page">
-        <header className="driver-header">
-          <div>
-            <p className="eyebrow">Driver</p>
-            <h1>My Tasks</h1>
-            <p className="muted">View and manage your assigned bookings</p>
-          </div>
-
-          <div className="driver-tabs">
-            <button
-              type="button"
-              className={`driver-tab ${tab === TABS.active ? 'active' : ''}`}
-              onClick={() => setTab(TABS.active)}
-            >
-              Active ({counts.active})
-            </button>
-            <button
-              type="button"
-              className={`driver-tab ${tab === TABS.completed ? 'active' : ''}`}
-              onClick={() => setTab(TABS.completed)}
-            >
-              Completed ({counts.completed})
-            </button>
-          </div>
-        </header>
-
         <section className="driver-calendar" aria-label="Task calendar">
           <div className="calendar-header">
             <button
@@ -699,17 +508,7 @@ function DriverHome() {
                     key={key}
                     type="button"
                     className={`calendar-cell ${isSelected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''}`}
-                    onClick={() => {
-                      setSelectedDate(date)
-                      if (meta) {
-                        if (tab === TABS.active && meta.incomplete === 0 && meta.completed > 0) {
-                          setTab(TABS.completed)
-                        }
-                        if (tab === TABS.completed && meta.completed === 0 && meta.incomplete > 0) {
-                          setTab(TABS.active)
-                        }
-                      }
-                    }}
+                    onClick={() => setSelectedDate(date)}
                     aria-label={`${dayNumber} ${monthLabel}${count ? `, ${count} task(s)` : ''}`}
                   >
                     <span className="calendar-date">{dayNumber}</span>
@@ -728,16 +527,8 @@ function DriverHome() {
 
         {!loading && !error && items.length === 0 ? (
           <div className="driver-empty">
-            <h2>
-              No {tabLabel} tasks for {selectedDateLabel}
-            </h2>
-            <p className="muted">
-              {otherTabHasTasksForDate
-                ? `Try switching to the ${otherTabLabel} tab.`
-                : hasAnyTasksForDate
-                  ? 'Try selecting another date.'
-                  : 'Try selecting another date or navigating to another month.'}
-            </p>
+            <h2>No tasks for {selectedDateLabel}</h2>
+            <p className="muted">Try selecting another date or navigating to another month.</p>
           </div>
         ) : null}
 
@@ -747,59 +538,53 @@ function DriverHome() {
               const phone = booking.requester_phone || ''
               const email = booking.requester_email || ''
               const isCompleted = booking.status === 'completed'
+              const isAwaitingValidation = booking.status === 'awaiting_validation'
               const isStarted = booking.starting_mileage !== null && booking.starting_mileage !== undefined
               return (
                 <article key={booking.id} className="driver-card">
-                  <div className="driver-card__top">
-                    <div className="driver-card__title">
-                      <h2 className="driver-route">
-                        <span className="driver-route__point">
-                          <span className="driver-route__label">Pickup Location</span>
-                          <span className="driver-route__value">{booking.pickup_location || '-'}</span>
-                        </span>
-                        <span className="driver-route__arrow">to</span>
-                        <span className="driver-route__point">
-                          <span className="driver-route__label">Destination</span>
-                          <span className="driver-route__value">{booking.destination || '-'}</span>
-                        </span>
-                      </h2>
-                      <div className="driver-subrow">
-                        {renderStatusStepper(booking.status)}
-                        <span className="muted">
-                          Departure: <strong>{formatDeparture(booking.departure_time)}</strong>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <h2 className="driver-task-request-id">{booking.request_id || '-'}</h2>
+                  {renderStatusStepper(booking.status)}
 
-                  <div className="driver-meta">
-                    <div className="driver-meta__item">
-                      <span className="driver-meta__label">Total Passenger</span>
-                      <span className="driver-meta__value">{booking.passenger_count ?? '-'}</span>
+                  <dl className="driver-task-details">
+                    <div className="driver-task-details__row">
+                      <dt>Requestor</dt>
+                      <dd>{booking.requester_name || '-'}</dd>
                     </div>
-                    <div className="driver-meta__item">
-                      <span className="driver-meta__label">Trip Type</span>
-                      <span className="driver-meta__value">{formatTripType(booking.trip_type)}</span>
+                    <div className="driver-task-details__row">
+                      <dt>Pick Up Location</dt>
+                      <dd>{booking.pickup_location || '-'}</dd>
                     </div>
-                    <div className="driver-meta__item">
-                      <span className="driver-meta__label">Requestor</span>
-                      <span className="driver-meta__value">{booking.requester_name || '-'}</span>
+                    <div className="driver-task-details__row">
+                      <dt>Destination</dt>
+                      <dd>{booking.destination || '-'}</dd>
                     </div>
-                    <div className="driver-meta__item">
-                      <span className="driver-meta__label">Phone</span>
-                      <span className="driver-meta__value">{phone || '-'}</span>
+                    <div className="driver-task-details__row">
+                      <dt>Departure</dt>
+                      <dd>{formatDeparture(booking.departure_time)}</dd>
                     </div>
-                    <div className="driver-meta__item">
-                      <span className="driver-meta__label">Email</span>
-                      <span className="driver-meta__value">{email || '-'}</span>
+                    <div className="driver-task-details__row">
+                      <dt>Estimated Arrival</dt>
+                      <dd>{formatDeparture(booking.estimated_arrival_time)}</dd>
                     </div>
-                  </div>
+                    <div className="driver-task-details__row">
+                      <dt>Total Passenger</dt>
+                      <dd>{booking.passenger_count ?? '-'}</dd>
+                    </div>
+                    <div className="driver-task-details__row driver-task-details__row--spaced">
+                      <dt>Phone/WA</dt>
+                      <dd>{phone || '-'}</dd>
+                    </div>
+                    <div className="driver-task-details__row">
+                      <dt>Email</dt>
+                      <dd>{email || '-'}</dd>
+                    </div>
+                  </dl>
 
-                  <div className="driver-actions">
-                    {!isCompleted ? (
+                  <div className="driver-actions driver-actions--task-card">
+                    {!isCompleted && !isAwaitingValidation ? (
                       <button
                         type="button"
-                        className="btn btn-neutral"
+                        className="btn btn-neutral driver-task-action"
                         disabled={processing[booking.id]}
                         onClick={() => {
                           if (isStarted) {
@@ -811,6 +596,12 @@ function DriverHome() {
                       >
                         {isStarted ? 'Finish' : 'Start'}
                       </button>
+                    ) : null}
+                    {isAwaitingValidation ? (
+                      <span className="driver-validation-waiting">
+                        <i className="bi bi-clock-history" aria-hidden="true" />
+                        Waiting for completion validation
+                      </span>
                     ) : null}
                   </div>
                 </article>
@@ -909,30 +700,9 @@ function DriverHome() {
                     Ending mileage must be greater than or equal to starting mileage.
                   </p>
                 ) : null}
-                <div className="signature-field" style={{ gridColumn: '1 / -1' }}>
-                  <span className="signature-label">Passenger signature</span>
-                  <div className="signature-pad">
-                    <canvas
-                      ref={signatureCanvasRef}
-                      className="signature-canvas"
-                      onPointerDown={handleSignaturePointerDown}
-                      onPointerMove={handleSignaturePointerMove}
-                      onPointerUp={handleSignaturePointerEnd}
-                      onPointerCancel={handleSignaturePointerEnd}
-                      onPointerLeave={handleSignaturePointerEnd}
-                    />
-                  </div>
-                  <div className="signature-actions">
-                    <button
-                      type="button"
-                      className="btn btn-neutral"
-                      onClick={resetSignatureCanvas}
-                      disabled={processing[activeBooking?.id]}
-                    >
-                      Clear signature
-                    </button>
-                    <span className="signature-hint">Ask the passenger to sign above.</span>
-                  </div>
+                <div className="driver-completion-validation-note" style={{ gridColumn: '1 / -1' }}>
+                  <i className="bi bi-person-check" aria-hidden="true" />
+                  <span>The trip will be marked as awaiting validation after this report is submitted.</span>
                 </div>
               </div>
 
@@ -943,7 +713,7 @@ function DriverHome() {
                   onClick={handleFinish}
                   disabled={processing[activeBooking?.id]}
                 >
-                  Save
+                  Submit Finish
                 </button>
                 <button type="button" className="btn btn-outline-danger" onClick={closeModals} disabled={processing[activeBooking?.id]}>
                   Cancel

@@ -5,11 +5,9 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
-  { label: 'Dashboard', icon: 'bi-speedometer2' },
-  { label: 'Travel Requests', icon: 'bi-ticket-perforated' },
+  { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
   { label: 'Travel Assign', icon: 'bi-building' },
-  { label: 'Booking Driver Requests', icon: 'bi-car-front' },
   { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
   { label: 'Booking Driver Assign', icon: 'bi-person-check' },
   { label: 'Manage User', icon: 'bi-people' },
@@ -75,15 +73,13 @@ function OfficeManageUser() {
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
-    const dashboardRoute = isSuperadmin ? '/admin/home' : '/office/home'
+    const quickViewRoute = isSuperadmin ? '/admin/home' : '/office/home'
     const manageUserRoute = isSuperadmin ? '/admin/manage-user' : '/office/manage-user'
 
-    if (item === 'Dashboard') navigate(dashboardRoute)
-    if (item === 'Travel Requests') navigate('/office/ticket-requests')
+    if (item === 'Quick View') navigate(quickViewRoute)
     if (item === 'Travel Status & History') navigate('/office/ticket-history')
     if (item === 'Booking Driver Status & History') navigate('/office/driver-history')
     if (item === 'Travel Assign') navigate('/office/travel-accommodation')
-    if (item === 'Booking Driver Requests') navigate('/office/driver-requests')
     if (item === 'Booking Driver Assign') navigate('/office/assign-drivers')
     if (item === 'Manage User') navigate(manageUserRoute)
   }
@@ -476,7 +472,7 @@ function OfficeManageUser() {
 
   return (
     <MainLayout title="Manage Users">
-      <div className={`office-dashboard fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
         <aside className="office-sidebar visible">
           <div className="sidebar-header">
             <span className="sidebar-role">{isSuperadmin ? 'Super Admin' : 'Office Coordinator'}</span>
@@ -738,12 +734,19 @@ function OfficeManageUser() {
                       <td>{user.phone || '-'}</td>
                       <td>{user.email || '-'}</td>
                       <td>
-                        <div className="office-row-actions">
+                        <div className="office-row-actions table-action-buttons">
                           <button
                             type="button"
                             className="btn btn-primary"
-                            disabled={actionLoadingId === user.uid || user.disabled}
+                            disabled={actionLoadingId === user.uid || (!isSuperadmin && user.disabled)}
                             onClick={() => handleSelectUser(user)}
+                            title={
+                              isSuperadmin
+                                ? 'Super Admin override: update user'
+                                : user.disabled
+                                  ? 'Deactivated users cannot be updated'
+                                  : 'Update user'
+                            }
                           >
                             Update
                           </button>
@@ -752,31 +755,37 @@ function OfficeManageUser() {
                             className="btn btn-neutral"
                             disabled={
                               actionLoadingId === user.uid ||
-                              user.disabled ||
-                              !user.role ||
-                              !['user', 'driver'].includes(user.role)
+                              (!isSuperadmin &&
+                                (user.disabled || !user.role || !['user', 'driver'].includes(user.role)))
                             }
                             onClick={() => openPasswordModal(user)}
                             title={
-                              user.role && ['user', 'driver'].includes(user.role)
-                                ? 'Reset password'
-                                : 'Password reset is only available for users and drivers.'
+                              isSuperadmin
+                                ? 'Super Admin override: reset password'
+                                : user.disabled
+                                ? 'Deactivated users cannot have their password reset'
+                                : user.role && ['user', 'driver'].includes(user.role)
+                                  ? 'Reset password'
+                                  : 'Password reset is only available for users and drivers.'
                             }
                           >
                             Reset Password
                           </button>
-                          {!user.disabled ? (
-                            <button
-                              type="button"
-                              className="btn btn-danger"
-                              disabled={actionLoadingId === user.uid}
-                              onClick={() => handleDeactivate(user)}
-                            >
-                              {actionLoadingId === user.uid ? 'Deactivating...' : 'Deactivate'}
-                            </button>
-                          ) : (
-                            <span className="status-badge status-cancelled">Deactivated</span>
-                          )}
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            disabled={actionLoadingId === user.uid || (!isSuperadmin && user.disabled)}
+                            onClick={() => handleDeactivate(user)}
+                            title={
+                              isSuperadmin
+                                ? 'Super Admin override: deactivate user'
+                                : user.disabled
+                                  ? 'This user is already deactivated'
+                                  : 'Deactivate user'
+                            }
+                          >
+                            Deactivate
+                          </button>
                         </div>
                       </td>
                     </tr>

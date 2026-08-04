@@ -44,8 +44,6 @@ services:
 
   mongo:
     image: mongo:7
-    profiles:
-      - local-db
     ports:
       - "27017:27017"
     volumes:

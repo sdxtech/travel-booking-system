@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import BookingFormSelect from '../components/BookingFormSelect'
+import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
-  { label: 'Dashboard', icon: 'bi-speedometer2' },
-  { label: 'Travel Requests', icon: 'bi-ticket-perforated' },
+  { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
   { label: 'Travel Assign', icon: 'bi-building' },
-  { label: 'Booking Driver Requests', icon: 'bi-car-front' },
   { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
   { label: 'Booking Driver Assign', icon: 'bi-person-check' },
   { label: 'Manage User', icon: 'bi-people' },
@@ -27,6 +27,8 @@ const initialForm = {
   trip_type: '',
   departure_date: '',
   departure_time: '',
+  arrival_date: '',
+  arrival_time: '',
   passenger_count: 1,
 }
 
@@ -81,7 +83,11 @@ function OfficeAssignDrivers() {
 
         const data = await res.json()
         const allUsers = Array.isArray(data) ? data : []
-        setDrivers(allUsers.filter((user) => user.role === 'driver'))
+        setDrivers(
+          allUsers.filter(
+            (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
+          )
+        )
       } catch (err) {
         setDriversError('Network error. Please try again.')
         setDrivers([])
@@ -91,22 +97,28 @@ function OfficeAssignDrivers() {
     }
 
     loadDrivers()
-  }, [])
+  }, [isSuperadmin])
 
-  // Check driver availability whenever departure date/time changes.
+  // Check driver availability whenever the requested time range changes.
   useEffect(() => {
     setAvailabilityError('')
     setAvailabilityChecked(false)
     setDriverAvailabilityError('')
 
-    if (!form.departure_date || !form.departure_time) {
+    if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) {
       setUnavailableDriverIds(new Set())
       return
     }
 
     const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
-    if (Number.isNaN(departureDateTime.getTime())) {
-      setAvailabilityError('Invalid departure date or time format.')
+    const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
+    if (Number.isNaN(departureDateTime.getTime()) || Number.isNaN(estimatedArrivalDateTime.getTime())) {
+      setAvailabilityError('Invalid booking time range.')
+      setUnavailableDriverIds(new Set())
+      return
+    }
+    if (estimatedArrivalDateTime <= departureDateTime) {
+      setAvailabilityError('Estimated arrival time must be later than departure time.')
       setUnavailableDriverIds(new Set())
       return
     }
@@ -127,7 +139,7 @@ function OfficeAssignDrivers() {
 
       try {
         const res = await fetch(
-          `${API_BASE_URL}/bookings/unavailable-drivers?departure_time=${encodeURIComponent(departureDateTime.toISOString())}`,
+          `${API_BASE_URL}/bookings/unavailable-drivers?departure_time=${encodeURIComponent(departureDateTime.toISOString())}&estimated_arrival_time=${encodeURIComponent(estimatedArrivalDateTime.toISOString())}`,
           {
             headers: { Authorization: `Bearer ${token}` },
             signal: controller.signal,
@@ -161,34 +173,42 @@ function OfficeAssignDrivers() {
 
     loadUnavailableDrivers()
     return () => controller.abort()
-  }, [form.departure_date, form.departure_time])
+  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time])
 
   // Guard against selecting a driver that is flagged as unavailable.
   useEffect(() => {
+    if (isSuperadmin) return
     if (!form.driver_email) return
-    if (!form.departure_date || !form.departure_time) return
+    if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) return
     if (!unavailableDriverIds.size) return
 
     const selected = drivers.find((driver) => driver.email === form.driver_email)
     if (!selected) return
 
     if (unavailableDriverIds.has(selected.uid)) {
-      setDriverAvailabilityError('Selected driver is not available at this departure time.')
+      setDriverAvailabilityError('Selected driver has another booking that overlaps this time range.')
       setForm((prev) => ({ ...prev, driver_email: '' }))
     }
-  }, [drivers, form.departure_date, form.departure_time, form.driver_email, unavailableDriverIds])
+  }, [
+    drivers,
+    form.departure_date,
+    form.departure_time,
+    form.arrival_date,
+    form.arrival_time,
+    form.driver_email,
+    isSuperadmin,
+    unavailableDriverIds,
+  ])
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
-    const dashboardRoute = isSuperadmin ? '/admin/home' : '/office/home'
+    const quickViewRoute = isSuperadmin ? '/admin/home' : '/office/home'
     const manageUserRoute = isSuperadmin ? '/admin/manage-user' : '/office/manage-user'
 
-    if (item === 'Dashboard') navigate(dashboardRoute)
-    if (item === 'Travel Requests') navigate('/office/ticket-requests')
+    if (item === 'Quick View') navigate(quickViewRoute)
     if (item === 'Travel Status & History') navigate('/office/ticket-history')
     if (item === 'Booking Driver Status & History') navigate('/office/driver-history')
     if (item === 'Travel Assign') navigate('/office/travel-accommodation')
-    if (item === 'Booking Driver Requests') navigate('/office/driver-requests')
     if (item === 'Booking Driver Assign') navigate('/office/assign-drivers')
     if (item === 'Manage User') navigate(manageUserRoute)
   }
@@ -213,8 +233,8 @@ function OfficeAssignDrivers() {
     setErrorMessage('')
     setShowSuccessModal(false)
 
-    if (!form.departure_date || !form.departure_time) {
-      setErrorMessage('Departure date and time are required.')
+    if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) {
+      setErrorMessage('Departure and estimated arrival date/time are required.')
       setLoading(false)
       return
     }
@@ -227,8 +247,14 @@ function OfficeAssignDrivers() {
     }
 
     const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
-    if (Number.isNaN(departureDateTime.getTime())) {
-      setErrorMessage('Invalid departure date or time format.')
+    const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
+    if (Number.isNaN(departureDateTime.getTime()) || Number.isNaN(estimatedArrivalDateTime.getTime())) {
+      setErrorMessage('Invalid booking time range.')
+      setLoading(false)
+      return
+    }
+    if (estimatedArrivalDateTime <= departureDateTime) {
+      setErrorMessage('Estimated arrival time must be later than departure time.')
       setLoading(false)
       return
     }
@@ -244,6 +270,7 @@ function OfficeAssignDrivers() {
       destination: form.destination,
       trip_type: form.trip_type,
       departure_time: departureDateTime.toISOString(),
+      estimated_arrival_time: estimatedArrivalDateTime.toISOString(),
       passenger_count: Number(form.passenger_count) || 1,
     }
 
@@ -278,9 +305,35 @@ function OfficeAssignDrivers() {
     }
   }
 
+  const hasCompleteSchedule = Boolean(
+    form.departure_date && form.departure_time && form.arrival_date && form.arrival_time
+  )
+  const driverOptions = drivers
+    .slice()
+    .sort((a, b) => {
+      if (!hasCompleteSchedule || availabilityLoading || availabilityError) return 0
+      const aUnavailable = unavailableDriverIds.has(a.uid)
+      const bUnavailable = unavailableDriverIds.has(b.uid)
+      if (aUnavailable === bUnavailable) return 0
+      return aUnavailable ? 1 : -1
+    })
+    .map((driver) => {
+      const originalIndex = Math.max(0, drivers.findIndex((item) => item.uid === driver.uid))
+      const isUnavailable = hasCompleteSchedule && availabilityChecked && unavailableDriverIds.has(driver.uid)
+      const availabilityStatus = availabilityChecked ? (isUnavailable ? 'Unavailable' : 'Available') : 'Not checked'
+      return {
+        value: driver.email,
+        label: driver.name || driver.email || 'Driver',
+        status: availabilityStatus,
+        statusTone: availabilityStatus === 'Available' ? 'available' : availabilityStatus === 'Unavailable' ? 'unavailable' : 'neutral',
+        color: DRIVER_SELECT_COLORS[originalIndex % DRIVER_SELECT_COLORS.length],
+        disabled: !isSuperadmin && isUnavailable,
+      }
+    })
+
   return (
     <MainLayout title="Assign Drivers">
-      <div className={`office-dashboard fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
         <aside className="office-sidebar visible">
           <div className="sidebar-header">
             <span className="sidebar-role">{isSuperadmin ? 'Super Admin' : 'Office Coordinator'}</span>
@@ -436,6 +489,14 @@ function OfficeAssignDrivers() {
                   <input type="time" value={form.departure_time} onChange={handleChange('departure_time')} required />
                 </label>
                 <label className="inline-label">
+                  <span>Estimated arrival date</span>
+                  <input type="date" value={form.arrival_date} onChange={handleChange('arrival_date')} required />
+                </label>
+                <label className="inline-label">
+                  <span>Estimated arrival time</span>
+                  <input type="time" value={form.arrival_time} onChange={handleChange('arrival_time')} required />
+                </label>
+                <label className="inline-label">
                   <span>Total Passenger</span>
                   <input
                     type="number"
@@ -461,47 +522,28 @@ function OfficeAssignDrivers() {
               <div className="field-grid">
                 {driversError ? <p className="error-text">{driversError}</p> : null}
                 {driverAvailabilityError ? <p className="error-text">{driverAvailabilityError}</p> : null}
-                <label className="inline-label">
+                <div className="inline-label">
                   <span>Driver</span>
-                  <select
+                  <BookingFormSelect
                     value={form.driver_email}
-                    onChange={handleChange('driver_email')}
-                    disabled={driversLoading || loading || availabilityLoading || !drivers.length}
-                    required
-                  >
-                    <option value="" disabled>
-                      {driversLoading
+                    options={driverOptions}
+                    placeholder={
+                      driversLoading
                         ? 'Loading drivers...'
                         : availabilityLoading
                           ? 'Checking availability...'
                           : drivers.length
                             ? 'Select driver...'
-                            : 'No drivers found'}
-                    </option>
-                    {drivers
-                      .slice()
-                      .sort((a, b) => {
-                        if (!form.departure_date || !form.departure_time || availabilityLoading || availabilityError) return 0
-                        const aUnavailable = unavailableDriverIds.has(a.uid)
-                        const bUnavailable = unavailableDriverIds.has(b.uid)
-                        if (aUnavailable === bUnavailable) return 0
-                        return aUnavailable ? 1 : -1
-                      })
-                      .map((driver) => {
-                        const isCheckingAvailability = form.departure_date && form.departure_time && availabilityChecked
-                        const isUnavailable = isCheckingAvailability && unavailableDriverIds.has(driver.uid)
-                        const label = driver.name ? `${driver.name} (${driver.email})` : driver.email
-                        return (
-                          <option key={driver.uid} value={driver.email} disabled={isUnavailable}>
-                            {isUnavailable ? `${label} — Unavailable` : label}
-                          </option>
-                        )
-                      })}
-                  </select>
-                </label>
-                {!form.departure_date || !form.departure_time ? (
+                            : 'No drivers found'
+                    }
+                    disabled={driversLoading || loading || availabilityLoading || !drivers.length}
+                    ariaLabel="Select driver"
+                    onChange={(value) => setForm((prev) => ({ ...prev, driver_email: value }))}
+                  />
+                </div>
+                {!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time ? (
                   <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
-                    Set departure date and time to check driver availability.
+                    Set departure and estimated arrival date/time to check driver availability.
                   </p>
                 ) : availabilityLoading ? (
                   <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
