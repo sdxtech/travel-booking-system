@@ -2,9 +2,6 @@
 __pycache__
 *.pyc
 .env
-.env.local
-.env.staging
 .env.*
-!.env.example
 Dockerfile
 .dockerignore

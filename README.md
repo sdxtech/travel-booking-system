@@ -18,7 +18,7 @@ Koneksi MongoDB diambil dari `MONGODB_URI` dan harus menyertakan nama database.
 
 ### Backend
 
-1. Isi env di `backend/.env.local` atau `backend/.env`.
+1. Gunakan `.env.development` di root project.
 2. Minimal env yang wajib:
    - `MONGODB_URI`
    - `JWT_SECRET`
@@ -33,11 +33,7 @@ python -m uvicorn main:app --reload
 
 ### Frontend
 
-1. Isi `frontend/.env`:
-
-```bash
-VITE_API_BASE_URL=http://localhost:8000
-```
+1. `frontend` otomatis membaca `../.env.development` melalui konfigurasi Vite.
 
 2. Jalankan frontend:
 
@@ -67,8 +63,7 @@ Project ini sudah punya:
 ### Local Dengan Docker + MongoDB di Compose
 
 ```bash
-copy .env.example .env
-docker compose up -d --build
+docker compose --env-file .env.development up -d --build
 ```
 
 Frontend: `http://localhost:8080`
@@ -76,7 +71,7 @@ Backend: `http://localhost:8000`
 
 ### Local Dengan Docker + MongoDB External
 
-1. Copy `.env.example` jadi `.env`
+1. Gunakan `.env.development` sebagai dasar konfigurasi.
 2. Ganti `MONGODB_URI` dengan URI MongoDB external
 3. Jalankan:
 
@@ -97,7 +92,7 @@ docker compose up -d --build
   - `JWT_ALGORITHM`: default `HS256`
   - `JWT_EXPIRES_HOURS`: default `8`
   - `CORS_ORIGINS`: daftar origin frontend, dipisah koma
-  - `APP_ENV`: set `staging` untuk load `.env.staging`
+  - `APP_ENV`: gunakan `production` untuk konfigurasi production
 - Catatan: `MONGODB_URI` juga bisa berisi nama env var lain yang menyimpan URI MongoDB.
 
 ### Frontend (Vercel)
@@ -109,6 +104,4 @@ docker compose up -d --build
 ## Deploy Notes
 
 Detail deploy container ada di `DEPLOY.md`.
-Contoh env production:
-- `backend/.env.production.example`
-- `frontend/.env.production.example`
+Konfigurasi environment tersimpan di `.env.development` dan `.env.production`.

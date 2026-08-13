@@ -7,12 +7,10 @@ from dotenv import load_dotenv
 
 
 def load_environment() -> None:
-    app_env = os.getenv("APP_ENV", "").lower()
-    if app_env == "staging":
-        load_dotenv(".env.staging")
-    else:
-        load_dotenv(".env.local")
-    load_dotenv()
+    app_env = os.getenv("APP_ENV", "development").lower()
+    env_name = "production" if app_env == "production" else "development"
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), f".env.{env_name}")
+    load_dotenv(env_path)
 
 
 def parse_args() -> argparse.Namespace:

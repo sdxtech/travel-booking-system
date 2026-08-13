@@ -8,13 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent
 
 def load_backend_env() -> None:
     """Load one backend env file using an explicit, predictable precedence."""
-    app_env = os.getenv("APP_ENV", "").lower()
-    env_candidates = [BASE_DIR / ".env.staging"] if app_env == "staging" else [BASE_DIR / ".env", BASE_DIR / ".env.local"]
-
-    for env_path in env_candidates:
-        if env_path.exists():
-            load_dotenv(env_path)
-            break
+    app_env = os.getenv("APP_ENV", "development").lower()
+    env_name = "production" if app_env == "production" else "development"
+    env_path = BASE_DIR.parent / f".env.{env_name}"
+    if env_path.exists():
+        load_dotenv(env_path)
 
 
 load_backend_env()

@@ -57,9 +57,7 @@ VITE_API_BASE_URL=https://<backend-domain>
 
 Karena frontend Vite dibuild statis, `VITE_API_BASE_URL` harus diisi saat build image frontend.
 
-Template env production:
-- `backend/.env.production.example`
-- `frontend/.env.production.example`
+Gunakan `.env.production` sebagai satu-satunya file konfigurasi production.
 
 ## Seed Superadmin
 
@@ -88,13 +86,12 @@ Script ini idempotent:
 ### Pakai MongoDB lokal di dalam compose
 
 ```bash
-copy .env.example .env
-docker compose up -d --build
+docker compose --env-file .env.development up -d --build
 ```
 
 ### Pakai MongoDB external
 
-Ubah `MONGODB_URI` di `.env`, lalu:
+Ubah `MONGODB_URI` di `.env.development`, lalu:
 
 ```bash
 docker compose up -d --build

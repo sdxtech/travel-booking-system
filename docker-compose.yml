@@ -12,7 +12,7 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRES_HOURS: ${JWT_EXPIRES_HOURS:-8}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
-      APP_ENV: ${APP_ENV:-local}
+      APP_ENV: ${APP_ENV:-development}
       PORT: 8000
     ports:
       - "${BACKEND_PORT:-8000}:8000"
