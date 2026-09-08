@@ -2294,7 +2294,7 @@
 .quick-scheduler__time-column {
   position: sticky;
   left: 0;
-  z-index: 5;
+  z-index: 9;
   background-color: #252525;
   border-right: 1px solid #454545;
 }
@@ -2302,7 +2302,8 @@
 .quick-scheduler__time-spacer {
   position: sticky;
   top: 0;
-  z-index: 8;
+  left: 0;
+  z-index: 10;
   height: 104px;
   border-bottom: 1px solid #4a4a4a;
   background-color: #252525;
@@ -2319,6 +2320,10 @@
   transform: translateY(-50%);
   color: #c8cdd3;
   font-size: 12px;
+}
+
+.quick-scheduler__time-body span:first-child {
+  transform: translateY(4px);
 }
 
 .quick-scheduler__lanes {
@@ -2390,8 +2395,10 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 5px;
+  overflow: hidden;
   border-left: 1px solid #545454;
   color: #d1d5db;
 }
@@ -2401,15 +2408,19 @@
 }
 
 .quick-scheduler-lane__days strong {
+  flex: 0 0 auto;
   color: #3b9cff;
-  font-size: 18px;
-  line-height: 22px;
+  font-size: 16px;
+  line-height: 20px;
 }
 
 .quick-scheduler-lane__days span {
+  flex: 0 1 auto;
   min-width: 0;
-  font-size: 18px;
-  line-height: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .quick-scheduler-lane__days .is-today {
@@ -2572,6 +2583,10 @@
   border-color: #cbd5e1;
   background-color: #ffffff;
   color: #1f2937;
+}
+
+.quick-driver-multiselect summary {
+  border-color: var(--brand-bold);
 }
 
 .quick-today-button:hover,
@@ -3374,14 +3389,18 @@
   }
 
   .quick-scheduler-lane__days > div {
-    gap: 4px;
-    padding: 5px 6px;
+    gap: 2px;
+    padding: 4px;
   }
 
-  .quick-scheduler-lane__days strong,
+  .quick-scheduler-lane__days strong {
+    font-size: 13px;
+    line-height: 17px;
+  }
+
   .quick-scheduler-lane__days span {
-    font-size: 14px;
-    line-height: 18px;
+    font-size: 11px;
+    line-height: 15px;
   }
 }
 
@@ -3627,8 +3646,8 @@
   }
 
   .quick-scheduler-lane__days span {
-    font-size: 11px;
-    line-height: 16px;
+    font-size: 10px;
+    line-height: 14px;
   }
 
   .office-table th,

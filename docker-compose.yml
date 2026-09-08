@@ -7,12 +7,15 @@ services:
         condition: service_healthy
         required: false
     environment:
-      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/bdtr_local}
+      MONGODB_URI: ${DOCKER_MONGODB_URI:-mongodb://mongo:27017/bdtr_local}
       JWT_SECRET: ${JWT_SECRET:-change-me-before-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRES_HOURS: ${JWT_EXPIRES_HOURS:-8}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
       APP_ENV: ${APP_ENV:-development}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Booking App <notifications@booking.plvpilot.space>}
+      APP_PUBLIC_URL: ${DOCKER_APP_PUBLIC_URL:-http://localhost:8080}
       PORT: 8000
     ports:
       - "${BACKEND_PORT:-8000}:8000"

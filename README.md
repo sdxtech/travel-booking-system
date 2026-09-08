@@ -14,72 +14,164 @@ Project ini sekarang menggunakan MongoDB sebagai database utama. Koleksi yang di
 
 Koneksi MongoDB diambil dari `MONGODB_URI` dan harus menyertakan nama database.
 
-## Local Setup
+## Local Setup (Rekomendasi: Docker)
 
-### Backend
+Pastikan Docker Desktop sudah berjalan, lalu masuk ke folder project:
 
-1. Gunakan `.env.development` di root project.
-2. Minimal env yang wajib:
-   - `MONGODB_URI`
-   - `JWT_SECRET`
-   - `CORS_ORIGINS`
-3. Jalankan backend:
-
-```bash
-cd backend
-pip install -r requirements.txt
-python -m uvicorn main:app --reload
+```powershell
+cd "C:\xampp81\htdocs\SODEXO\00-INTERNAL\101-TRAVEL BOOKING SYSTEM\booking-driver-ticket-request - mongo"
 ```
 
-### Frontend
+Project menggunakan `.env.development` untuk konfigurasi local.
 
-1. `frontend` otomatis membaca `../.env.development` melalui konfigurasi Vite.
+### Menjalankan pertama kali
 
-2. Jalankan frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Seed Superadmin
-
-Kalau database masih kosong, buat akun superadmin pertama:
-
-```bash
-cd backend
-python seed_superadmin.py --email admin@example.com --password admin123
-```
-
-## Docker Setup
-
-Project ini sudah punya:
-- `backend/Dockerfile`
-- `frontend/Dockerfile`
-- `docker-compose.yml`
-- healthcheck container untuk backend, frontend, dan MongoDB lokal
-
-### Local Dengan Docker + MongoDB di Compose
+Build dan jalankan MongoDB, backend, serta frontend:
 
 ```bash
 docker compose --env-file .env.development up -d --build
 ```
 
-Frontend: `http://localhost:8080`
-Backend: `http://localhost:8000`
-
-### Local Dengan Docker + MongoDB External
-
-1. Gunakan `.env.development` sebagai dasar konfigurasi.
-2. Ganti `MONGODB_URI` dengan URI MongoDB external
-3. Jalankan:
+Cek status service:
 
 ```bash
-docker compose up -d --build
+docker compose --env-file .env.development ps
 ```
 
+Aplikasi tersedia di:
+
+- Frontend: `http://localhost:8080`
+- Backend: `http://localhost:8000`
+- Health check: `http://localhost:8000/healthz`
+
+### Membuat Super Admin pertama kali
+
+Jika database masih kosong, jalankan:
+
+```bash
+docker compose --env-file .env.development exec backend python seed_superadmin.py --email admin@example.com --password admin123
+```
+
+Contoh akun awal:
+
+```text
+Email: admin@example.com
+Password: admin123
+```
+
+Ganti password setelah login.
+
+### Menjalankan setelah setup pertama kali
+
+Jika container masih ada tetapi berhenti:
+
+```bash
+docker compose --env-file .env.development start
+```
+
+Atau gunakan:
+
+```bash
+docker compose --env-file .env.development up -d
+```
+
+Tidak perlu menggunakan `--build` setiap kali menjalankan ulang. Gunakan `--build` jika ada perubahan source code atau dependency:
+
+```bash
+docker compose --env-file .env.development up -d --build
+```
+
+### Melihat log
+
+```bash
+docker compose --env-file .env.development logs -f
+docker compose --env-file .env.development logs -f backend
+docker compose --env-file .env.development logs -f frontend
+```
+
+Tekan `Ctrl+C` untuk keluar dari tampilan log. Container tetap berjalan.
+
+### Menghentikan project
+
+Menghentikan container tanpa menghapus data MongoDB:
+
+```bash
+docker compose --env-file .env.development stop
+```
+
+Menurunkan container dan network:
+
+```bash
+docker compose --env-file .env.development down
+```
+
+Data MongoDB tersimpan di volume Docker `mongo_data`. Jangan gunakan `down -v` kecuali memang ingin menghapus seluruh database local:
+
+```bash
+docker compose --env-file .env.development down -v
+```
+
+### Docker dengan MongoDB external
+
+Isi `DOCKER_MONGODB_URI` di `.env.development` dengan URI MongoDB external, lalu jalankan:
+
+```bash
+docker compose --env-file .env.development up -d --build
+```
+
+## Local Setup Tanpa Docker
+
+Mode ini membutuhkan MongoDB yang berjalan langsung di komputer host. Untuk mode ini, gunakan `MONGODB_URI=mongodb://localhost:27017/bdtr_local`.
+
+### Backend
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn main:app --reload
+```
+
+Install dependency hanya saat pertama kali atau ketika `requirements.txt` berubah:
+
+```powershell
+pip install -r requirements.txt
+```
+
+### Frontend
+
+Buka terminal baru:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend otomatis membaca konfigurasi melalui Vite. Mode ini biasanya tersedia di `http://localhost:5173`.
+
 ## Staging Deploy
+
+## Email Notification dengan Resend
+
+Email dikirim otomatis bersama notifikasi aplikasi jika `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` terisi. Jika salah satunya kosong atau Resend gagal, notifikasi aplikasi tetap tersimpan dan proses bisnis tidak dibatalkan.
+
+1. Tambahkan dan verifikasi domain pengirim di Resend. Untuk production, alamat default proyek adalah `notifications@booking.plvpilot.space`.
+2. Buat API key dengan izin mengirim email.
+3. Isi file environment yang sesuai. Gunakan `.env.development` untuk lokal dan `.env.production` untuk production. Jangan commit API key asli:
+
+```env
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_FROM_EMAIL=Booking App <notifications@booking.plvpilot.space>
+APP_PUBLIC_URL=https://booking.plvpilot.space
+```
+
+Untuk Docker Compose, restart backend setelah mengubah environment:
+
+```bash
+docker compose --env-file .env.development up -d --build backend
+```
+
+Status pengiriman tersimpan pada koleksi `notifications` melalui field `email_status` (`skipped`, `pending`, `sent`, atau `failed`) dan `email_provider_id` jika berhasil.
 
 ### Backend (Render)
 
@@ -93,6 +185,9 @@ docker compose up -d --build
   - `JWT_EXPIRES_HOURS`: default `8`
   - `CORS_ORIGINS`: daftar origin frontend, dipisah koma
   - `APP_ENV`: gunakan `production` untuk konfigurasi production
+  - `RESEND_API_KEY`: API key rahasia dari Resend
+  - `RESEND_FROM_EMAIL`: nama dan alamat pengirim dari domain yang sudah diverifikasi
+  - `APP_PUBLIC_URL`: URL aplikasi untuk tombol pada email
 - Catatan: `MONGODB_URI` juga bisa berisi nama env var lain yang menyimpan URI MongoDB.
 
 ### Frontend (Vercel)
