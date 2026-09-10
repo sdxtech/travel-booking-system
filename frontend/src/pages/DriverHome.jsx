@@ -47,7 +47,7 @@ function DriverHome() {
 
   // Load bookings assigned to the signed-in driver.
   useEffect(() => {
-    
+
 
     // Fetch assigned bookings for the driver.
     const loadAssigned = async () => {
@@ -129,7 +129,7 @@ function DriverHome() {
       return
     }
 
-   
+
 
     setProcessing((prev) => ({ ...prev, [activeBooking.id]: true }))
     setActionMessage('')
@@ -140,7 +140,7 @@ function DriverHome() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-        
+
         },
         credentials:'include',
         body: JSON.stringify({ starting_mileage: mileageValue }),
@@ -183,7 +183,7 @@ function DriverHome() {
       return
     }
 
-    
+
 
     setProcessing((prev) => ({ ...prev, [activeBooking.id]: true }))
     setActionMessage('')
@@ -194,7 +194,7 @@ function DriverHome() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-         
+
         },
         credentials:'include',
         body: JSON.stringify({ ending_mileage: endingValue }),

@@ -1,4 +1,5 @@
 import React from 'react'
+import TableActionDropdown from './TableActionDropdown'
 
 function BookingActions({
   booking,
@@ -15,19 +16,21 @@ function BookingActions({
   const isAwaitingValidation = statusValue === 'awaiting_validation'
 
   return (
-    <div className="table-row-actions table-action-buttons">
+    <TableActionDropdown
+      label={`Actions for ${booking.request_id || 'driver booking'}`}
+      disabled={actionLoadingId === booking.id}
+    >
       <button
         type="button"
-        className="btn btn-outline-brand"
         onClick={() => onEdit(booking)}
-        disabled={!isPending || actionLoadingId === booking.id}
+        disabled={!isPending || booking.cancellation_status === 'pending' || actionLoadingId === booking.id}
         title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
       >
         Edit
       </button>
       <button
         type="button"
-        className="btn btn-danger"
+        className="is-danger"
         onClick={() => onCancel(booking.id)}
         disabled={!canCancel || actionLoadingId === booking.id}
         title={
@@ -42,7 +45,6 @@ function BookingActions({
       </button>
       <button
         type="button"
-        className="btn btn-primary"
         onClick={() => onValidate(booking)}
         disabled={!isAwaitingValidation || actionLoadingId === booking.id}
         title={
@@ -55,13 +57,12 @@ function BookingActions({
       </button>
       <button
         type="button"
-        className="btn btn-outline-brand"
         onClick={() => onDetails(booking)}
         disabled={actionLoadingId === booking.id}
       >
         Details
       </button>
-    </div>
+    </TableActionDropdown>
   )
 }
 

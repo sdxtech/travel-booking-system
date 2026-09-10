@@ -1,8 +1,7 @@
-from datetime import datetime
+import os
 
-from fastapi import APIRouter, HTTPException, status, Response, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
-from bson import ObjectId
 from main import get_current_user
 
 from auth_utils import create_access_token, verify_password, hash_password, get_jwt_expires_hours
@@ -20,19 +19,18 @@ class LoginRequest(BaseModel):
     remember_me: bool = False
 
 
-class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_at: datetime
-
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(..., min_length=1)
     confirm_password: str = Field(..., min_length=6)
     new_password: str = Field(..., min_length=6)
 
 
+def use_secure_cookie() -> bool:
+    return os.getenv("APP_ENV", "development").strip().lower() == "production"
+
+
 @router.post("/login")
-def login(payload: LoginRequest, response: Response,):
+def login(payload: LoginRequest, response: Response):
     email = payload.email.strip().lower()
     user = db["users"].find_one({
         "email": email
@@ -57,11 +55,11 @@ def login(payload: LoginRequest, response: Response,):
             detail="Invalid email or password"
         )
     if payload.remember_me:
-        expires_hours = 24 * 30  
+        expires_hours = 24 * 30
         cookie_max_age = 60 * 60 * 24 * 30
     else:
         expires_hours = get_jwt_expires_hours()
-        cookie_max_age = expires_hours * 60 * 60
+        cookie_max_age = None
 
     token, expires_at = create_access_token(
         user_id=str(user.get("_id")),
@@ -72,7 +70,7 @@ def login(payload: LoginRequest, response: Response,):
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,  
+        secure=use_secure_cookie(),
         samesite="lax",
         max_age=cookie_max_age,
         path="/",
@@ -148,13 +146,13 @@ def change_password(
     return {
         "message": "Password changed successfully"
     }
-    
+
 @router.post("/logout")
 def logout(response: Response):
     response.delete_cookie(
     key="access_token",
     path="/",
-    secure=False,
+    secure=use_secure_cookie(),
     httponly=True,
     samesite="lax",
 )

@@ -1,13 +1,8 @@
 
-import {
-  createContext,
-  useEffect,
-  useState,
-} from 'react'
+import { useEffect, useState } from 'react'
 
 import { API_BASE_URL } from '../config'
-
-export const AuthContext = createContext(null)
+import AuthContext from './AuthContext'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -40,7 +35,7 @@ export function AuthProvider({ children }) {
 
 
   const fetchPagePermissions = async (role) => {
-    
+
     if (role !== 'user') {
       setPagePermissions([])
       setPermissionsLoaded(true)
@@ -73,11 +68,6 @@ export function AuthProvider({ children }) {
 
       const data = await response.json()
 
-      console.log(
-        'AUTH PAGE PERMISSIONS RESPONSE:',
-        data
-      )
-
       const permissions = Array.isArray(data)
         ? data
         : Array.isArray(data?.permissions)
@@ -85,11 +75,6 @@ export function AuthProvider({ children }) {
           : Array.isArray(data?.pages)
             ? data.pages
             : []
-
-      console.log(
-        'AUTH PAGE PERMISSIONS:',
-        permissions
-      )
 
       setPagePermissions(permissions)
 
@@ -148,7 +133,7 @@ export function AuthProvider({ children }) {
       )
     }
 
-    
+
     await fetchPagePermissions(
       userData.role
     )
@@ -169,7 +154,7 @@ export function AuthProvider({ children }) {
     } finally {
       setUser(null)
 
-     
+
       setPagePermissions([])
       setPermissionsLoaded(false)
       setPermissionsLoading(false)
@@ -204,7 +189,7 @@ export function AuthProvider({ children }) {
     initializeAuth()
   }, [])
 
-  
+
 
   return (
     <AuthContext.Provider

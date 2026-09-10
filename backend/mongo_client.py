@@ -77,7 +77,7 @@ def init_mongo():
         init_page_permissions(database)
     except Exception as exc:
         print(f"Page permission setup skipped: {exc}")
-   
+
     try:
         from request_id_service import backfill_request_ids
 
@@ -136,6 +136,11 @@ def init_page_permissions(database):
         database["pages"].update_one(
             {"_id": page["_id"]},
             {"$setOnInsert": page},
+            upsert=True,
+        )
+        database["role_page_permissions"].update_one(
+            {"role": "user", "page_id": page["_id"]},
+            {"$setOnInsert": {"enabled": True}},
             upsert=True,
         )
 

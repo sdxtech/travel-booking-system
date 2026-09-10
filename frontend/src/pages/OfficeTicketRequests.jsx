@@ -44,7 +44,7 @@ const isSuperadmin =
 
   // Load pending ticket requests.
   useEffect(() => {
-    
+
 
     // Fetch pending tickets from the API.
     const loadTickets = async () => {
@@ -68,7 +68,7 @@ const isSuperadmin =
           const data = await res.json()
           setTickets(Array.isArray(data) ? data : [])
         }
-      } catch (err) {
+      } catch {
         setError('Network error. Please try again.')
         setTickets([])
       } finally {
@@ -81,7 +81,7 @@ const isSuperadmin =
 
   // Update ticket status and remove it from the pending list.
   const handleStatusUpdate = async (ticketId, nextStatus) => {
-   
+
 
     setProcessing((prev) => ({ ...prev, [ticketId]: true }))
     setActionMessage('')
@@ -92,7 +92,7 @@ const isSuperadmin =
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          
+
         },
          credentials:'include',
         body: JSON.stringify({ status: nextStatus }),
@@ -112,7 +112,7 @@ const isSuperadmin =
 
       setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId))
       setActionMessage(`Ticket ${nextStatus}. Moved to ticket history.`)
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setProcessing((prev) => {

@@ -18,7 +18,6 @@ import AdminSettings from './pages/AdminSettings'
 import AdminDriverAvailability from './pages/AdminDriverAvailability'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
-import { AuthProvider } from './contexts/authContext'
 import Unauthorized from './pages/Unauthorized'
 import ResetPassword from './pages/ResetPassword'
 import AdminPagePermissions from './pages/AdminPagePermissions'
@@ -141,6 +140,22 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <OfficeManageUser />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/office/settings"
+            element={
+              <ProtectedRoute allowedRoles={["office_coordinator"]}>
+                <Navigate to="/office/settings/driver-availability" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/office/settings/driver-availability"
+            element={
+              <ProtectedRoute allowedRoles={["office_coordinator"]}>
+                <AdminDriverAvailability />
               </ProtectedRoute>
             }
           />

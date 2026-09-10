@@ -39,7 +39,7 @@ const initialForm = {
 // Create a travel request on behalf of a user (office coordinator flow).
 function OfficeTravelAccommodation() {
   const navigate = useNavigate()
-  
+
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const { user } = useAuth()
 const isSuperadmin =
@@ -84,7 +84,7 @@ const isSuperadmin =
     setErrorMessage('')
     setShowSuccessModal(false)
 
-    
+
 
     const payload = {
       ...form,
@@ -96,7 +96,7 @@ const isSuperadmin =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          
+
         },
         credentials: 'include',
         body: JSON.stringify(payload),
@@ -116,7 +116,7 @@ const isSuperadmin =
         setForm(initialForm)
         setShowSuccessModal(true)
       }
-    } catch (error) {
+    } catch {
       setErrorMessage('Network error. Please try again.')
     } finally {
       setLoading(false)

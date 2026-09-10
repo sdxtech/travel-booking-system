@@ -4,7 +4,6 @@ import BookingActions from './BookingAction'
 
 function DataCard({
   booking,
-  index,
   statusValue,
   canCancel,
   cancellationPolicyLabel,
@@ -22,7 +21,7 @@ function DataCard({
     <div className="booking-card-item">
       <div className="booking-card-header">
         <div>
-         
+
           <h3 className="booking-card-title">{booking.request_id || 'Driver Booking'}</h3>
         </div>
         <span className={`status-badge status-${statusValue}`}>

@@ -8,18 +8,16 @@ BASE_DIR = Path(__file__).resolve().parent
 
 def load_backend_env() -> None:
     """Load one backend env file using an explicit, predictable precedence."""
-    app_env = os.getenv("APP_ENV", "").lower()
-    env_candidates = [BASE_DIR / ".env.staging"] if app_env == "staging" else [BASE_DIR / ".env", BASE_DIR / ".env.local"]
-
-    for env_path in env_candidates:
-        if env_path.exists():
-            load_dotenv(env_path)
-            break
+    app_env = os.getenv("APP_ENV", "development").lower()
+    env_name = "production" if app_env == "production" else "development"
+    env_path = BASE_DIR.parent / f".env.{env_name}"
+    if env_path.exists():
+        load_dotenv(env_path)
 
 
 load_backend_env()
 
-from fastapi import FastAPI, Depends, HTTPException, status, Cookie, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -27,9 +25,6 @@ from jwt import ExpiredSignatureError, InvalidTokenError
 
 from auth_utils import decode_access_token, get_jwt_secret
 from mongo_client import db, init_mongo
-
-from bson import ObjectId
-from bson.errors import InvalidId
 
 app = FastAPI()
 
@@ -43,7 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 @app.on_event("startup")
@@ -55,12 +50,12 @@ def startup_event():
 
 def get_current_user(
     request: Request,
+    creds: HTTPAuthorizationCredentials | None = Depends(security),
 ):
-    """Validate access token from HttpOnly cookie."""
-
-    token = request.cookies.get(
-        "access_token"
-    )
+    """Validate the HttpOnly session cookie, with Bearer fallback during migration."""
+    token = request.cookies.get("access_token")
+    if not token and creds:
+        token = creds.credentials
 
     if not token:
         raise HTTPException(

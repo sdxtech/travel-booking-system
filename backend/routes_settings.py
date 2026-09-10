@@ -14,12 +14,14 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 class BookingCancellationPolicyUpdate(BaseModel):
+    auto_approve: bool = True
     value: int = Field(..., ge=1, le=8760)
     unit: Literal["hours", "days"]
     cutoff_time: str = Field(default="17:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
 class BookingCancellationPolicyResponse(BaseModel):
+    auto_approve: bool = True
     value: int
     unit: Literal["hours", "days"]
     cutoff_minutes: int
@@ -45,6 +47,14 @@ class DriverAvailabilityResponse(BaseModel):
 def require_superadmin(current_user: dict) -> None:
     if current_user.get("role") != "superadmin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super Admin access required")
+
+
+def require_driver_availability_manager(current_user: dict) -> None:
+    if current_user.get("role") not in ("office_coordinator", "superadmin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Office Coordinator or Super Admin access required",
+        )
 
 
 def serialize_driver_availability(document: dict) -> DriverAvailabilityResponse:
@@ -87,6 +97,7 @@ def update_booking_cancellation_policy(
         {
             "$set": {
                 "value": payload.value,
+                "auto_approve": payload.auto_approve,
                 "unit": payload.unit,
                 "cutoff_time": payload.cutoff_time,
                 "updated_at": now,
@@ -100,8 +111,8 @@ def update_booking_cancellation_policy(
 
 @router.get("/drivers", response_model=list[DriverAvailabilityResponse])
 def list_driver_availability(current_user=Depends(get_current_user)):
-    """List driver booking availability for Super Admin Settings."""
-    require_superadmin(current_user)
+    """List driver booking availability for Coordinator and Super Admin Settings."""
+    require_driver_availability_manager(current_user)
     drivers = list(db["users"].find({"role": "driver"}))
     drivers.sort(key=lambda item: str((item or {}).get("name") or (item or {}).get("email") or "").lower())
     return [serialize_driver_availability(driver) for driver in drivers]
@@ -114,7 +125,7 @@ def update_driver_availability(
     current_user=Depends(get_current_user),
 ):
     """Turn a driver's eligibility for new bookings on or off."""
-    require_superadmin(current_user)
+    require_driver_availability_manager(current_user)
     driver = db["users"].find_one({"_id": driver_id})
     if not driver:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
@@ -135,12 +146,13 @@ def update_driver_availability(
         },
     )
 
+    actor_label = "Super Admin" if current_user.get("role") == "superadmin" else "Office Coordinator"
     create_user_notification(
         driver_id,
         (
-            "Your availability for new driver bookings has been turned on by Super Admin."
+            f"Your availability for new driver bookings has been turned on by {actor_label}."
             if payload.booking_enabled
-            else "Your availability for new driver bookings has been turned off by Super Admin. Existing tasks are unchanged."
+            else f"Your availability for new driver bookings has been turned off by {actor_label}. Existing tasks are unchanged."
         ),
         event="driver_availability_updated",
         entity_type="user",

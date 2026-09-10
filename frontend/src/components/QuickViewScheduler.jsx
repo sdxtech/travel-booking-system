@@ -92,14 +92,12 @@ function QuickViewScheduler({
 }) {
   const today = useMemo(() => new Date(), [])
   const [selectedDate, setSelectedDate] = useState(today)
-  const [selectedCalendarIds, setSelectedCalendarIds] = useState(null)
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState([])
   const availableCalendarIds = useMemo(() => new Set(calendars.map((calendar) => String(calendar.id))), [calendars])
-  const activeCalendarIds = useMemo(() => {
-    if (selectedCalendarIds === null) {
-      return new Set(calendars.length ? [String(calendars[0].id)] : [])
-    }
-    return new Set(selectedCalendarIds.filter((calendarId) => availableCalendarIds.has(calendarId)))
-  }, [availableCalendarIds, calendars, selectedCalendarIds])
+  const activeCalendarIds = useMemo(
+    () => new Set(selectedCalendarIds.filter((calendarId) => availableCalendarIds.has(calendarId))),
+    [availableCalendarIds, selectedCalendarIds]
+  )
 
   const weekDays = useMemo(() => {
     const start = startOfWorkWeek(selectedDate)

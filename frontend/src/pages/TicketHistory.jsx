@@ -138,6 +138,8 @@ function TicketHistory() {
         return a.index - b.index;
       })
       .map((entry) => entry.ticket);
+  // Sorting helpers are pure and intentionally scoped to this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets, sortConfig]);
 
   const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize));
@@ -349,11 +351,10 @@ function TicketHistory() {
                 {pagedTickets.length === 0 ? (
                   <p className="muted">No ticket requests yet.</p>
                 ) : (
-                  pagedTickets.map((ticket, index) => (
+                  pagedTickets.map((ticket) => (
                     <TicketCard
                       key={ticket.id}
                       ticket={ticket}
-                      index={(currentPage - 1) * pageSize + index + 1}
                       actionLoadingId={actionLoadingId}
                       formatDate={formatDate}
                       formatDateTime={formatDateTime}

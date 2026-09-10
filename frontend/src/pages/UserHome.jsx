@@ -61,7 +61,7 @@ function UserHome() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-   
+
 
     const loadQuickView = async () => {
       setLoading(true)

@@ -10,6 +10,7 @@ import {
 } from '../components/quickViewSchedulerUtils'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -75,7 +76,8 @@ function buildDriverBookingEvent(booking, calendarId, color) {
 function OfficeHome() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+  const { user } = useAuth()
+  const isSuperadmin = user?.role === 'superadmin'
   const [tickets, setTickets] = useState([])
   const [bookings, setBookings] = useState([])
   const [driverSchedules, setDriverSchedules] = useState([])

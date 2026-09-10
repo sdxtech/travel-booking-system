@@ -12,6 +12,7 @@ JAKARTA_TIMEZONE = timezone(timedelta(hours=7), name="Asia/Jakarta")
 
 
 class BookingCancellationPolicy(TypedDict):
+    auto_approve: bool
     value: int
     unit: Literal["hours", "days"]
     cutoff_minutes: int
@@ -48,6 +49,7 @@ def get_booking_cancellation_policy() -> BookingCancellationPolicy:
         cutoff_time = DEFAULT_CANCELLATION_TIME
 
     return {
+        "auto_approve": document.get("auto_approve", True) is not False,
         "value": value,
         "unit": unit,
         "cutoff_minutes": cancellation_cutoff_minutes(value, unit),

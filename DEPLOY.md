@@ -18,6 +18,9 @@ Rekomendasi production:
 - `JWT_ALGORITHM` (default `HS256`)
 - `JWT_EXPIRES_HOURS` (default `8`)
 - `CORS_ORIGINS`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `APP_PUBLIC_URL`
 
 ### Frontend
 
@@ -57,9 +60,7 @@ VITE_API_BASE_URL=https://<backend-domain>
 
 Karena frontend Vite dibuild statis, `VITE_API_BASE_URL` harus diisi saat build image frontend.
 
-Template env production:
-- `backend/.env.production.example`
-- `frontend/.env.production.example`
+Gunakan `.env.production` sebagai satu-satunya file konfigurasi production.
 
 ## Seed Superadmin
 
@@ -88,16 +89,15 @@ Script ini idempotent:
 ### Pakai MongoDB lokal di dalam compose
 
 ```bash
-copy .env.example .env
-docker compose up -d --build
+docker compose --env-file .env.development up -d --build
 ```
 
 ### Pakai MongoDB external
 
-Ubah `MONGODB_URI` di `.env`, lalu:
+Isi `DOCKER_MONGODB_URI` di `.env.development` dengan URI MongoDB external, lalu:
 
 ```bash
-docker compose up -d --build
+docker compose --env-file .env.development up -d --build
 ```
 
 Frontend akan tersedia di `http://localhost:8080` dan backend di `http://localhost:8000`.

@@ -5,13 +5,7 @@ import { API_BASE_URL } from '../config'
 import MainLayout from "../components/MainLayout"
 
 const AdminPagePermissions = () => {
-  const [roles, setRoles] = useState([
-    "user",
-    "driver",
-    "office_coordinator",
-  ])
-
-  const [selectedRole, setSelectedRole] = useState("user")
+  const selectedRole = "user"
 
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(false)
@@ -64,11 +58,6 @@ const AdminPagePermissions = () => {
 
   const togglePermission = async (page) => {
   const nextEnabled = !page.enabled
-   console.log("Toggle page:", page)
-  console.log("Next enabled:", nextEnabled)
-  console.log("Selected role:", selectedRole)
-
-
   setUpdatingId(page.page_id)
   setError('')
   setSuccess('')
@@ -156,7 +145,7 @@ const AdminPagePermissions = () => {
           <label htmlFor="permission-role">
             Role
           </label>
- 
+
           <select
             id="permission-role"
             value={selectedRole}

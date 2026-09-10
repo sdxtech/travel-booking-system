@@ -61,7 +61,7 @@ function ProtectedRoute({
     return <div>Loading...</div>
   }
 
- 
+
 
   const currentPermission =
     pagePermissions.find(

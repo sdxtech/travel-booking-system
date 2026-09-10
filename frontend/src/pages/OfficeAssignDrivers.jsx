@@ -57,7 +57,7 @@ const isSuperadmin =
 
   // Load the list of available drivers (role === 'driver').
   useEffect(() => {
-    
+
 
     // Fetch drivers from the user list endpoint.
     const loadDrivers = async () => {
@@ -88,7 +88,7 @@ const isSuperadmin =
             (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
           )
         )
-      } catch (err) {
+      } catch {
         setDriversError('Network error. Please try again.')
         setDrivers([])
       } finally {
@@ -123,7 +123,7 @@ const isSuperadmin =
       return
     }
 
-    
+
 
     const controller = new AbortController()
     // Fetch the driver ids that are busy for the selected departure time.
@@ -234,7 +234,7 @@ const isSuperadmin =
       return
     }
 
-   
+
 
     const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
     const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
@@ -269,7 +269,7 @@ const isSuperadmin =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-         
+
         },
         credentials: 'include',
         body: JSON.stringify(payload),
@@ -289,7 +289,7 @@ const isSuperadmin =
         setForm(initialForm)
         setShowSuccessModal(true)
       }
-    } catch (error) {
+    } catch {
       setErrorMessage('Network error. Please try again.')
     } finally {
       setLoading(false)

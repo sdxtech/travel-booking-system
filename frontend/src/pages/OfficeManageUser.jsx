@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import TableActionDropdown from '../components/TableActionDropdown'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
@@ -64,16 +65,23 @@ const isSuperadmin =
   const [passwordError, setPasswordError] = useState('')
 
   const pageSize = 10
-  const totalPages = Math.max(1, Math.ceil(users.length / pageSize))
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const filteredUsers = users.filter((user) => {
+    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email]
+      .filter((value) => value != null).join(' ').toLowerCase()
+    return searchTerms.every((term) => text.includes(term))
+  })
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const pagedUsers = users.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const pagedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   // Keep page index within bounds when the list size changes.
   useEffect(() => {
     setPage((prev) => Math.min(prev, totalPages))
   }, [totalPages])
 
- 
+
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
@@ -90,7 +98,7 @@ const isSuperadmin =
 
   // Fetch user profiles from the API.
   const loadUsers = async () => {
-    
+
 
     setLoading(true)
     setError('')
@@ -112,7 +120,7 @@ const isSuperadmin =
         const data = await res.json()
         setUsers(Array.isArray(data) ? data : [])
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.')
       setUsers([])
     } finally {
@@ -123,7 +131,6 @@ const isSuperadmin =
   // Initial data fetch.
   useEffect(() => {
     loadUsers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update create form fields.
@@ -204,7 +211,7 @@ const isSuperadmin =
 
   // Upload and import users from the selected CSV/XLSX file.
   const handleImportUsers = async () => {
-    
+
 
     if (!importFile) {
       setImportError('Please choose a file (.xlsx or .csv).')
@@ -221,7 +228,7 @@ const isSuperadmin =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-         
+
         },
         credentials:'include',
         body: JSON.stringify({
@@ -245,7 +252,7 @@ const isSuperadmin =
       const data = await res.json()
       setImportResult(data)
       await loadUsers()
-    } catch (err) {
+    } catch {
       setImportError('Network error. Please try again.')
     } finally {
       setImportLoading(false)
@@ -269,7 +276,7 @@ const isSuperadmin =
   // Create a new user account from the create form.
   const handleCreate = async (event) => {
     event.preventDefault()
-    
+
 
     setCreateLoading(true)
     setCreateError('')
@@ -280,7 +287,7 @@ const isSuperadmin =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-         
+
         },
          credentials:'include',
         body: JSON.stringify(createForm),
@@ -304,7 +311,7 @@ const isSuperadmin =
         setShowCreate(false)
         await loadUsers()
       }
-    } catch (err) {
+    } catch {
       setCreateError('Network error. Please try again.')
     } finally {
       setCreateLoading(false)
@@ -330,7 +337,7 @@ const isSuperadmin =
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-         
+
         },
         credentials:'include',
         body: JSON.stringify(updatePayload),
@@ -352,7 +359,7 @@ const isSuperadmin =
         })
         await loadUsers()
       }
-    } catch (err) {
+    } catch {
       setEditError('Network error. Please try again.')
     } finally {
       setEditLoading(false)
@@ -390,7 +397,7 @@ const isSuperadmin =
 
       setActionSuccess('User deactivated successfully.')
       await loadUsers()
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setActionLoadingId('')
@@ -443,7 +450,7 @@ const isSuperadmin =
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-         
+
         },
         credentials:'include',
         body: JSON.stringify({ password: nextPassword }),
@@ -506,15 +513,26 @@ const isSuperadmin =
 
         <section className="office-content">
           <header className="office-header">
-            <p className="eyebrow">Manage User</p>
             <h1>Manage Users</h1>
-            <p className="muted">Create new accounts and update existing user profiles</p>
           </header>
 
           {actionSuccess ? <p className="success-text">{actionSuccess}</p> : null}
           {actionError ? <p className="error-text">{actionError}</p> : null}
 
-          <div className="form-actions">
+          <div className="form-actions history-toolbar">
+            <label className="history-search">
+              <i className="bi bi-search" aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search users"
+                placeholder="Search by name, email, department, or role..."
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setPage(1)
+                }}
+              />
+            </label>
             <button type="button" className="btn btn-primary" onClick={() => setShowCreate((v) => !v)}>
               {showCreate ? 'Close Create Form' : 'Create Account'}
             </button>
@@ -715,7 +733,7 @@ const isSuperadmin =
                       {error}
                     </td>
                   </tr>
-                ) : users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan="8" className="muted">
                       No users found.
@@ -735,10 +753,12 @@ const isSuperadmin =
                       <td>{user.phone || '-'}</td>
                       <td>{user.email || '-'}</td>
                       <td>
-                        <div className="office-row-actions table-action-buttons">
+                        <TableActionDropdown
+                          label={`Actions for ${user.name || user.email || 'user'}`}
+                          disabled={actionLoadingId === user.uid}
+                        >
                           <button
                             type="button"
-                            className="btn btn-primary"
                             disabled={actionLoadingId === user.uid || (!isSuperadmin && user.disabled)}
                             onClick={() => handleSelectUser(user)}
                             title={
@@ -749,11 +769,10 @@ const isSuperadmin =
                                   : 'Update user'
                             }
                           >
-                            Update
+                            <i className="bi bi-pencil-square" aria-hidden="true" /> Update
                           </button>
                           <button
                             type="button"
-                            className="btn btn-neutral"
                             disabled={
                               actionLoadingId === user.uid ||
                               (!isSuperadmin &&
@@ -770,11 +789,11 @@ const isSuperadmin =
                                   : 'Password reset is only available for users and drivers.'
                             }
                           >
-                            Reset Password
+                            <i className="bi bi-key" aria-hidden="true" /> Reset Password
                           </button>
                           <button
                             type="button"
-                            className="btn btn-danger"
+                            className="is-danger"
                             disabled={actionLoadingId === user.uid || (!isSuperadmin && user.disabled)}
                             onClick={() => handleDeactivate(user)}
                             title={
@@ -785,9 +804,9 @@ const isSuperadmin =
                                   : 'Deactivate user'
                             }
                           >
-                            Deactivate
+                            <i className="bi bi-person-slash" aria-hidden="true" /> Deactivate
                           </button>
-                        </div>
+                        </TableActionDropdown>
                       </td>
                     </tr>
                   ))

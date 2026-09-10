@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
+from email_service import email_delivery_enabled, send_notification_email
 from mongo_client import db
 
 
@@ -26,6 +27,9 @@ def create_user_notification(
         return None
 
     notification_id = uuid4().hex
+    user_snapshot = db["users"].find_one({"_id": str(user_id)}, {"email": 1, "name": 1}) or {}
+    recipient_email = str(user_snapshot.get("email") or "").strip().lower()
+    should_send_email = bool(recipient_email and email_delivery_enabled())
     db["notifications"].insert_one(
         {
             "_id": notification_id,
@@ -38,8 +42,45 @@ def create_user_notification(
             "status": status,
             "actor_id": actor_id,
             "created_at": utc_now(),
+            "email_to": recipient_email or None,
+            "email_status": "pending" if should_send_email else "skipped",
         }
     )
+
+    if should_send_email:
+        try:
+            resend_email_id = send_notification_email(
+                to_email=recipient_email,
+                recipient_name=user_snapshot.get("name"),
+                message=message,
+                event=event,
+                entity_type=entity_type,
+                notification_id=notification_id,
+            )
+            db["notifications"].update_one(
+                {"_id": notification_id},
+                {
+                    "$set": {
+                        "email_status": "sent",
+                        "email_provider": "resend",
+                        "email_provider_id": resend_email_id,
+                        "email_sent_at": utc_now(),
+                    }
+                },
+            )
+        except Exception as exc:
+            db["notifications"].update_one(
+                {"_id": notification_id},
+                {
+                    "$set": {
+                        "email_status": "failed",
+                        "email_provider": "resend",
+                        "email_error": str(exc)[:500],
+                        "email_failed_at": utc_now(),
+                    }
+                },
+            )
+            print(f"Email notification {notification_id} failed: {exc}")
     return notification_id
 
 

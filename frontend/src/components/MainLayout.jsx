@@ -68,16 +68,8 @@ const officeNavSections = [
     label: 'Status & History',
     icon: 'bi-clock-history',
     items: [
-      {
-        label: 'Travel Status & History',
-        path: '/office/ticket-history',
-        icon: 'bi-card-checklist',
-      },
-      {
-        label: 'Booking Driver Status & History',
-        path: '/office/driver-history',
-        icon: 'bi-journal-check',
-      },
+      { label: 'Travel Request & History', path: '/office/ticket-history', icon: 'bi-card-checklist' },
+      { label: 'Booking Driver Request & History', path: '/office/driver-history', icon: 'bi-journal-check' },
     ],
   },
 ]
@@ -118,6 +110,16 @@ const accountSettingsSection = {
   ],
 }
 
+const officeSettingsSection = {
+  id: 'settings',
+  label: 'Settings',
+  icon: 'bi-gear',
+  items: [
+    { label: 'Driver Availability', path: '/office/settings/driver-availability', icon: 'bi-person-check' },
+  ],
+}
+
+// Shared page shell with header, notifications, and logout.
 function MainLayout({ title, children }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -128,31 +130,13 @@ function MainLayout({ title, children }) {
   const [notificationsError, setNotificationsError] = useState('')
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
-  const { logout, user, pagePermissions,
-  permissionsLoading,
-  permissionsLoaded, } = useAuth()
+  const { logout, user, pagePermissions, permissionsLoaded } = useAuth()
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
 
     return window.matchMedia('(max-width: 768px)').matches
   })
-const getUserNavSections = () => {
-  if (!permissionsLoaded) {
-    return []
-  }
-
-  return userNavSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) =>
-        hasPagePermission(item.pageId)
-      ),
-    }))
-    .filter(
-      (section) => section.items.length > 0
-    )
-}
   const [openNavGroups, setOpenNavGroups] = useState({
     request: true,
     history: true,
@@ -163,9 +147,9 @@ const getUserNavSections = () => {
     'account-settings': true,
   })
 
-  
 
-  
+
+
 
   const notificationsContainerRef = useRef(null)
 
@@ -182,40 +166,19 @@ const getUserNavSections = () => {
   const isSuperadmin = role === 'superadmin'
 
 
- const hasPagePermission = (pageId) => {
-  const permission = pagePermissions.find(
-    (item) => item.page_id === pageId
+  const hasPagePermission = (pageId) => pagePermissions.some(
+    (item) => item.page_id === pageId && item.enabled === true
   )
 
-  return permission?.enabled === true
-}
-
-
-  const filteredUserNavSections = useMemo(() => {
-    
-    if (!isEmployee) {
-      return userNavSections
-    }
-
-    if (!permissionsLoaded) {
-      return []
-    }
-
+  const getUserNavSections = () => {
+    if (!permissionsLoaded) return []
     return userNavSections
       .map((section) => ({
         ...section,
-
-        items: section.items.filter((item) =>
-          hasPagePermission(item.path)
-        ),
+        items: section.items.filter((item) => hasPagePermission(item.pageId)),
       }))
-      
       .filter((section) => section.items.length > 0)
-  }, [
-    isEmployee,
-    permissionsLoaded,
-    pagePermissions,
-  ])
+  }
 
 
   let navSections = []
@@ -234,10 +197,13 @@ const getUserNavSections = () => {
       ...officeNavSections,
       adminSettingsSection,
     ]
-  } else {
+  } else if (role === 'office_coordinator') {
     navSections = [
       ...officeNavSections,
+      officeSettingsSection,
     ]
+  } else {
+    navSections = []
   }
 
 
@@ -274,7 +240,6 @@ const getUserNavSections = () => {
         ]
       : []
 
-
   useEffect(() => {
     const trimmedTitle =
       typeof title === 'string'
@@ -285,7 +250,7 @@ const getUserNavSections = () => {
       ? `${trimmedTitle} | ${APP_NAME}`
       : APP_NAME
   }, [title])
- 
+
 
   const unreadCount = useMemo(
     () =>
@@ -372,7 +337,7 @@ const getUserNavSections = () => {
     }
   }
 
- 
+
   useEffect(() => {
     fetchNotifications()
 
@@ -729,7 +694,7 @@ const getUserNavSections = () => {
 
       {/* SIDEBAR USER */}
       <div className="app-sidebar__user">
-       
+
       </div>
     </aside>
   )
@@ -790,7 +755,7 @@ const getUserNavSections = () => {
   </div>
 
   <div className="navbar__actions">
-    
+
     <div
       className="navbar-notifications"
       ref={
@@ -947,10 +912,10 @@ const getUserNavSections = () => {
         {userDropdownOpen ? (
             <i className=' bi-chevron-up'> </i>
         ):
-          <i className=' bi-chevron-down'> </i> 
+          <i className=' bi-chevron-down'> </i>
         }
         </div>
-        
+
       </button>
 
       {/* DROPDOWN MENU */}

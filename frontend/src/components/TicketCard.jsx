@@ -2,7 +2,6 @@ import React from 'react'
 
 function TicketCard({
   ticket,
-  index,
   actionLoadingId,
   formatDate,
   formatDateTime,

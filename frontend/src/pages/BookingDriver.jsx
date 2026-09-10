@@ -74,7 +74,7 @@ function BookingDriver() {
 
   // Load active drivers for the employee's required driver selection.
   useEffect(() => {
-    
+
 
     const loadDrivers = async () => {
       setDriversLoading(true)
@@ -114,7 +114,7 @@ function BookingDriver() {
       return undefined
     }
 
-    
+
 
     const controller = new AbortController()
     const loadAvailability = async () => {
@@ -191,7 +191,7 @@ function BookingDriver() {
       return
     }
 
-   
+
 
     const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
     const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
@@ -227,7 +227,7 @@ function BookingDriver() {
         method,
         headers: {
           'Content-Type': 'application/json',
-          
+
         },
          credentials: 'include',
         body: JSON.stringify(payload),

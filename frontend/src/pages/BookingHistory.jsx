@@ -18,16 +18,16 @@ function BookingHistory() {
   const [actionLoadingId, setActionLoadingId] = useState('')
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [cancellationPolicy, setCancellationPolicy] = useState(null)
-  
+
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
 
-  
+
   const [viewMode, setViewMode] = useState('card')
 
   const pageSize = 10
 
-  
+
   useEffect(() => {
     if (window.innerWidth <= 768) {
       setViewMode('card')
@@ -69,6 +69,7 @@ function BookingHistory() {
 
   // Match the server-side cutoff so unavailable cancellation actions are disabled in advance.
   const canCancelBooking = (booking) => {
+    if (booking.cancellation_status === 'pending') return false
     if (getBookingStatus(booking) !== 'pending') return false
     if (!cancellationPolicy) return true
 
@@ -179,6 +180,8 @@ function BookingHistory() {
         return a.index - b.index
       })
       .map((entry) => entry.booking)
+  // Sorting helpers are pure and intentionally scoped to this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings, sortConfig])
 
   const totalPages = Math.max(1, Math.ceil(sortedBookings.length / pageSize))
@@ -249,7 +252,9 @@ function BookingHistory() {
   }
 
   const handleCancel = async (bookingId) => {
-    const confirmed = window.confirm('Cancel this driver booking request?')
+    const confirmed = window.confirm(cancellationPolicy?.auto_approve === false
+      ? 'Request Office Coordinator approval to cancel this booking?'
+      : 'Cancel this driver booking request?')
     if (!confirmed) return
 
     setActionLoadingId(bookingId)
@@ -276,6 +281,9 @@ function BookingHistory() {
 
       const updated = await response.json()
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? updated : b)))
+      setActionMessage(updated.cancellation_status === 'pending'
+        ? 'Cancellation requested. Waiting for Office Coordinator approval.'
+        : 'Booking cancelled.')
       window.dispatchEvent(new Event('notifications:refresh'))
     } catch {
       setActionError('Network error. Please try again.')
@@ -324,19 +332,6 @@ function BookingHistory() {
     })
   }
 
-  const renderSortIcon = (key) => {
-    const isActive = sortConfig.key === key
-    if (!isActive) {
-      return <i className="bi bi-arrow-down-up sort-indicator sort-indicator-muted" aria-hidden="true" />
-    }
-    return (
-      <i
-        className={`bi ${sortConfig.direction === 'asc' ? 'bi-caret-up-fill' : 'bi-caret-down-fill'} sort-indicator`}
-        aria-hidden="true"
-      />
-    )
-  }
-
   const formatTripType = (value) => {
     if (!value) return '-'
     if (value === 'antar') return 'Drop-off'
@@ -361,64 +356,6 @@ function BookingHistory() {
     return date.toLocaleDateString('en-GB')
   }
 
-  // Reusable action buttons for table rows and card items
-  const renderActionButtons = (booking) => {
-    const statusValue = getBookingStatus(booking)
-    const isPending = statusValue === 'pending'
-    const isAwaitingValidation = statusValue === 'awaiting_validation'
-    const canCancel = canCancelBooking(booking)
-
-    return (
-      <div className="table-row-actions table-action-buttons">
-        <button
-          type="button"
-          className="btn btn-outline-brand"
-          onClick={() => handleEdit(booking)}
-          disabled={!isPending || actionLoadingId === booking.id}
-          title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          className="btn btn-danger"
-          onClick={() => handleCancel(booking.id)}
-          disabled={!canCancel || actionLoadingId === booking.id}
-          title={
-            !isPending
-              ? 'Only pending requests can be cancelled'
-              : canCancel
-                ? 'Cancel this request'
-                : `Cancellation closes ${getCancellationPolicyLabel()}`
-          }
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => handleValidateCompletion(booking)}
-          disabled={!isAwaitingValidation || actionLoadingId === booking.id}
-          title={
-            isAwaitingValidation
-              ? 'Validate this trip completion'
-              : 'Available after the driver submits the finish report'
-          }
-        >
-          Validate
-        </button>
-        <button
-          type="button"
-          className="btn btn-outline-brand"
-          onClick={() => setSelectedBooking(booking)}
-          disabled={actionLoadingId === booking.id}
-        >
-          Details
-        </button>
-      </div>
-    )
-  }
-
   return (
     <MainLayout title="Booking Driver History">
       <div className="ticket-history">
@@ -440,7 +377,7 @@ function BookingHistory() {
     </div>
   </div>
 </header>
-        
+
 
         {loading ? <p className="muted">Loading bookings...</p> : null}
         {error ? <p className="error-text">{error}</p> : null}
@@ -449,9 +386,10 @@ function BookingHistory() {
         {cancellationPolicy ? (
           <p className="muted booking-cancellation-policy">
             Pending bookings can be cancelled until {getCancellationPolicyLabel()}.
+            {cancellationPolicy.auto_approve === false ? ' Cancellation requires Office Coordinator approval.' : ''}
           </p>
         ) : null}
-         
+
 
         {!loading && !error ? (
           <>
@@ -482,11 +420,10 @@ function BookingHistory() {
                 {bookings.length === 0 ? (
                   <p className="muted">No driver bookings yet.</p>
                 ) : (
-                  pagedBookings.map((booking, index) => (
+                  pagedBookings.map((booking) => (
                     <DataCard
                       key={booking.id}
                       booking={booking}
-                      index={(currentPage - 1) * pageSize + index + 1}
                       statusValue={getBookingStatus(booking)}
                       canCancel={canCancelBooking(booking)}
                       cancellationPolicyLabel={getCancellationPolicyLabel()}

@@ -20,7 +20,7 @@ const Unauthorized = () => {
           Go Back
         </button>
     </section>
-    
+
   )
 }
 

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from main import get_current_user
 from mongo_client import db
 from notifications_service import create_user_notification, notify_roles
+from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
@@ -154,6 +155,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
     """Create a new travel request using the current user's saved profile fields."""
     uid = current_user["uid"]
     user_profile = ensure_user_role(uid)
+    enforce_employee_page_permission(uid, "ticket_request")
 
     full_name = user_profile.get("name") or user_profile.get("full_name")
     dept_job_position = user_profile.get("dept_job_position") or user_profile.get("department") or user_profile.get("job_position")
@@ -322,6 +324,7 @@ def update_ticket(ticket_id: str, payload: TicketUserCreate, current_user=Depend
     """Allow a user to edit their own pending travel request."""
     uid = current_user["uid"]
     ensure_user_role(uid)
+    enforce_employee_page_permission(uid, "ticket_history")
 
     snapshot = db["tickets"].find_one({"_id": ticket_id})
     if not snapshot:
@@ -365,6 +368,7 @@ def cancel_ticket(ticket_id: str, current_user=Depends(get_current_user)):
     """Allow a user to cancel their own pending travel request."""
     uid = current_user["uid"]
     ensure_user_role(uid)
+    enforce_employee_page_permission(uid, "ticket_history")
 
     snapshot = db["tickets"].find_one({"_id": ticket_id})
     if not snapshot:
@@ -407,6 +411,7 @@ def list_my_tickets(current_user=Depends(get_current_user)):
     """List travel requests created by the current user (newest first)."""
     uid = current_user["uid"]
     ensure_user_role(uid)
+    enforce_employee_page_permission(uid, "ticket_history")
 
     snapshots = db["tickets"].find({"user_id": uid}).sort("created_at", -1)
     return [serialize_ticket(doc) for doc in snapshots]

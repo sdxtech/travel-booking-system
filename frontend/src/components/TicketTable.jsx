@@ -1,10 +1,10 @@
 import React from 'react'
+import TableActionDropdown from './TableActionDropdown'
 
 function TicketTable({
   tickets,
   currentPage,
   pageSize,
-  sortConfig,
   onSort,
   renderSortIcon,
   formatDate,
@@ -61,10 +61,12 @@ function TicketTable({
                     </span>
                   </td>
                   <td>
-                    <div className="table-row-actions table-action-buttons">
+                    <TableActionDropdown
+                      label={`Actions for ${ticket.request_id || 'travel request'}`}
+                      disabled={isLoading}
+                    >
                       <button
                         type="button"
-                        className="btn btn-outline-brand"
                         onClick={() => onEdit(ticket)}
                         disabled={!isPending || isLoading}
                         title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
@@ -73,7 +75,7 @@ function TicketTable({
                       </button>
                       <button
                         type="button"
-                        className="btn btn-danger"
+                        className="is-danger"
                         onClick={() => onCancel(ticket.id)}
                         disabled={!isPending || isLoading}
                         title={isPending ? 'Cancel this request' : 'Only pending requests can be cancelled'}
@@ -82,13 +84,12 @@ function TicketTable({
                       </button>
                       <button
                         type="button"
-                        className="btn btn-outline-brand"
                         onClick={() => onDetails(ticket)}
                         disabled={isLoading}
                       >
                         Details
                       </button>
-                    </div>
+                    </TableActionDropdown>
                   </td>
                 </tr>
               )

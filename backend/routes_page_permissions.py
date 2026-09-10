@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field, ValidationError
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from main import get_current_user
 from mongo_client import db
 
 router = APIRouter(prefix="/pages", tags=["permissions"])
 
 class PagePermissionUpdate(BaseModel):
-    role: str
+    role: Literal["user"]
     page_id: str
     enabled: bool
 
@@ -21,43 +23,6 @@ def ensure_role(uid: str, allowed: tuple[str, ...]):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
     if role not in allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    return role
-
-def ensure_page_permission(uid: str, page_key: str):
-    """Ensure that the user's role is allowed to access a specific page."""
-    user = db["users"].find_one({"_id": uid})
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User profile not found",
-        )
-    if user.get("disabled"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is disabled",
-        )
-    role = user.get("role")
-    if role == "superadmin":
-        return role
-    page = db["pages"].find_one({
-        "key": page_key,
-        "is_active": True,
-    })
-    if not page:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Page not found",
-        )
-    permission = db["role_page_permissions"].find_one({
-        "role": role,
-        "page_id": page["_id"],
-        "enabled": True,
-    })
-    if not permission:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to access this page",
-        )
     return role
 
 @router.get("")
@@ -80,7 +45,11 @@ def get_pages(current_user=Depends(get_current_user),):
 @router.get("/permissions/{role}")
 def get_role_permissions(role: str, current_user=Depends(get_current_user),):
     uid = current_user["uid"]
-    ensure_role(uid,("superadmin","user"))
+    actor_role = ensure_role(uid, ("superadmin", "user", "driver", "office_coordinator"))
+    if role not in {"user", "driver", "office_coordinator"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
+    if actor_role != "superadmin" and role != actor_role:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     pages = list(db["pages"].find({"is_active": True}).sort("name", 1))
     permissions = db["role_page_permissions"].find({
         "role": role
@@ -115,13 +84,9 @@ def update_page_permission(
         ("superadmin",)
     )
 
-   
-
     page = db["pages"].find_one({
         "_id": payload.page_id
     })
-
-    print("PAGE FOUND:", page)
 
     if not page:
         raise HTTPException(
@@ -135,16 +100,7 @@ def update_page_permission(
             detail="Superadmin permissions cannot be modified",
         )
 
-   
-    existing = db["role_page_permissions"].find_one({
-        "role": payload.role,
-        "page_id": payload.page_id,
-    })
-
-    print("EXISTING PERMISSION:", existing)
-
-    
-    result = db["role_page_permissions"].update_one(
+    db["role_page_permissions"].update_one(
         {
             "role": payload.role,
             "page_id": payload.page_id,
@@ -157,15 +113,6 @@ def update_page_permission(
         upsert=True,
     )
 
-   
-
-    
-    updated = db["role_page_permissions"].find_one({
-        "role": payload.role,
-        "page_id": payload.page_id,
-    })
-
-    
 
     return {
         "message": "Page permission updated successfully",
