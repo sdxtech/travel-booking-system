@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
+import ViewModeToggle from '../components/ViewModeToogle'
+import DataCard from '../components/DataCard'
+import DataTable from '../components/DataTable'
+
 
 // List the signed-in user's driver bookings and their statuses.
 function BookingHistory() {
@@ -14,10 +18,21 @@ function BookingHistory() {
   const [actionLoadingId, setActionLoadingId] = useState('')
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [cancellationPolicy, setCancellationPolicy] = useState(null)
+
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
 
+
+  const [viewMode, setViewMode] = useState('card')
+
   const pageSize = 10
+
+
+  useEffect(() => {
+    if (window.innerWidth <= 768) {
+      setViewMode('card')
+    }
+  }, [])
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -111,11 +126,10 @@ function BookingHistory() {
         return booking.destination || ''
       case 'driver_name':
         return booking.driver_name || booking.driver_id || ''
-      case 'passenger_count':
-        {
-          const count = Number(booking.passenger_count)
-          return Number.isFinite(count) ? count : null
-        }
+      case 'passenger_count': {
+        const count = Number(booking.passenger_count)
+        return Number.isFinite(count) ? count : null
+      }
       case 'trip_type':
         return booking.trip_type || ''
       case 'departure_time':
@@ -193,26 +207,14 @@ function BookingHistory() {
 
   // Load the current user's booking history.
   useEffect(() => {
-    // Fetch bookings data from the API.
     const fetchBookings = async () => {
       setLoading(true)
       setError('')
 
-      const token = localStorage.getItem('authToken')
-      if (!token) {
-        setError('Authentication token not found. Please login again.')
-        setLoading(false)
-        return
-      }
-
       try {
         const [response, policyResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/bookings/my`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE_URL}/settings/booking-cancellation`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          fetch(`${API_BASE_URL}/bookings/my`, { credentials: 'include' }),
+          fetch(`${API_BASE_URL}/settings/booking-cancellation`, { credentials: 'include' }),
         ])
 
         if (policyResponse.ok) {
@@ -245,23 +247,15 @@ function BookingHistory() {
     fetchBookings()
   }, [])
 
-  // Open the booking form with the selected request for editing.
   const handleEdit = (booking) => {
     navigate('/user/booking-driver', { state: { booking } })
   }
 
-  // Cancel a booking request (when allowed by status).
   const handleCancel = async (bookingId) => {
     const confirmed = window.confirm(cancellationPolicy?.auto_approve === false
       ? 'Request Office Coordinator approval to cancel this booking?'
       : 'Cancel this driver booking request?')
     if (!confirmed) return
-
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found. Please login again.')
-      return
-    }
 
     setActionLoadingId(bookingId)
     setActionError('')
@@ -270,7 +264,7 @@ function BookingHistory() {
     try {
       const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
 
       if (!response.ok) {
@@ -298,16 +292,9 @@ function BookingHistory() {
     }
   }
 
-  // Confirm that the driver-reported trip completion is correct.
   const handleValidateCompletion = async (booking) => {
     const confirmed = window.confirm('Confirm that this trip has been completed?')
     if (!confirmed) return
-
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found. Please login again.')
-      return
-    }
 
     setActionLoadingId(booking.id)
     setActionError('')
@@ -315,7 +302,7 @@ function BookingHistory() {
     try {
       const response = await fetch(`${API_BASE_URL}/bookings/${booking.id}/validate-completion`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
@@ -335,7 +322,6 @@ function BookingHistory() {
     }
   }
 
-  // Toggle sort direction for a column (or activate a new sort key).
   const toggleSort = (key) => {
     setPage(1)
     setSortConfig((prev) => {
@@ -346,21 +332,6 @@ function BookingHistory() {
     })
   }
 
-  // Render the sort icon for the table header.
-  const renderSortIcon = (key) => {
-    const isActive = sortConfig.key === key
-    if (!isActive) {
-      return <i className="bi bi-arrow-down-up sort-indicator sort-indicator-muted" aria-hidden="true" />
-    }
-    return (
-      <i
-        className={`bi ${sortConfig.direction === 'asc' ? 'bi-caret-up-fill' : 'bi-caret-down-fill'} sort-indicator`}
-        aria-hidden="true"
-      />
-    )
-  }
-
-  // Format the trip type values into labels users understand.
   const formatTripType = (value) => {
     if (!value) return '-'
     if (value === 'antar') return 'Drop-off'
@@ -369,7 +340,6 @@ function BookingHistory() {
     return value
   }
 
-  // Format a date+time field for table display.
   const formatDateTime = (value) => {
     const date = toDate(value)
     if (!date) return '-'
@@ -380,7 +350,6 @@ function BookingHistory() {
     })}`
   }
 
-  // Format a date-only field for table display.
   const formatDateOnly = (value) => {
     const date = toDate(value)
     if (!date) return '-'
@@ -390,16 +359,25 @@ function BookingHistory() {
   return (
     <MainLayout title="Booking Driver History">
       <div className="ticket-history">
-        <header className="history-header">
-          <button className="back-link" type="button" onClick={() => navigate(-1)}>
-            &larr; Back
-          </button>
-          <div>
-            <p className="eyebrow">Booking Driver Status & History</p>
-            <h1>List of all Booking Driver Request</h1>
-            <p className="muted">Track the status of all your driver booking requests</p>
-          </div>
-        </header>
+       <header className="history-header">
+  <button className="back-link" type="button" onClick={() => navigate(-1)}>
+    <i className="bi bi-arrow-left" aria-hidden="true" />
+    <span>Back</span>
+  </button>
+
+  <div className="history-header-main">
+    <div className="header-title-group">
+      <span className="eyebrow">Booking Driver Status & History</span>
+      <h1 className="header-title">List of all Booking Driver Request</h1>
+      <p className="muted">Track the status of all your driver booking requests</p>
+    </div>
+
+    <div className="header-actions">
+      <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+    </div>
+  </div>
+</header>
+
 
         {loading ? <p className="muted">Loading bookings...</p> : null}
         {error ? <p className="error-text">{error}</p> : null}
@@ -412,113 +390,57 @@ function BookingHistory() {
           </p>
         ) : null}
 
+
         {!loading && !error ? (
           <>
-            <div className="table-wrapper">
-              <table className="simple-table history-summary-table">
-                <thead>
-                  <tr>
-                    <th className="table-col-no">No</th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('created_at')}>
-                        Submission Date {renderSortIcon('created_at')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('request_id')}>
-                        Request ID {renderSortIcon('request_id')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('status')}>
-                        Status {renderSortIcon('status')}
-                      </button>
-                    </th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="muted">
-                        No driver bookings yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    pagedBookings.map((booking, index) => {
-                      const statusValue = getBookingStatus(booking)
-                      const isPending = statusValue === 'pending'
-                      const isAwaitingValidation = statusValue === 'awaiting_validation'
-                      const canCancel = canCancelBooking(booking)
+            {/* Table View Component */}
+            {viewMode === 'table' ? (
+             <DataTable
+                bookings={pagedBookings}
+                currentPage={currentPage}
+                pageSize={pageSize}
+                sortConfig={sortConfig}
+                onSort={toggleSort}
+                getBookingStatus={getBookingStatus}
+                canCancelBooking={canCancelBooking}
+                getCancellationPolicyLabel={getCancellationPolicyLabel}
+                formatDateOnly={formatDateOnly}
+                formatStatusText={formatStatusText}
+                actionLoadingId={actionLoadingId}
+                onEdit={handleEdit}
+                onCancel={handleCancel}
+                onValidate={handleValidateCompletion}
+                onDetails={setSelectedBooking}
+              />
+            ) : null}
 
-                      return (
-                        <tr key={booking.id}>
-                          <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
-                          <td>{formatDateOnly(booking.created_at)}</td>
-                          <td className="request-id-cell">{booking.request_id || '-'}</td>
-                          <td>
-                            <span className={`status-badge status-${statusValue}`}>{formatStatusText(statusValue)}</span>
-                            {booking.cancellation_status === 'pending' ? <div className="muted">Cancellation awaiting approval</div> : null}
-                            {booking.cancellation_status === 'rejected' ? <div className="muted">Cancellation rejected</div> : null}
-                          </td>
-                          <td>
-                            <div className="table-row-actions table-action-buttons">
-                              <button
-                                type="button"
-                                className="btn btn-outline-brand"
-                                onClick={() => handleEdit(booking)}
-                                disabled={!isPending || booking.cancellation_status === 'pending' || actionLoadingId === booking.id}
-                                title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                onClick={() => handleCancel(booking.id)}
-                                disabled={!canCancel || actionLoadingId === booking.id}
-                                title={
-                                  booking.cancellation_status === 'pending'
-                                    ? 'Cancellation awaiting Office Coordinator approval'
-                                    : !isPending
-                                    ? 'Only pending requests can be cancelled'
-                                    : canCancel
-                                      ? 'Cancel this request'
-                                      : `Cancellation closes ${getCancellationPolicyLabel()}`
-                                }
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() => handleValidateCompletion(booking)}
-                                disabled={!isAwaitingValidation || actionLoadingId === booking.id}
-                                title={
-                                  isAwaitingValidation
-                                    ? 'Validate this trip completion'
-                                    : 'Available after the driver submits the finish report'
-                                }
-                              >
-                                Validate
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-outline-brand"
-                                onClick={() => setSelectedBooking(booking)}
-                                disabled={actionLoadingId === booking.id}
-                              >
-                                Details
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {/* Card View Component (Responsive Card List) */}
+            {viewMode === 'card' ? (
+              <div className="booking-cards-grid">
+                {bookings.length === 0 ? (
+                  <p className="muted">No driver bookings yet.</p>
+                ) : (
+                  pagedBookings.map((booking) => (
+                    <DataCard
+                      key={booking.id}
+                      booking={booking}
+                      statusValue={getBookingStatus(booking)}
+                      canCancel={canCancelBooking(booking)}
+                      cancellationPolicyLabel={getCancellationPolicyLabel()}
+                      actionLoadingId={actionLoadingId}
+                      formatDateOnly={formatDateOnly}
+                      formatDateTime={formatDateTime}
+                      formatTripType={formatTripType}
+                      formatStatusText={formatStatusText}
+                      onEdit={handleEdit}
+                      onCancel={handleCancel}
+                      onValidate={handleValidateCompletion}
+                      onDetails={setSelectedBooking}
+                    />
+                  ))
+                )}
+              </div>
+            ) : null}
 
             <div className="office-pagination">
               <button

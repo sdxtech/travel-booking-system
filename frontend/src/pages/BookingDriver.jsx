@@ -74,17 +74,13 @@ function BookingDriver() {
 
   // Load active drivers for the employee's required driver selection.
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setDriversLoading(false)
-      return
-    }
+
 
     const loadDrivers = async () => {
       setDriversLoading(true)
       try {
         const response = await fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         })
         if (!response.ok) throw new Error('Failed to load drivers')
         const data = await response.json()
@@ -118,8 +114,7 @@ function BookingDriver() {
       return undefined
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) return undefined
+
 
     const controller = new AbortController()
     const loadAvailability = async () => {
@@ -128,7 +123,7 @@ function BookingDriver() {
         const response = await fetch(
           `${API_BASE_URL}/bookings/unavailable-drivers?departure_time=${encodeURIComponent(departureDateTime.toISOString())}&estimated_arrival_time=${encodeURIComponent(estimatedArrivalDateTime.toISOString())}`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+           credentials: 'include',
             signal: controller.signal,
           }
         )
@@ -196,12 +191,7 @@ function BookingDriver() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setErrorMessage('Authentication token not found. Please login again.')
-      setLoading(false)
-      return
-    }
+
 
     const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
     const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
@@ -237,8 +227,9 @@ function BookingDriver() {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+         credentials: 'include',
         body: JSON.stringify(payload),
       })
 
@@ -271,7 +262,7 @@ function BookingDriver() {
 
   return (
     <MainLayout title="Booking Driver">
-      <div className="ticket-request-page booking-driver-page">
+      <div className=" booking-driver-page">
         <header className="ticket-request-header">
           <button className="back-link" type="button" onClick={() => navigate(-1)}>
             &larr; Back

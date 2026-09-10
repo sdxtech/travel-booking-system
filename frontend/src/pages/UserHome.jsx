@@ -61,12 +61,7 @@ function UserHome() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setLoading(false)
-      setError('Authentication token not found. Please login again.')
-      return
-    }
+
 
     const loadQuickView = async () => {
       setLoading(true)
@@ -75,13 +70,13 @@ function UserHome() {
       try {
         const [ticketsRes, bookingsRes, driverCalendarRes] = await Promise.all([
           fetch(`${API_BASE_URL}/tickets/my`, {
-            headers: { Authorization: `Bearer ${token}` },
+             credentials: 'include',
           }),
           fetch(`${API_BASE_URL}/bookings/my`, {
-            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
           }),
           fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
-            headers: { Authorization: `Bearer ${token}` },
+             credentials: 'include',
           }),
         ])
 

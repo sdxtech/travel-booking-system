@@ -31,6 +31,7 @@ class CancellationApprovalTests(unittest.TestCase):
         for patcher in [
             patch.object(bookings, "db", {"bookings": self.collection}),
             patch.object(bookings, "ensure_role", side_effect=authorize),
+            patch.object(bookings, "enforce_employee_page_permission"),
             patch.object(bookings, "get_booking_cancellation_policy", return_value=self.policy),
             patch.object(bookings, "utc_now", return_value=self.now),
             patch.object(bookings, "create_user_notification"),

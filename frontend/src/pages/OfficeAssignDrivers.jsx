@@ -5,6 +5,7 @@ import BookingFormSelect from '../components/BookingFormSelect'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -32,11 +33,14 @@ const initialForm = {
   passenger_count: 1,
 }
 
+
 // Manual driver assignment form for office coordinators.
 function OfficeAssignDrivers() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+  const { user } = useAuth()
+const isSuperadmin =
+  user?.role === 'superadmin'
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -53,11 +57,7 @@ function OfficeAssignDrivers() {
 
   // Load the list of available drivers (role === 'driver').
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setDriversError('Authentication token not found.')
-      return
-    }
+
 
     // Fetch drivers from the user list endpoint.
     const loadDrivers = async () => {
@@ -66,7 +66,7 @@ function OfficeAssignDrivers() {
 
       try {
         const res = await fetch(`${API_BASE_URL}/users`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         })
         if (!res.ok) {
           let detail = 'Failed to load drivers.'
@@ -123,12 +123,7 @@ function OfficeAssignDrivers() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setAvailabilityError('Authentication token not found.')
-      setUnavailableDriverIds(new Set())
-      return
-    }
+
 
     const controller = new AbortController()
     // Fetch the driver ids that are busy for the selected departure time.
@@ -141,7 +136,7 @@ function OfficeAssignDrivers() {
         const res = await fetch(
           `${API_BASE_URL}/bookings/unavailable-drivers?departure_time=${encodeURIComponent(departureDateTime.toISOString())}&estimated_arrival_time=${encodeURIComponent(estimatedArrivalDateTime.toISOString())}`,
           {
-            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
             signal: controller.signal,
           }
         )
@@ -239,12 +234,7 @@ function OfficeAssignDrivers() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setErrorMessage('Authentication token not found. Please login again.')
-      setLoading(false)
-      return
-    }
+
 
     const departureDateTime = new Date(`${form.departure_date}T${form.departure_time}`)
     const estimatedArrivalDateTime = new Date(`${form.arrival_date}T${form.arrival_time}`)
@@ -279,8 +269,9 @@ function OfficeAssignDrivers() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
 

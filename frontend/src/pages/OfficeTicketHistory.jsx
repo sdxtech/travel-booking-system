@@ -5,6 +5,7 @@ import TableActionDropdown from '../components/TableActionDropdown'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -15,12 +16,15 @@ const menuItems = [
   { label: 'Manage User', icon: 'bi-people' },
 ]
 
+
 // Travel request history page for office coordinators (with export + date range).
 function OfficeTicketHistory() {
   const historyTableRef = useFrozenHistoryColumns()
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+  const { user } = useAuth()
+const isSuperadmin =
+  user?.role === 'superadmin'
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -188,19 +192,13 @@ function OfficeTicketHistory() {
 
   // Load ticket history and apply optional date filtering client-side.
   const loadTickets = async (range) => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setError('Authentication token not found.')
-      setTickets([])
-      setHasLoaded(true)
-      return
-    }
+
 
     setLoading(true)
     setError('')
     try {
       const res = await fetch(`${API_BASE_URL}/tickets/history`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!res.ok) {
         let detail = 'Failed to load tickets.'
@@ -282,11 +280,7 @@ function OfficeTicketHistory() {
   const handleStatusUpdate = async (ticket, nextStatus) => {
     if (!ticket?.id) return
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+
 
     setActionLoadingId(ticket.id)
     setActionError('')
@@ -295,9 +289,10 @@ function OfficeTicketHistory() {
       const res = await fetch(`${API_BASE_URL}/tickets/${ticket.id}/status`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ status: nextStatus }),
       })
       if (!res.ok) {

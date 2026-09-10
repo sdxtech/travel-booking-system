@@ -47,12 +47,7 @@ function DriverHome() {
 
   // Load bookings assigned to the signed-in driver.
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setLoading(false)
-      setError('Authentication token not found.')
-      return
-    }
+
 
     // Fetch assigned bookings for the driver.
     const loadAssigned = async () => {
@@ -60,7 +55,7 @@ function DriverHome() {
       setError('')
       try {
         const res = await fetch(`${API_BASE_URL}/bookings/assigned`, {
-          headers: { Authorization: `Bearer ${token}` },
+           credentials: 'include',
         })
         if (!res.ok) {
           let detail = 'Failed to load assignments.'
@@ -134,11 +129,7 @@ function DriverHome() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+
 
     setProcessing((prev) => ({ ...prev, [activeBooking.id]: true }))
     setActionMessage('')
@@ -149,8 +140,9 @@ function DriverHome() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+        credentials:'include',
         body: JSON.stringify({ starting_mileage: mileageValue }),
       })
 
@@ -191,11 +183,7 @@ function DriverHome() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+
 
     setProcessing((prev) => ({ ...prev, [activeBooking.id]: true }))
     setActionMessage('')
@@ -206,8 +194,9 @@ function DriverHome() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+        credentials:'include',
         body: JSON.stringify({ ending_mileage: endingValue }),
       })
 

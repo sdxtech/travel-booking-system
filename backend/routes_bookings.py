@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from main import get_current_user
 from mongo_client import db
 from notifications_service import create_user_notification, notify_roles
+from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
 from settings_service import get_booking_cancellation_deadline, get_booking_cancellation_policy
 
@@ -283,6 +284,7 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
     """Auto-approve a free driver slot, otherwise keep the request pending."""
     uid = current_user["uid"]
     ensure_role(uid, ("user",))
+    enforce_employee_page_permission(uid, "booking_driver")
     validate_booking_interval(payload.departure_time, payload.estimated_arrival_time)
     driver_data = resolve_driver(payload.driver_id)
     driver_name = driver_data.get("name") or driver_data.get("email") or "Driver"
@@ -470,6 +472,7 @@ def list_my_bookings(current_user=Depends(get_current_user)):
     """List bookings created by the current user (newest first)."""
     uid = current_user["uid"]
     ensure_role(uid, ("user",))
+    enforce_employee_page_permission(uid, "booking_history")
 
     snapshots = db["bookings"].find({"user_id": uid}).sort("created_at", -1)
     return [serialize_booking(doc) for doc in snapshots]
@@ -494,6 +497,7 @@ def list_unavailable_drivers(
     """Return driver ids unavailable for the caller's booking flow and requested interval."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
+    enforce_employee_page_permission(uid, "booking_driver")
 
     requested_start = normalize_datetime(departure_time)
     requested_end = normalize_datetime(estimated_arrival_time) if estimated_arrival_time else None
@@ -707,6 +711,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
     """Edit an Employee pending request or allow Super Admin to overwrite any booking."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "superadmin"))
+    enforce_employee_page_permission(uid, "booking_history")
 
     snapshot = db["bookings"].find_one({"_id": booking_id})
     if not snapshot:
@@ -845,6 +850,7 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
     """Cancel a booking with role-based rules (user: pending only, office: approved before start)."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
+    enforce_employee_page_permission(uid, "booking_history")
 
     snapshot = db["bookings"].find_one({"_id": booking_id})
     if not snapshot:
@@ -1113,6 +1119,7 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
     """Confirm a driver's finish report through the linked Employee or Office fallback."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
+    enforce_employee_page_permission(uid, "booking_history")
 
     snapshot = db["bookings"].find_one({"_id": booking_id})
     if not snapshot:

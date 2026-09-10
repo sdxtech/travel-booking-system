@@ -85,12 +85,7 @@ function TicketRequest() {
     setLoading(true)
     setErrorMessage('')
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setErrorMessage('Authentication token not found. Please login again.')
-      setLoading(false)
-      return
-    }
+
 
     const payload = {
       ...form,
@@ -114,8 +109,8 @@ function TicketRequest() {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+         credentials: 'include',
         body: JSON.stringify(payload),
       })
 

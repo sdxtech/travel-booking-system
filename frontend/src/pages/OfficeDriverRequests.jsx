@@ -5,6 +5,7 @@ import BookingFormSelect from '../components/BookingFormSelect'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -21,7 +22,8 @@ const menuItems = [
 function OfficeDriverRequests() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+  const { user } = useAuth()
+  const isSuperadmin = user?.role === 'superadmin'
   const [, setProfile] = useState({ name: '' })
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -53,13 +55,12 @@ function OfficeDriverRequests() {
 
   // Load profile for the greeting header.
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return
+
     // Fetch current user details from the API.
     const loadProfile = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/users/me`, {
-          headers: { Authorization: `Bearer ${token}` },
+           credentials: 'include',
         })
         if (res.ok) {
           const data = await res.json()
@@ -74,8 +75,7 @@ function OfficeDriverRequests() {
 
   // Load selectable drivers for assignment.
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return
+
 
     // Fetch drivers from the user list endpoint.
     const loadDrivers = async () => {
@@ -84,7 +84,7 @@ function OfficeDriverRequests() {
 
       try {
         const res = await fetch(`${API_BASE_URL}/users`, {
-          headers: { Authorization: `Bearer ${token}` },
+           credentials: 'include',
         })
         if (!res.ok) {
           let detail = 'Failed to load drivers.'
@@ -119,12 +119,7 @@ function OfficeDriverRequests() {
 
   // Load all pending driver bookings.
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setLoading(false)
-      setError('Authentication token not found.')
-      return
-    }
+
 
     // Fetch pending bookings from the API.
     const loadBookings = async () => {
@@ -132,7 +127,7 @@ function OfficeDriverRequests() {
       setError('')
       try {
         const res = await fetch(`${API_BASE_URL}/bookings/pending`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         })
         if (!res.ok) {
           let detail = 'Failed to load bookings.'
@@ -171,13 +166,7 @@ function OfficeDriverRequests() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setUnavailableDriverIds([])
-      setAvailabilityError('Authentication token not found.')
-      setAvailabilityLoading(false)
-      return
-    }
+
 
     setAvailabilityLoading(true)
     setAvailabilityError('')
@@ -191,7 +180,7 @@ function OfficeDriverRequests() {
       }
 
       const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
       })
 
       if (!res.ok) {
@@ -294,11 +283,7 @@ function OfficeDriverRequests() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+
 
     setProcessing((prev) => ({ ...prev, [assignTarget.id]: true }))
     setActionMessage('')
@@ -309,7 +294,7 @@ function OfficeDriverRequests() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+           credentials: 'include',
         },
         body: JSON.stringify({ status: 'approved', driver_id: selectedDriverId }),
       })
@@ -343,11 +328,7 @@ function OfficeDriverRequests() {
 
   // Reject a booking request.
   const handleReject = async (bookingId) => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+
 
     setProcessing((prev) => ({ ...prev, [bookingId]: true }))
     setActionMessage('')
@@ -358,7 +339,7 @@ function OfficeDriverRequests() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          credentials: 'include',
         },
         body: JSON.stringify({ status: 'rejected' }),
       })

@@ -4,6 +4,8 @@ import MainLayout from '../components/MainLayout'
 import TableActionDropdown from '../components/TableActionDropdown'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
+
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -28,7 +30,9 @@ const initialCreate = {
 function OfficeManageUser() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+ const { user } = useAuth()
+const isSuperadmin =
+  user?.role === 'superadmin'
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -77,7 +81,7 @@ function OfficeManageUser() {
     setPage((prev) => Math.min(prev, totalPages))
   }, [totalPages])
 
-  const token = localStorage.getItem('authToken')
+
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
@@ -94,17 +98,13 @@ function OfficeManageUser() {
 
   // Fetch user profiles from the API.
   const loadUsers = async () => {
-    if (!token) {
-      setLoading(false)
-      setError('Authentication token not found.')
-      return
-    }
+
 
     setLoading(true)
     setError('')
     try {
       const res = await fetch(`${API_BASE_URL}/users`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!res.ok) {
         let detail = 'Failed to load users.'
@@ -131,7 +131,6 @@ function OfficeManageUser() {
   // Initial data fetch.
   useEffect(() => {
     loadUsers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update create form fields.
@@ -186,7 +185,7 @@ function OfficeManageUser() {
     setImportError('')
     try {
       const res = await fetch(`${API_BASE_URL}/users/import/template`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+       credentials: 'include'
       })
 
       if (!res.ok) {
@@ -212,10 +211,7 @@ function OfficeManageUser() {
 
   // Upload and import users from the selected CSV/XLSX file.
   const handleImportUsers = async () => {
-    if (!token) {
-      setImportError('Authentication token not found.')
-      return
-    }
+
 
     if (!importFile) {
       setImportError('Please choose a file (.xlsx or .csv).')
@@ -232,8 +228,9 @@ function OfficeManageUser() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+        credentials:'include',
         body: JSON.stringify({
           filename: importFile.name,
           file_base64: fileBase64,
@@ -279,7 +276,7 @@ function OfficeManageUser() {
   // Create a new user account from the create form.
   const handleCreate = async (event) => {
     event.preventDefault()
-    if (!token) return
+
 
     setCreateLoading(true)
     setCreateError('')
@@ -290,8 +287,9 @@ function OfficeManageUser() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+         credentials:'include',
         body: JSON.stringify(createForm),
       })
       if (!res.ok) {
@@ -323,7 +321,7 @@ function OfficeManageUser() {
   // Save changes for the selected user.
   const handleUpdate = async (event) => {
     event.preventDefault()
-    if (!token || !selectedUser) return
+    if ( !selectedUser) return
 
     setEditLoading(true)
     setEditError('')
@@ -339,8 +337,9 @@ function OfficeManageUser() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+        credentials:'include',
         body: JSON.stringify(updatePayload),
       })
       if (!res.ok) {
@@ -369,7 +368,7 @@ function OfficeManageUser() {
 
   // Deactivate an account and keep it unavailable for login.
   const handleDeactivate = async (user) => {
-    if (!token || !user?.uid) return
+    if (!user?.uid) return
 
     const confirmed = window.confirm(`Deactivate this account?\n\n${user.email || user.name || user.uid}`)
     if (!confirmed) return
@@ -381,7 +380,7 @@ function OfficeManageUser() {
     try {
       const res = await fetch(`${API_BASE_URL}/users/${user.uid}/deactivate`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+       credentials:'include',
       })
 
       if (!res.ok) {
@@ -431,7 +430,7 @@ function OfficeManageUser() {
   // Reset a user's password via the API.
   const handleResetPassword = async (event) => {
     event.preventDefault()
-    if (!token || !passwordModalUser?.uid) return
+    if (!passwordModalUser?.uid) return
 
     setPasswordError('')
 
@@ -451,8 +450,9 @@ function OfficeManageUser() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+
         },
+        credentials:'include',
         body: JSON.stringify({ password: nextPassword }),
       })
 

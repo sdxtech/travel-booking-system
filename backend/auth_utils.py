@@ -38,16 +38,26 @@ def get_jwt_expires_hours() -> int:
     return hours
 
 
-def create_access_token(*, user_id: str, email: str) -> tuple[str, datetime]:
+def create_access_token(*,
+    user_id: str,
+    email: str,
+    expires_hours: int | None = None, ) -> tuple[str, datetime]:
+
     now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(hours=get_jwt_expires_hours())
+    if expires_hours is None:
+        expires_hours = get_jwt_expires_hours()
+    expires_at = now + timedelta(hours=expires_hours)
     payload = {
         "sub": user_id,
         "email": email,
         "iat": int(now.timestamp()),
         "exp": expires_at,
     }
-    token = jwt.encode(payload, get_jwt_secret(), algorithm=get_jwt_algorithm())
+    token = jwt.encode(
+        payload,
+        get_jwt_secret(),
+        algorithm=get_jwt_algorithm(),
+    )
     return token, expires_at
 
 

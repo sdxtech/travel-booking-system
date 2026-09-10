@@ -27,16 +27,11 @@ function AdminSettings() {
 
   useEffect(() => {
     const loadPolicy = async () => {
-      const token = localStorage.getItem('authToken')
-      if (!token) {
-        setError('Authentication token not found. Please login again.')
-        setLoading(false)
-        return
-      }
+
 
       try {
         const response = await fetch(`${API_BASE_URL}/settings/booking-cancellation`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials:'include',
         })
         if (!response.ok) {
           const data = await response.json().catch(() => ({}))
@@ -72,11 +67,7 @@ function AdminSettings() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setError('Authentication token not found. Please login again.')
-      return
-    }
+
 
     setSaving(true)
     setError('')
@@ -85,9 +76,10 @@ function AdminSettings() {
       const response = await fetch(`${API_BASE_URL}/settings/booking-cancellation`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ value, unit: policy.unit, cutoff_time: policy.cutoff_time, auto_approve: policy.auto_approve }),
       })
       if (!response.ok) {

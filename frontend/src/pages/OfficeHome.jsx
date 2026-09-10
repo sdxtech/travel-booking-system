@@ -10,6 +10,7 @@ import {
 } from '../components/quickViewSchedulerUtils'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -75,105 +76,160 @@ function buildDriverBookingEvent(booking, calendarId, color) {
 function OfficeHome() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+  const { user } = useAuth()
+  const isSuperadmin = user?.role === 'superadmin'
   const [tickets, setTickets] = useState([])
   const [bookings, setBookings] = useState([])
   const [driverSchedules, setDriverSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setLoading(false)
-      setError('Authentication token not found.')
-      return
-    }
+ useEffect(() => {
+  const loadQuickView = async () => {
+    setLoading(true)
+    setError('')
 
-    const loadQuickView = async () => {
-      setLoading(true)
-      setError('')
+    try {
+      const [
+        pendingTicketsRes,
+        ticketHistoryRes,
+        pendingBookingsRes,
+        bookingHistoryRes,
+        driverCalendarRes,
+      ] = await Promise.all([
+        fetch(`${API_BASE_URL}/tickets/pending`, {
+          credentials: "include",
+        }),
 
-      try {
-        const [pendingTicketsRes, ticketHistoryRes, pendingBookingsRes, bookingHistoryRes, driverCalendarRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/tickets/pending`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE_URL}/tickets/history`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE_URL}/bookings/pending`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE_URL}/bookings/history`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ])
+        fetch(`${API_BASE_URL}/tickets/history`, {
+          credentials: "include",
+        }),
 
-        if (!pendingTicketsRes.ok) {
-          setError(await getErrorDetail(pendingTicketsRes, 'Failed to load pending travel requests.'))
-          setTickets([])
-          setBookings([])
-          return
-        }
-        if (!ticketHistoryRes.ok) {
-          setError(await getErrorDetail(ticketHistoryRes, 'Failed to load travel history.'))
-          setTickets([])
-          setBookings([])
-          return
-        }
-        if (!pendingBookingsRes.ok) {
-          setError(await getErrorDetail(pendingBookingsRes, 'Failed to load pending driver bookings.'))
-          setTickets([])
-          setBookings([])
-          return
-        }
-        if (!bookingHistoryRes.ok) {
-          setError(await getErrorDetail(bookingHistoryRes, 'Failed to load driver booking history.'))
-          setTickets([])
-          setBookings([])
-          return
-        }
-        if (!driverCalendarRes.ok) {
-          setError(await getErrorDetail(driverCalendarRes, 'Failed to load driver calendars.'))
-          setTickets([])
-          setBookings([])
-          setDriverSchedules([])
-          return
-        }
+        fetch(`${API_BASE_URL}/bookings/pending`, {
+          credentials: "include",
+        }),
 
-        const [pendingTickets, ticketHistory, pendingBookings, bookingHistory, driverCalendarData] = await Promise.all([
-          pendingTicketsRes.json(),
-          ticketHistoryRes.json(),
-          pendingBookingsRes.json(),
-          bookingHistoryRes.json(),
-          driverCalendarRes.json(),
-        ])
+        fetch(`${API_BASE_URL}/bookings/history`, {
+          credentials: "include",
+        }),
 
-        setTickets([
-          ...(Array.isArray(pendingTickets) ? pendingTickets : []),
-          ...(Array.isArray(ticketHistory) ? ticketHistory : []),
-        ])
-        setBookings([
-          ...(Array.isArray(pendingBookings) ? pendingBookings : []),
-          ...(Array.isArray(bookingHistory) ? bookingHistory : []),
-        ])
-        setDriverSchedules(Array.isArray(driverCalendarData) ? driverCalendarData : [])
-      } catch {
-        setError('Network error. Please try again.')
+        fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
+          credentials: "include",
+        }),
+      ])
+
+      if (!pendingTicketsRes.ok) {
+        setError(
+          await getErrorDetail(
+            pendingTicketsRes,
+            'Failed to load pending travel requests.'
+          )
+        )
+        setTickets([])
+        setBookings([])
+        return
+      }
+
+      if (!ticketHistoryRes.ok) {
+        setError(
+          await getErrorDetail(
+            ticketHistoryRes,
+            'Failed to load travel history.'
+          )
+        )
+        setTickets([])
+        setBookings([])
+        return
+      }
+
+      if (!pendingBookingsRes.ok) {
+        setError(
+          await getErrorDetail(
+            pendingBookingsRes,
+            'Failed to load pending driver bookings.'
+          )
+        )
+        setTickets([])
+        setBookings([])
+        return
+      }
+
+      if (!bookingHistoryRes.ok) {
+        setError(
+          await getErrorDetail(
+            pendingBookingsRes,
+            'Failed to load pending driver bookings.'
+          )
+        )
+        setTickets([])
+        setBookings([])
+        return
+      }
+
+      if (!driverCalendarRes.ok) {
+        setError(
+          await getErrorDetail(
+            driverCalendarRes,
+            'Failed to load driver calendars.'
+          )
+        )
         setTickets([])
         setBookings([])
         setDriverSchedules([])
-      } finally {
-        setLoading(false)
+        return
       }
-    }
 
-    loadQuickView()
-  }, [])
+      const [
+        pendingTickets,
+        ticketHistory,
+        pendingBookings,
+        bookingHistory,
+        driverCalendarData,
+      ] = await Promise.all([
+        pendingTicketsRes.json(),
+        ticketHistoryRes.json(),
+        pendingBookingsRes.json(),
+        bookingHistoryRes.json(),
+        driverCalendarRes.json(),
+      ])
+
+      setTickets([
+        ...(Array.isArray(pendingTickets)
+          ? pendingTickets
+          : []),
+
+        ...(Array.isArray(ticketHistory)
+          ? ticketHistory
+          : []),
+      ])
+
+      setBookings([
+        ...(Array.isArray(pendingBookings)
+          ? pendingBookings
+          : []),
+
+        ...(Array.isArray(bookingHistory)
+          ? bookingHistory
+          : []),
+      ])
+
+      setDriverSchedules(
+        Array.isArray(driverCalendarData)
+          ? driverCalendarData
+          : []
+      )
+    } catch {
+      setError('Network error. Please try again.')
+      setTickets([])
+      setBookings([])
+      setDriverSchedules([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  loadQuickView()
+}, [])
 
   const driverCalendars = useMemo(
     () =>
