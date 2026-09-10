@@ -57,7 +57,6 @@ def init_mongo():
     """Initialize Mongo connection early (useful for startup checks)."""
     database = db.get_db()
 
-    # Best-effort index creation; ignore failures (e.g., duplicate data).
     try:
         database["users"].create_index([("email", ASCENDING)], unique=True)
         database["users"].create_index([("role", ASCENDING)])
@@ -78,7 +77,7 @@ def init_mongo():
         init_page_permissions(database)
     except Exception as exc:
         print(f"Page permission setup skipped: {exc}")
-    # Populate request IDs for records created before this numbering regulation.
+   
     try:
         from request_id_service import backfill_request_ids
 
@@ -86,7 +85,6 @@ def init_mongo():
     except Exception as exc:
         print(f"Request ID backfill skipped: {exc}")
 
-    # Enforce uniqueness after legacy records have received their request IDs.
     try:
         request_id_index_options = {
             "unique": True,

@@ -135,7 +135,7 @@ def update_page_permission(
             detail="Superadmin permissions cannot be modified",
         )
 
-    # Cari dulu dokumennya
+   
     existing = db["role_page_permissions"].find_one({
         "role": payload.role,
         "page_id": payload.page_id,
@@ -143,7 +143,7 @@ def update_page_permission(
 
     print("EXISTING PERMISSION:", existing)
 
-    # Update
+    
     result = db["role_page_permissions"].update_one(
         {
             "role": payload.role,
@@ -159,7 +159,7 @@ def update_page_permission(
 
    
 
-    # Ambil ulang setelah update
+    
     updated = db["role_page_permissions"].find_one({
         "role": payload.role,
         "page_id": payload.page_id,
