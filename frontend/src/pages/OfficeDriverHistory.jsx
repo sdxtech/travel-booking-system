@@ -351,19 +351,13 @@ function OfficeDriverHistory() {
 
   // Load driver booking history and apply optional date filtering client-side.
   const loadBookings = async (range) => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setError('Authentication token not found.')
-      setBookings([])
-      setHasLoaded(true)
-      return
-    }
+   
 
     setLoading(true)
     setError('')
     try {
       const res = await fetch(`${API_BASE_URL}/bookings/history`, {
-        headers: { Authorization: `Bearer ${token}` },
+         credentials: 'include',
       })
       if (!res.ok) {
         let detail = 'Failed to load driver history.'
@@ -512,8 +506,7 @@ function OfficeDriverHistory() {
     const requestId = availabilityRequestIdRef.current
     if (!booking?.departure_time) return
 
-    const token = localStorage.getItem('authToken')
-    if (!token) return
+    
 
     setAvailabilityLoading(true)
     setAvailabilityError('')
@@ -526,7 +519,7 @@ function OfficeDriverHistory() {
       }
 
       const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${token}` },
+         credentials: 'include',
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -574,11 +567,7 @@ function OfficeDriverHistory() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+   
 
     setActionLoadingId(assignTarget.id)
     setActionError('')
@@ -587,9 +576,10 @@ function OfficeDriverHistory() {
       const res = await fetch(`${API_BASE_URL}/bookings/${assignTarget.id}/status`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+         
           'Content-Type': 'application/json',
         },
+         credentials: 'include',
         body: JSON.stringify({ status: 'approved', driver_id: selectedDriverId }),
       })
       if (!res.ok) {
@@ -666,11 +656,7 @@ function OfficeDriverHistory() {
       return
     }
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+    
 
     setActionLoadingId(editTarget.id)
     setActionError('')
@@ -679,9 +665,10 @@ function OfficeDriverHistory() {
       const res = await fetch(`${API_BASE_URL}/bookings/${editTarget.id}`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+         
           'Content-Type': 'application/json',
         },
+         credentials: 'include',
         body: JSON.stringify({
           ...editForm,
           departure_time: departureTime.toISOString(),
@@ -712,11 +699,7 @@ function OfficeDriverHistory() {
     const confirmed = window.confirm('Cancel this approved booking?')
     if (!confirmed) return
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+   
 
     setActionLoadingId(booking.id)
     setActionError('')
@@ -725,7 +708,7 @@ function OfficeDriverHistory() {
     try {
       const res = await fetch(`${API_BASE_URL}/bookings/${booking.id}/cancel`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
 
       if (!res.ok) {
@@ -755,11 +738,7 @@ function OfficeDriverHistory() {
     const confirmed = window.confirm('Confirm that this unlinked trip has been completed?')
     if (!confirmed) return
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+    
 
     setActionLoadingId(booking.id)
     setActionError('')
@@ -767,7 +746,7 @@ function OfficeDriverHistory() {
     try {
       const res = await fetch(`${API_BASE_URL}/bookings/${booking.id}/validate-completion`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+         credentials: 'include',
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -792,11 +771,7 @@ function OfficeDriverHistory() {
     const confirmed = window.confirm(`Reject booking ${booking.request_id || booking.id}?`)
     if (!confirmed) return
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+    
 
     setActionLoadingId(booking.id)
     setActionError('')
@@ -805,9 +780,10 @@ function OfficeDriverHistory() {
       const res = await fetch(`${API_BASE_URL}/bookings/${booking.id}/status`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+         
           'Content-Type': 'application/json',
         },
+         credentials: 'include',
         body: JSON.stringify({ status: 'rejected' }),
       })
       if (!res.ok) {

@@ -12,16 +12,11 @@ function AdminDriverAvailability() {
 
   useEffect(() => {
     const loadDrivers = async () => {
-      const token = localStorage.getItem('authToken')
-      if (!token) {
-        setError('Authentication token not found. Please login again.')
-        setLoading(false)
-        return
-      }
+    
 
       try {
         const response = await fetch(`${API_BASE_URL}/settings/drivers`, {
-          headers: { Authorization: `Bearer ${token}` },
+         credentials: 'include',
         })
         if (!response.ok) {
           const data = await response.json().catch(() => ({}))
@@ -42,11 +37,7 @@ function AdminDriverAvailability() {
   }, [])
 
   const toggleDriver = async (driver) => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setError('Authentication token not found. Please login again.')
-      return
-    }
+   
 
     const nextEnabled = !driver.booking_enabled
     setUpdatingId(driver.driver_id)
@@ -56,9 +47,10 @@ function AdminDriverAvailability() {
       const response = await fetch(`${API_BASE_URL}/settings/drivers/${driver.driver_id}`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${token}`,
+          
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ booking_enabled: nextEnabled }),
       })
       if (!response.ok) {

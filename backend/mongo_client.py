@@ -74,6 +74,10 @@ def init_mongo():
     except Exception as exc:
         print(f"Mongo index setup skipped: {exc}")
 
+    try:
+        init_page_permissions(database)
+    except Exception as exc:
+        print(f"Page permission setup skipped: {exc}")
     # Populate request IDs for records created before this numbering regulation.
     try:
         from request_id_service import backfill_request_ids
@@ -93,3 +97,64 @@ def init_mongo():
     except Exception as exc:
         print(f"Request ID index setup skipped: {exc}")
     return db
+
+def init_page_permissions(database):
+    pages = [
+        {
+            "_id": "page_ticket_request",
+            "name": "Ticket Request",
+            "key": "ticket_request",
+            "path": "/user/ticket-request",
+            "description": "Halaman untuk membuat ticket request",
+            "is_active": True,
+        },
+        {
+            "_id": "page_ticket_history",
+            "name": "Ticket History",
+            "key": "ticket_history",
+            "path": "/user/ticket-history",
+            "description": "Riwayat ticket user",
+            "is_active": True,
+        },
+        {
+            "_id": "page_booking_driver",
+            "name": "Booking Driver",
+            "key": "booking_driver",
+            "path": "/user/booking-driver",
+            "description": "Halaman booking driver",
+            "is_active": True,
+        },
+         {
+                "_id": "page_booking_history",
+                "name": "Booking History",
+                "key": "booking_history",
+                "path": "/user/booking-history",
+                "description": "Halaman booking history",
+                "is_active": True,
+            },
+    ]
+
+    for page in pages:
+        database["pages"].update_one(
+            {"_id": page["_id"]},
+            {"$setOnInsert": page},
+            upsert=True,
+        )
+
+    database["pages"].create_index(
+        [("key", ASCENDING)],
+        unique=True,
+    )
+
+    database["pages"].create_index(
+        [("path", ASCENDING)],
+        unique=True,
+    )
+
+    database["role_page_permissions"].create_index(
+        [
+            ("role", ASCENDING),
+            ("page_id", ASCENDING),
+        ],
+        unique=True,
+    )

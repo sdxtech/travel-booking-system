@@ -18,6 +18,11 @@ import AdminSettings from './pages/AdminSettings'
 import AdminDriverAvailability from './pages/AdminDriverAvailability'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
+import { AuthProvider } from './contexts/authContext'
+import Unauthorized from './pages/Unauthorized'
+import ResetPassword from './pages/ResetPassword'
+import AdminPagePermissions from './pages/AdminPagePermissions'
+
 
 // Main router for all app pages.
 function App() {
@@ -26,10 +31,11 @@ function App() {
       <div className="app-shell">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
           <Route
             path="/user/home"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["user"]}>
                 <UserHome />
               </ProtectedRoute>
             }
@@ -37,7 +43,7 @@ function App() {
           <Route
             path="/user/ticket-request"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["user"]} pageId="page_ticket_request">
                 <TicketRequest />
               </ProtectedRoute>
             }
@@ -45,7 +51,7 @@ function App() {
           <Route
             path="/user/ticket-history"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["user"]} pageId="page_ticket_history">
                 <TicketHistory />
               </ProtectedRoute>
             }
@@ -53,7 +59,7 @@ function App() {
           <Route
             path="/user/booking-driver"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["user"]} pageId="page_booking_driver">
                 <BookingDriver />
               </ProtectedRoute>
             }
@@ -61,7 +67,7 @@ function App() {
           <Route
             path="/user/booking-history"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["user"]} pageId="page_booking_history">
                 <BookingHistory />
               </ProtectedRoute>
             }
@@ -69,7 +75,7 @@ function App() {
           <Route
             path="/driver/home"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["driver"]}>
                 <DriverHome />
               </ProtectedRoute>
             }
@@ -77,7 +83,7 @@ function App() {
           <Route
             path="/office/home"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <OfficeHome />
               </ProtectedRoute>
             }
@@ -85,7 +91,7 @@ function App() {
           <Route
             path="/office/ticket-requests"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <Navigate to="/office/ticket-history" replace />
               </ProtectedRoute>
             }
@@ -93,7 +99,7 @@ function App() {
           <Route
             path="/office/driver-requests"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <Navigate to="/office/driver-history" replace />
               </ProtectedRoute>
             }
@@ -101,7 +107,7 @@ function App() {
           <Route
             path="/office/ticket-history"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <OfficeTicketHistory />
               </ProtectedRoute>
             }
@@ -109,7 +115,7 @@ function App() {
           <Route
             path="/office/driver-history"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <OfficeDriverHistory />
               </ProtectedRoute>
             }
@@ -117,7 +123,7 @@ function App() {
           <Route
             path="/office/travel-accommodation"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <OfficeTravelAccommodation />
               </ProtectedRoute>
             }
@@ -125,7 +131,7 @@ function App() {
           <Route
             path="/office/assign-drivers"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <OfficeAssignDrivers />
               </ProtectedRoute>
             }
@@ -133,7 +139,7 @@ function App() {
           <Route
             path="/office/manage-user"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
                 <OfficeManageUser />
               </ProtectedRoute>
             }
@@ -141,7 +147,7 @@ function App() {
           <Route
             path="/admin/home"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminHome />
               </ProtectedRoute>
             }
@@ -149,7 +155,7 @@ function App() {
           <Route
             path="/admin/manage-user"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminManageUser />
               </ProtectedRoute>
             }
@@ -157,7 +163,7 @@ function App() {
           <Route
             path="/admin/settings"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin"]}>
                 <Navigate to="/admin/settings/cancel-booking" replace />
               </ProtectedRoute>
             }
@@ -165,16 +171,32 @@ function App() {
           <Route
             path="/admin/settings/cancel-booking"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminSettings />
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/admin/settings/page-permissions"
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <AdminPagePermissions />
               </ProtectedRoute>
             }
           />
           <Route
             path="/admin/settings/driver-availability"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminDriverAvailability />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <ProtectedRoute allowedRoles={["user", "driver"]}>
+                <ResetPassword />
               </ProtectedRoute>
             }
           />

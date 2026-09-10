@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
 
+import TicketCard from '../components/TicketCard'
+import TicketTable from '../components/TicketTable'
+import ViewModeToggle from '../components/ViewModeToogle'
+
+
+
 // List the signed-in user's travel requests and their statuses.
 function TicketHistory() {
   const navigate = useNavigate()
@@ -14,8 +20,15 @@ function TicketHistory() {
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
+  const [viewMode, setViewMode] = useState('card')
 
   const pageSize = 10
+
+  useEffect(() => {
+    if (window.innerWidth <= 768) {
+      setViewMode('card')
+    }
+  }, [])
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -45,33 +58,31 @@ function TicketHistory() {
         return ticket.phone_number || ''
       case 'email':
         return ticket.email || ''
-      case 'departure_datetime':
-        {
-          const date = toDate(ticket.departure_date)
-          if (!date) return null
-          const timeValue = String(ticket.departure_time || '').trim()
-          if (!timeValue) return date.getTime()
+      case 'departure_datetime': {
+        const date = toDate(ticket.departure_date)
+        if (!date) return null
+        const timeValue = String(ticket.departure_time || '').trim()
+        if (!timeValue) return date.getTime()
 
-          const [hours, minutes] = timeValue.split(':').map((part) => Number(part))
-          if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return date.getTime()
+        const [hours, minutes] = timeValue.split(':').map((part) => Number(part))
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return date.getTime()
 
-          const merged = new Date(date)
-          merged.setHours(hours, minutes, 0, 0)
-          return merged.getTime()
-        }
+        const merged = new Date(date)
+        merged.setHours(hours, minutes, 0, 0)
+        return merged.getTime()
+      }
       case 'departure_point':
         return ticket.departure_point || ''
       case 'destination':
         return ticket.destination || ''
       case 'trip_type':
         return ticket.trip_type || ''
-      case 'hotel_accommodation':
-        {
-          const value = ticket.hotel_accommodation
-          if (value === true || value === 'yes') return 1
-          if (value === false || value === 'no') return 0
-          return null
-        }
+      case 'hotel_accommodation': {
+        const value = ticket.hotel_accommodation
+        if (value === true || value === 'yes') return 1
+        if (value === false || value === 'no') return 0
+        return null
+      }
       case 'hotel_name':
         return ticket.hotel_name || ''
       case 'hotel_location':
@@ -151,31 +162,20 @@ function TicketHistory() {
 
   // Load the current user's ticket history.
   useEffect(() => {
-    // Fetch ticket data from the API.
     const fetchTickets = async () => {
       setLoading(true)
       setError('')
-      const token = localStorage.getItem('authToken')
-      if (!token) {
-        setError('Authentication token not found. Please login again.')
-        setLoading(false)
-        return
-      }
 
       try {
         const response = await fetch(`${API_BASE_URL}/tickets/my`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: 'include',
         })
 
         if (!response.ok) {
           let detail = 'Failed to load tickets.'
           try {
             const data = await response.json()
-            if (data?.detail) {
-              detail = data.detail
-            }
+            if (data?.detail) detail = data.detail
           } catch {
             // ignore parse error
           }
@@ -206,19 +206,13 @@ function TicketHistory() {
     const confirmed = window.confirm('Cancel this ticket request?')
     if (!confirmed) return
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found. Please login again.')
-      return
-    }
-
     setActionLoadingId(ticketId)
     setActionError('')
 
     try {
       const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/cancel`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
 
       if (!response.ok) {
@@ -288,10 +282,8 @@ function TicketHistory() {
 
   // Format boolean-ish values consistently.
   const formatBool = (value) => {
-    if (value === true) return 'Yes'
-    if (value === false) return 'No'
-    if (value === 'yes') return 'Yes'
-    if (value === 'no') return 'No'
+    if (value === true || value === 'yes') return 'Yes'
+    if (value === false || value === 'no') return 'No'
     return '-'
   }
 
@@ -302,11 +294,15 @@ function TicketHistory() {
           <button className="back-link" type="button" onClick={() => navigate(-1)}>
             &larr; Back
           </button>
-          <div>
-            <p className="eyebrow">Travel Status & History</p>
-            <h1>List of all Travel Request</h1>
-            <p className="muted">Track the status of all your travel requests</p>
+          <div className="history-header-main">
+            <div>
+              <p className="eyebrow">Travel Status & History</p>
+              <h1>List of all Travel Request</h1>
+              <p className="muted">Track the status of all your travel requests</p>
+            </div>
+           
           </div>
+           <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
         </header>
 
         {loading ? <p className="muted">Loading tickets...</p> : null}
@@ -315,86 +311,41 @@ function TicketHistory() {
 
         {!loading && !error ? (
           <>
-            <div className="table-wrapper">
-              <table className="simple-table history-summary-table">
-                <thead>
-                  <tr>
-                    <th className="table-col-no">No</th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('created_at')}>
-                        Submission Date {renderSortIcon('created_at')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('request_id')}>
-                        Request ID {renderSortIcon('request_id')}
-                      </button>
-                    </th>
-                    <th>
-                      <button type="button" className="table-sort" onClick={() => toggleSort('status')}>
-                        Status {renderSortIcon('status')}
-                      </button>
-                    </th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tickets.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="muted">
-                        No ticket requests yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    pagedTickets.map((ticket, index) => {
-                      const statusValue = (ticket.status || 'pending').toLowerCase()
-                      const isPending = statusValue === 'pending'
-
-                      return (
-                        <tr key={ticket.id}>
-                          <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
-                          <td>{formatDate(ticket.created_at)}</td>
-                          <td className="request-id-cell">{ticket.request_id || '-'}</td>
-                          <td>
-                            <span className={`status-badge status-${statusValue}`}>{ticket.status || 'pending'}</span>
-                          </td>
-                          <td>
-                            <div className="table-row-actions table-action-buttons">
-                              <button
-                                type="button"
-                                className="btn btn-outline-brand"
-                                onClick={() => handleEdit(ticket)}
-                                disabled={!isPending || actionLoadingId === ticket.id}
-                                title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-danger"
-                                onClick={() => handleCancel(ticket.id)}
-                                disabled={!isPending || actionLoadingId === ticket.id}
-                                title={isPending ? 'Cancel this request' : 'Only pending requests can be cancelled'}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-outline-brand"
-                                onClick={() => setSelectedTicket(ticket)}
-                                disabled={actionLoadingId === ticket.id}
-                              >
-                                Details
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {viewMode === 'table' ? (
+              <TicketTable
+                tickets={pagedTickets}
+                currentPage={currentPage}
+                pageSize={pageSize}
+                sortConfig={sortConfig}
+                onSort={toggleSort}
+                renderSortIcon={renderSortIcon}
+                formatDate={formatDate}
+                actionLoadingId={actionLoadingId}
+                onEdit={handleEdit}
+                onCancel={handleCancel}
+                onDetails={setSelectedTicket}
+              />
+            ) : (
+              <div className="booking-cards-grid">
+                {pagedTickets.length === 0 ? (
+                  <p className="muted">No ticket requests yet.</p>
+                ) : (
+                  pagedTickets.map((ticket, index) => (
+                    <TicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      index={(currentPage - 1) * pageSize + index + 1}
+                      actionLoadingId={actionLoadingId}
+                      formatDate={formatDate}
+                      formatDateTime={formatDateTime}
+                      onEdit={handleEdit}
+                      onCancel={handleCancel}
+                      onDetails={setSelectedTicket}
+                    />
+                  ))
+                )}
+              </div>
+            )}
 
             <div className="office-pagination">
               <button

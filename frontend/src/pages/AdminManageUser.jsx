@@ -69,7 +69,7 @@ function AdminManageUser() {
     setPage((prev) => Math.min(prev, totalPages))
   }, [totalPages])
 
-  const token = localStorage.getItem('authToken')
+  
 
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
@@ -83,17 +83,13 @@ function AdminManageUser() {
 
   // Fetch user profiles from the API.
   const loadUsers = async () => {
-    if (!token) {
-      setLoading(false)
-      setError('Authentication token not found.')
-      return
-    }
+    
 
     setLoading(true)
     setError('')
     try {
       const res = await fetch(`${API_BASE_URL}/users`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
       if (!res.ok) {
         let detail = 'Failed to load users.'
@@ -175,7 +171,7 @@ function AdminManageUser() {
     setImportError('')
     try {
       const res = await fetch(`${API_BASE_URL}/users/import/template`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        credentials:'include' ,
       })
 
       if (!res.ok) {
@@ -201,10 +197,7 @@ function AdminManageUser() {
 
   // Upload and import users from the selected CSV/XLSX file.
   const handleImportUsers = async () => {
-    if (!token) {
-      setImportError('Authentication token not found.')
-      return
-    }
+    
 
     if (!importFile) {
       setImportError('Please choose a file (.xlsx or .csv).')
@@ -221,8 +214,9 @@ function AdminManageUser() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+         
         },
+        credentials:'include' ,
         body: JSON.stringify({
           filename: importFile.name,
           file_base64: fileBase64,
@@ -268,7 +262,7 @@ function AdminManageUser() {
   // Create a new user account from the create form.
   const handleCreate = async (event) => {
     event.preventDefault()
-    if (!token) return
+   
 
     setCreateLoading(true)
     setCreateError('')
@@ -279,8 +273,9 @@ function AdminManageUser() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          
         },
+         credentials:'include' ,
         body: JSON.stringify(createForm),
       })
       if (!res.ok) {
@@ -311,49 +306,67 @@ function AdminManageUser() {
 
   // Save changes for the selected user.
   const handleUpdate = async (event) => {
-    event.preventDefault()
-    if (!token || !selectedUser) return
+  event.preventDefault()
 
-    setEditLoading(true)
-    setEditError('')
-    setSuccessModal(null)
+  if (!selectedUser) return
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/users/${selectedUser.uid}`, {
+  setEditLoading(true)
+  setEditError('')
+  setSuccessModal(null)
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/users/${selectedUser.uid}`,
+      {
         method: 'PATCH',
+
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+
+        credentials: 'include',
+
         body: JSON.stringify(editForm),
-      })
-      if (!res.ok) {
-        let detail = 'Failed to update user.'
-        try {
-          const data = await res.json()
-          if (data?.detail) detail = data.detail
-        } catch {
-          // ignore parse error
-        }
-        setEditError(detail)
-      } else {
-        setSuccessModal({
-          mode: 'update',
-          title: 'Changes Saved',
-          message: 'User profile was updated successfully.',
-        })
-        await loadUsers()
       }
-    } catch (err) {
-      setEditError('Network error. Please try again.')
-    } finally {
-      setEditLoading(false)
+    )
+
+    if (!res.ok) {
+      let detail = 'Failed to update user.'
+
+      try {
+        const data = await res.json()
+
+        if (data?.detail) {
+          detail = data.detail
+        }
+      } catch {
+        // ignore parse error
+      }
+
+      setEditError(detail)
+      return
     }
+
+    setSuccessModal({
+      mode: 'update',
+      title: 'Changes Saved',
+      message: 'User profile was updated successfully.',
+    })
+
+    await loadUsers()
+
+  } catch {
+    setEditError(
+      'Network error. Please try again.'
+    )
+  } finally {
+    setEditLoading(false)
   }
+}
 
   // Deactivate an account and keep it unavailable for login.
   const handleDeactivate = async (user) => {
-    if (!token || !user?.uid) return
+    if ( !user?.uid) return
 
     const confirmed = window.confirm(`Deactivate this account?\n\n${user.email || user.name || user.uid}`)
     if (!confirmed) return
@@ -365,7 +378,7 @@ function AdminManageUser() {
     try {
       const res = await fetch(`${API_BASE_URL}/users/${user.uid}/deactivate`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
 
       if (!res.ok) {
@@ -415,7 +428,7 @@ function AdminManageUser() {
   // Reset a user's password via the API.
   const handleResetPassword = async (event) => {
     event.preventDefault()
-    if (!token || !passwordModalUser?.uid) return
+    if (!passwordModalUser?.uid) return
 
     setPasswordError('')
 
@@ -435,8 +448,9 @@ function AdminManageUser() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          
         },
+        credentials: 'include',
         body: JSON.stringify({ password: nextPassword }),
       })
 
@@ -464,7 +478,7 @@ function AdminManageUser() {
 
   // Permanently delete a user account from the backend.
   const handleDelete = async (user) => {
-    if (!token || !user?.uid) return
+    if (!user?.uid) return
 
     const confirmed = window.confirm(
       `Delete this account permanently?\n\nThis will remove the user record from MongoDB.\n\n${user.email || user.name || user.uid}`
@@ -479,7 +493,7 @@ function AdminManageUser() {
     try {
       const res = await fetch(`${API_BASE_URL}/users/${user.uid}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       })
 
       if (!res.ok) {

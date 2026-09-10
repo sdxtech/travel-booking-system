@@ -19,7 +19,7 @@ def load_backend_env() -> None:
 
 load_backend_env()
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Cookie, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -27,6 +27,9 @@ from jwt import ExpiredSignatureError, InvalidTokenError
 
 from auth_utils import decode_access_token, get_jwt_secret
 from mongo_client import db, init_mongo
+
+from bson import ObjectId
+from bson.errors import InvalidId
 
 app = FastAPI()
 
@@ -51,17 +54,29 @@ def startup_event():
 
 
 def get_current_user(
-    creds: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
 ):
-    """Validate the auth token and return the decoded user payload."""
-    token = creds.credentials
+    """Validate access token from HttpOnly cookie."""
+
+    token = request.cookies.get(
+        "access_token"
+    )
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
     try:
         decoded = decode_access_token(token)
+
     except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired",
         )
+
     except InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -69,18 +84,23 @@ def get_current_user(
         )
 
     uid = decoded.get("sub")
+
     if not uid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
 
-    user_doc = db["users"].find_one({"_id": uid})
+    user_doc = db["users"].find_one({
+        "_id": uid
+    })
+
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+
     if user_doc.get("disabled"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -88,11 +108,10 @@ def get_current_user(
         )
 
     return {
-        "uid": uid,
+        "uid": str(user_doc["_id"]),
         "email": user_doc.get("email"),
         "role": user_doc.get("role"),
     }
-
 
 from routes_bookings import router as bookings_router
 from routes_auth import router as auth_router
@@ -100,6 +119,7 @@ from routes_notifications import router as notifications_router
 from routes_settings import router as settings_router
 from routes_tickets import router as tickets_router
 from routes_users_admin import router as users_router
+from routes_page_permissions import router as pages_router
 
 
 @app.get("/health")
@@ -137,3 +157,4 @@ app.include_router(notifications_router)
 app.include_router(settings_router)
 app.include_router(tickets_router)
 app.include_router(users_router)
+app.include_router(pages_router)

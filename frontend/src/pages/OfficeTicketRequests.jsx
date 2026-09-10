@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
+
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -19,7 +21,9 @@ const menuItems = [
 function OfficeTicketRequests() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+  const { user } = useAuth()
+const isSuperadmin =
+  user?.role === 'superadmin'
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,12 +44,7 @@ function OfficeTicketRequests() {
 
   // Load pending ticket requests.
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setLoading(false)
-      setError('Authentication token not found.')
-      return
-    }
+    
 
     // Fetch pending tickets from the API.
     const loadTickets = async () => {
@@ -53,7 +52,7 @@ function OfficeTicketRequests() {
       setError('')
       try {
         const res = await fetch(`${API_BASE_URL}/tickets/pending`, {
-          headers: { Authorization: `Bearer ${token}` },
+        credentials:'include',
         })
         if (!res.ok) {
           let detail = 'Failed to load tickets.'
@@ -82,11 +81,7 @@ function OfficeTicketRequests() {
 
   // Update ticket status and remove it from the pending list.
   const handleStatusUpdate = async (ticketId, nextStatus) => {
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setActionError('Authentication token not found.')
-      return
-    }
+   
 
     setProcessing((prev) => ({ ...prev, [ticketId]: true }))
     setActionMessage('')
@@ -97,8 +92,9 @@ function OfficeTicketRequests() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          
         },
+         credentials:'include',
         body: JSON.stringify({ status: nextStatus }),
       })
 

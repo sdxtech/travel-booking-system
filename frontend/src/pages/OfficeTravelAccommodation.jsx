@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
+import { useAuth } from '../hooks/useAuth'
+
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -37,8 +39,11 @@ const initialForm = {
 // Create a travel request on behalf of a user (office coordinator flow).
 function OfficeTravelAccommodation() {
   const navigate = useNavigate()
+  
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
-  const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
+  const { user } = useAuth()
+const isSuperadmin =
+  user?.role === 'superadmin'
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -79,12 +84,7 @@ function OfficeTravelAccommodation() {
     setErrorMessage('')
     setShowSuccessModal(false)
 
-    const token = localStorage.getItem('authToken')
-    if (!token) {
-      setErrorMessage('Authentication token not found. Please login again.')
-      setLoading(false)
-      return
-    }
+    
 
     const payload = {
       ...form,
@@ -96,8 +96,9 @@ function OfficeTravelAccommodation() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          
         },
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
 
