@@ -55,8 +55,11 @@ function ProtectedRoute({
 
 
   if (
+    !['user', 'office_coordinator'].includes(user.role) ||
+    (
     permissionsLoading ||
     !permissionsLoaded
+    )
   ) {
     return <div>Loading...</div>
   }

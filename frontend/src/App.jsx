@@ -90,7 +90,7 @@ function App() {
           <Route
             path="/office/ticket-requests"
             element={
-              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]} pageId="page_ticket_history">
                 <Navigate to="/office/ticket-history" replace />
               </ProtectedRoute>
             }
@@ -98,7 +98,7 @@ function App() {
           <Route
             path="/office/driver-requests"
             element={
-              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]} pageId="page_booking_history">
                 <Navigate to="/office/driver-history" replace />
               </ProtectedRoute>
             }
@@ -106,7 +106,7 @@ function App() {
           <Route
             path="/office/ticket-history"
             element={
-              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]} pageId="page_ticket_history">
                 <OfficeTicketHistory />
               </ProtectedRoute>
             }
@@ -114,7 +114,7 @@ function App() {
           <Route
             path="/office/driver-history"
             element={
-              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]} pageId="page_booking_history">
                 <OfficeDriverHistory />
               </ProtectedRoute>
             }
@@ -122,7 +122,7 @@ function App() {
           <Route
             path="/office/travel-accommodation"
             element={
-              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]} pageId="page_ticket_request">
                 <OfficeTravelAccommodation />
               </ProtectedRoute>
             }
@@ -130,7 +130,7 @@ function App() {
           <Route
             path="/office/assign-drivers"
             element={
-              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]}>
+              <ProtectedRoute allowedRoles={["superadmin", "office_coordinator"]} pageId="page_booking_driver">
                 <OfficeAssignDrivers />
               </ProtectedRoute>
             }

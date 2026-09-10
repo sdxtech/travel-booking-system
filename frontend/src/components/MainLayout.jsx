@@ -54,11 +54,13 @@ const officeNavSections = [
       {
         label: 'Travel Assign',
         path: '/office/travel-accommodation',
+        pageId: 'page_ticket_request',
         icon: 'bi-luggage',
       },
       {
         label: 'Booking Driver Assign',
         path: '/office/assign-drivers',
+        pageId: 'page_booking_driver',
         icon: 'bi-car-front-fill',
       },
     ],
@@ -68,8 +70,8 @@ const officeNavSections = [
     label: 'Status & History',
     icon: 'bi-clock-history',
     items: [
-      { label: 'Travel Request & History', path: '/office/ticket-history', icon: 'bi-card-checklist' },
-      { label: 'Booking Driver Request & History', path: '/office/driver-history', icon: 'bi-journal-check' },
+      { label: 'Travel Request & History', path: '/office/ticket-history', pageId: 'page_ticket_history', icon: 'bi-card-checklist' },
+      { label: 'Booking Driver Request & History', path: '/office/driver-history', pageId: 'page_booking_history', icon: 'bi-journal-check' },
     ],
   },
 ]
@@ -180,6 +182,16 @@ function MainLayout({ title, children }) {
       .filter((section) => section.items.length > 0)
   }
 
+  const getOfficeNavSections = () => {
+    if (!permissionsLoaded) return []
+    return officeNavSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => hasPagePermission(item.pageId)),
+      }))
+      .filter((section) => section.items.length > 0)
+  }
+
 
   let navSections = []
 
@@ -199,7 +211,7 @@ function MainLayout({ title, children }) {
     ]
   } else if (role === 'office_coordinator') {
     navSections = [
-      ...officeNavSections,
+      ...getOfficeNavSections(),
       officeSettingsSection,
     ]
   } else {

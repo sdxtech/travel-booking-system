@@ -5,7 +5,11 @@ import { API_BASE_URL } from '../config'
 import MainLayout from "../components/MainLayout"
 
 const AdminPagePermissions = () => {
-  const selectedRole = "user"
+  const [selectedRole, setSelectedRole] = useState("user")
+  const roles = [
+    { value: 'user', label: 'Employee' },
+    { value: 'office_coordinator', label: 'Office Coordinator' },
+  ]
 
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(false)
@@ -138,7 +142,6 @@ const AdminPagePermissions = () => {
             Turning a page off prevents users from accessing that page.
           </span>
         </div>
-{/*
         <div className="page-permission-role-selector">
           <label htmlFor="permission-role">
             Role
@@ -148,21 +151,18 @@ const AdminPagePermissions = () => {
             id="permission-role"
             value={selectedRole}
             className="permission-role-selector"
-            onChange={(event) =>
-              setSelectedRole(event.target.value)
-            }
+            onChange={(event) => setSelectedRole(event.target.value)}
           >
             {roles.map((role) => (
               <option
-                key={role}
-                value={role}
+                key={role.value}
+                value={role.value}
               >
-                {formatRoleName(role)}
+                {role.label}
               </option>
             ))}
           </select>
         </div>
-        */}
 
         <div
           className="driver-availability-feedback"

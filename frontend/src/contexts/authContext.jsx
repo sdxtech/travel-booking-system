@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
 
   const fetchPagePermissions = async (role) => {
 
-    if (role !== 'user') {
+    if (!['user', 'office_coordinator'].includes(role)) {
       setPagePermissions([])
       setPermissionsLoaded(true)
       return []
@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
       setPermissionsLoaded(false)
 
       const response = await fetch(
-        `${API_BASE_URL}/pages/permissions/user`,
+        `${API_BASE_URL}/pages/permissions/${role}`,
         {
           credentials: 'include',
         }

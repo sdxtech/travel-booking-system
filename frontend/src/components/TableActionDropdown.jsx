@@ -108,14 +108,18 @@ function TableActionDropdown({ label, disabled = false, children }) {
           tabIndex={-1}
           style={position}
           onKeyDown={handleMenuKeyDown}
-          onClickCapture={(event) => {
-            const action = event.target.closest('button')
-            if (action && !action.disabled) closeAndFocusTrigger()
-          }}
         >
           {Children.map(children, (child) => cloneElement(child, {
             role: 'menuitem',
             tabIndex: -1,
+            onClick: (event) => {
+              // Run the action first. Closing on click-capture can unmount the
+              // button before callbacks such as Details update their parent.
+              child.props.onClick?.(event)
+              if (!event.defaultPrevented && !event.currentTarget.disabled) {
+                closeAndFocusTrigger()
+              }
+            },
           }))}
         </div>,
         document.body,

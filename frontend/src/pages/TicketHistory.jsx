@@ -18,6 +18,7 @@ function TicketHistory() {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [page, setPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
+  const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("card");
 
   const pageSize = 10;
@@ -122,9 +123,13 @@ function TicketHistory() {
 
   // Sort tickets based on the active column/direction.
   const sortedTickets = useMemo(() => {
-    if (!sortConfig.key) return tickets;
+    const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const filtered = terms.length === 0 ? tickets : tickets.filter((ticket) =>
+      terms.every((term) => JSON.stringify(ticket).toLowerCase().includes(term))
+    );
+    if (!sortConfig.key) return filtered;
 
-    return tickets
+    return filtered
       .map((ticket, index) => ({ ticket, index }))
       .sort((a, b) => {
         const aValue = getTicketSortValue(a.ticket, sortConfig.key);
@@ -140,7 +145,7 @@ function TicketHistory() {
       .map((entry) => entry.ticket);
   // Sorting helpers are pure and intentionally scoped to this component.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, sortConfig]);
+  }, [tickets, sortConfig, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -321,6 +326,13 @@ function TicketHistory() {
             </div>
           </div>
         </header>
+
+        <div className="form-actions history-toolbar">
+          <label className="history-search">
+            <i className="bi bi-search" aria-hidden="true" />
+            <input type="search" aria-label="Search travel history" placeholder="Search by Request ID, status, or destination..." value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setPage(1); }} />
+          </label>
+        </div>
 
         {loading ? <p className="muted">Loading tickets...</p> : null}
         {error ? <p className="error-text">{error}</p> : null}
