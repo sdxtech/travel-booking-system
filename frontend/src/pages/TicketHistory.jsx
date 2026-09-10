@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import TableActionDropdown from '../components/TableActionDropdown'
 import { API_BASE_URL } from '../config'
 
 // List the signed-in user's travel requests and their statuses.
@@ -126,6 +127,8 @@ function TicketHistory() {
         return a.index - b.index
       })
       .map((entry) => entry.ticket)
+  // Sorting helpers are pure and intentionally scoped to this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets, sortConfig])
 
   const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize))
@@ -359,34 +362,38 @@ function TicketHistory() {
                             <span className={`status-badge status-${statusValue}`}>{ticket.status || 'pending'}</span>
                           </td>
                           <td>
-                            <div className="table-row-actions table-action-buttons">
+                            <TableActionDropdown
+                              label={`Actions for ${ticket.request_id || 'travel request'}`}
+                              disabled={actionLoadingId === ticket.id}
+                            >
                               <button
                                 type="button"
-                                className="btn btn-outline-brand"
                                 onClick={() => handleEdit(ticket)}
                                 disabled={!isPending || actionLoadingId === ticket.id}
                                 title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
                               >
-                                Edit
+                                <i className="bi bi-pencil-square" aria-hidden="true" />
+                                <span>Edit</span>
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-danger"
+                                className="is-danger"
                                 onClick={() => handleCancel(ticket.id)}
                                 disabled={!isPending || actionLoadingId === ticket.id}
                                 title={isPending ? 'Cancel this request' : 'Only pending requests can be cancelled'}
                               >
-                                Cancel
+                                <i className="bi bi-x-circle" aria-hidden="true" />
+                                <span>Cancel</span>
                               </button>
                               <button
                                 type="button"
-                                className="btn btn-outline-brand"
                                 onClick={() => setSelectedTicket(ticket)}
                                 disabled={actionLoadingId === ticket.id}
                               >
-                                Details
+                                <i className="bi bi-info-circle" aria-hidden="true" />
+                                <span>Details</span>
                               </button>
-                            </div>
+                            </TableActionDropdown>
                           </td>
                         </tr>
                       )

@@ -40,6 +40,7 @@ class BookingAssignCreate(BaseModel):
 
 
 class BookingResponse(BaseModel):
+    cancellation_status: Optional[str] = None
     id: str
     request_id: Optional[str] = None
     user_id: Optional[str] = None
@@ -136,6 +137,7 @@ def serialize_booking(doc_snapshot) -> BookingResponse:
         estimated_arrival_time=data.get("estimated_arrival_time"),
         passenger_count=data.get("passenger_count"),
         status=data.get("status"),
+        cancellation_status=data.get("cancellation_status"),
         starting_mileage=data.get("starting_mileage"),
         ending_mileage=data.get("ending_mileage"),
         completion_proof=data.get("completion_proof"),
@@ -229,19 +231,20 @@ def resolve_driver(driver_id: str, *, allow_unavailable: bool = False) -> dict:
     return driver_data
 
 
-def is_driver_busy(
+def find_driver_conflicts(
     driver_id: str,
     departure_time: Optional[datetime],
     estimated_arrival_time: Optional[datetime],
     exclude_booking_id: Optional[str] = None,
     blocking_statuses: tuple[str, ...] = ("approved", "in_progress"),
-) -> bool:
-    """Check whether an existing booking overlaps the requested time interval."""
+) -> list[dict]:
+    """Return active bookings that overlap the requested driver interval."""
     requested_start = normalize_datetime(departure_time)
     requested_end = normalize_datetime(estimated_arrival_time)
     if not driver_id or not requested_start or not requested_end:
-        return False
+        return []
 
+    conflicts = []
     query = db["bookings"].find({"driver_id": driver_id})
     for doc in query:
         if exclude_booking_id and str(doc.get("_id")) == exclude_booking_id:
@@ -253,9 +256,26 @@ def is_driver_busy(
 
         other_start, other_end = booking_interval(data)
         if other_start and other_end and requested_start < other_end and requested_end > other_start:
-            return True
+            conflicts.append(data)
 
-    return False
+    return conflicts
+
+
+def is_driver_busy(
+    driver_id: str,
+    departure_time: Optional[datetime],
+    estimated_arrival_time: Optional[datetime],
+    exclude_booking_id: Optional[str] = None,
+    blocking_statuses: tuple[str, ...] = ("approved", "in_progress"),
+) -> bool:
+    """Check availability using the same conflicts shown during approval."""
+    return bool(find_driver_conflicts(
+        driver_id,
+        departure_time,
+        estimated_arrival_time,
+        exclude_booking_id=exclude_booking_id,
+        blocking_statuses=blocking_statuses,
+    ))
 
 
 @router.post("", response_model=BookingResponse)
@@ -590,6 +610,9 @@ def update_booking_status(
 
     booking_data = snapshot or {}
 
+    if current_role != "superadmin" and booking_data.get("cancellation_status") == "pending":
+        raise HTTPException(status_code=409, detail="Review the cancellation request first")
+
     if payload.status == "approved":
         if not payload.driver_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="driver_id is required for approval")
@@ -604,16 +627,26 @@ def update_booking_status(
         if not isinstance(estimated_arrival_time, datetime):
             estimated_arrival_time = departure_time + timedelta(hours=2)
 
-        if current_role != "superadmin" and is_driver_busy(
-            payload.driver_id,
-            departure_time,
-            estimated_arrival_time,
-            exclude_booking_id=booking_id,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Driver has an overlapping active booking. Cancel that booking before approving this request.",
+        if current_role != "superadmin":
+            conflicts = find_driver_conflicts(
+                payload.driver_id,
+                departure_time,
+                estimated_arrival_time,
+                exclude_booking_id=booking_id,
             )
+            if conflicts:
+                conflicting_ids = ", ".join(
+                    str(conflict.get("request_id") or conflict["_id"])
+                    for conflict in conflicts
+                )
+                booking_label = "booking" if len(conflicts) == 1 else "bookings"
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Driver has an overlapping active booking. "
+                        f"Cancel {booking_label} {conflicting_ids} before approving this request."
+                    ),
+                )
 
     updates = {
         "status": payload.status,
@@ -626,7 +659,14 @@ def update_booking_status(
         updates["approved_by"] = uid
         updates["approved_at"] = utc_now()
 
-    db["bookings"].update_one({"_id": booking_id}, {"$set": updates})
+    update_filter = {"_id": booking_id}
+    if current_role != "superadmin":
+        update_filter.update({"status": booking_data["status"], "cancellation_status": {"$ne": "pending"}})
+    elif booking_data.get("cancellation_status") == "pending":
+        updates["cancellation_status"] = "superseded"
+    result = db["bookings"].update_one(update_filter, {"$set": updates})
+    if not result.modified_count:
+        raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
 
     user_id = booking_data.get("user_id")
     if user_id:
@@ -678,6 +718,8 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
         if data.get("status", "pending") != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending bookings can be edited")
+        if data.get("cancellation_status") == "pending":
+            raise HTTPException(status_code=409, detail="Cancellation is awaiting Coordinator approval")
 
     validate_booking_interval(payload.departure_time, payload.estimated_arrival_time)
     driver_data = resolve_driver(payload.driver_id, allow_unavailable=role == "superadmin")
@@ -736,8 +778,8 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
     )
     booking_status = "pending" if has_conflict else "approved"
 
-    db["bookings"].update_one(
-        {"_id": booking_id},
+    result = db["bookings"].update_one(
+        {"_id": booking_id, "status": "pending", "cancellation_status": {"$ne": "pending"}},
         {
             "$set": {
                 "pickup_location": payload.pickup_location,
@@ -755,6 +797,9 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
             }
         },
     )
+
+    if not result.modified_count:
+        raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
 
     create_user_notification(
         uid,
@@ -812,6 +857,9 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
         if data.get("user_id") != uid:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
+        if data.get("cancellation_status") == "pending":
+            raise HTTPException(status_code=409, detail="Cancellation is already awaiting Coordinator approval")
+
         if booking_status != "pending":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending bookings can be canceled")
 
@@ -833,8 +881,30 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Booking can only be canceled {policy_description}",
                 )
+        if not policy.get("auto_approve", True):
+            result = db["bookings"].update_one(
+                {"_id": booking_id, "status": "pending", "cancellation_status": {"$ne": "pending"},
+                 "updated_at": data.get("updated_at")},
+                {"$set": {
+                    "cancellation_status": "pending",
+                    "cancellation_requested_by": uid,
+                    "cancellation_requested_at": utc_now(),
+                    "updated_at": utc_now(),
+                }},
+            )
+            if not result.modified_count:
+                raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
+            notify_roles(
+                ("office_coordinator", "superadmin"),
+                f"Cancellation requested for booking {data.get('request_id') or booking_id}. Please review.",
+                event="cancellation_requested", entity_type="booking", entity_id=booking_id,
+                status=booking_status, actor_id=uid,
+            )
+            return serialize_booking(db["bookings"].find_one({"_id": booking_id}))
     elif role == "office_coordinator":
-        if booking_status != "approved":
+        if booking_status != "approved" and not (
+            booking_status == "pending" and data.get("cancellation_status") == "pending"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Only approved bookings can be canceled by office coordinator",
@@ -846,17 +916,30 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
                 detail="Booking already started and cannot be canceled",
             )
 
-    db["bookings"].update_one(
-        {"_id": booking_id},
+    cancel_filter = {"_id": booking_id}
+    if role != "superadmin":
+        cancel_filter.update({
+            "status": booking_status,
+            "cancellation_status": data.get("cancellation_status"),
+            "updated_at": data.get("updated_at"),
+        })
+    result = db["bookings"].update_one(
+        cancel_filter,
         {
             "$set": {
                 "status": "cancelled",
+                "cancellation_status": "approved",
+                "cancellation_reviewed_by": uid,
+                "cancellation_reviewed_at": utc_now(),
                 "cancelled_by": uid,
                 "cancelled_at": utc_now(),
                 "updated_at": utc_now(),
             }
         },
     )
+
+    if not result.modified_count:
+        raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
 
     target_user_id = data.get("user_id")
     if role == "user":
@@ -879,6 +962,41 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
 
     updated_snapshot = db["bookings"].find_one({"_id": booking_id})
     return serialize_booking(updated_snapshot)
+
+
+class CancellationReview(BaseModel):
+    decision: Literal["approved", "rejected"]
+
+
+@router.patch("/{booking_id}/cancellation-review", response_model=BookingResponse)
+def review_cancellation(booking_id: str, payload: CancellationReview, current_user=Depends(get_current_user)):
+    uid = current_user["uid"]
+    ensure_role(uid, ("office_coordinator", "superadmin"))
+    data = db["bookings"].find_one({"_id": booking_id})
+    if not data:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if data.get("cancellation_status") != "pending":
+        raise HTTPException(status_code=409, detail="No pending cancellation request")
+    if payload.decision == "approved":
+        return cancel_booking(booking_id, current_user)
+    result = db["bookings"].update_one(
+        {"_id": booking_id, "status": data["status"], "cancellation_status": "pending"},
+        {"$set": {
+            "cancellation_status": "rejected",
+            "cancellation_reviewed_by": uid,
+            "cancellation_reviewed_at": utc_now(),
+            "updated_at": utc_now(),
+        }},
+    )
+    if not result.modified_count:
+        raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
+    if data.get("user_id"):
+        create_user_notification(
+            data["user_id"], "Your cancellation request was rejected. The booking remains unchanged.",
+            event="cancellation_rejected", entity_type="booking", entity_id=booking_id,
+            status=data["status"], actor_id=uid,
+        )
+    return serialize_booking(db["bookings"].find_one({"_id": booking_id}))
 
 
 @router.patch("/{booking_id}/start", response_model=BookingResponse)

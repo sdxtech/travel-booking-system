@@ -63,7 +63,7 @@ function Login() {
           if (data?.detail) {
             detail = data.detail
           }
-        } catch (e) {
+        } catch {
           // ignore parse error
         }
         throw new Error(detail)
@@ -90,7 +90,7 @@ function Login() {
           if (data?.detail) {
             detail = data.detail
           }
-        } catch (e) {
+        } catch {
           // ignore parse error
         }
         throw new Error(detail)

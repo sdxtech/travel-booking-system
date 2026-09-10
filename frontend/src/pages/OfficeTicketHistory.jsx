@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import TableActionDropdown from '../components/TableActionDropdown'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
+import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
@@ -15,6 +17,7 @@ const menuItems = [
 
 // Travel request history page for office coordinators (with export + date range).
 function OfficeTicketHistory() {
+  const historyTableRef = useFrozenHistoryColumns()
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
@@ -35,6 +38,7 @@ function OfficeTicketHistory() {
   const [activeRange, setActiveRange] = useState({ mode: 'all', start: '', end: '' })
 
   const pageSize = 10
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -48,6 +52,8 @@ function OfficeTicketHistory() {
   const getTicketSortValue = (ticket, key) => {
     if (!ticket) return ''
     switch (key) {
+      case 'request_id':
+        return ticket.request_id || ''
       case 'full_name':
         return ticket.full_name || ''
       case 'dept_job_position':
@@ -110,9 +116,15 @@ function OfficeTicketHistory() {
 
   // Sort tickets based on the active column/direction.
   const sortedTickets = useMemo(() => {
-    if (!sortConfig.key) return tickets
+    const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const filtered = tickets.filter((ticket) => {
+      const text = [ticket.request_id, ticket.full_name, ticket.dept_job_position, ticket.phone_number, ticket.email, ticket.national_id, ticket.departure_point, ticket.destination, ticket.purpose_of_travel, ticket.trip_type, ticket.hotel_name, ticket.hotel_location, ticket.transportation_mode, ticket.additional_notes, ticket.status]
+        .filter((value) => value != null).join(' ').toLowerCase()
+      return terms.every((term) => text.includes(term))
+    })
+    if (!sortConfig.key) return filtered
 
-    return tickets
+    return filtered
       .map((ticket, index) => ({ ticket, index }))
       .sort((a, b) => {
         const aValue = getTicketSortValue(a.ticket, sortConfig.key)
@@ -126,7 +138,9 @@ function OfficeTicketHistory() {
         return a.index - b.index
       })
       .map((entry) => entry.ticket)
-  }, [tickets, sortConfig])
+  // Sorting helpers are pure and intentionally scoped to this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets, sortConfig, searchQuery])
 
   const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -219,7 +233,7 @@ function OfficeTicketHistory() {
       } else {
         setTickets(rawTickets)
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.')
       setTickets([])
     } finally {
@@ -353,6 +367,7 @@ function OfficeTicketHistory() {
 
     const headers = [
       'No',
+      'Request ID',
       'Name',
       'User Dept/Job Position',
       'Phone',
@@ -375,6 +390,7 @@ function OfficeTicketHistory() {
 
     const rows = sortedTickets.map((ticket, index) => [
       index + 1,
+      ticket.request_id || '',
       ticket.full_name || '',
       ticket.dept_job_position || '',
       ticket.phone_number || '',
@@ -473,12 +489,23 @@ function OfficeTicketHistory() {
 
         <section className="office-content">
           <header className="office-header">
-            <p className="eyebrow">Travel Status & History</p>
             <h1>Travel Requests & History</h1>
-            <p className="muted">All travel requests, statuses, and history in one table</p>
           </header>
 
-          <div className="form-actions">
+          <div className="form-actions history-toolbar">
+            <label className="history-search">
+              <i className="bi bi-search" aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search travel history"
+                placeholder="Search by Request ID, name, status, or location..."
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setPage(1)
+                }}
+              />
+            </label>
             <button type="button" className="btn btn-neutral" onClick={openRangeModal} disabled={loading}>
               <i className="bi bi-calendar3" aria-hidden="true" />
               {hasLoaded ? 'Change Date Range' : 'Date Range'}
@@ -487,8 +514,8 @@ function OfficeTicketHistory() {
               type="button"
               className="btn btn-outline-brand"
               onClick={handleExport}
-              disabled={!hasLoaded || loading || !tickets.length}
-              title={tickets.length ? 'Export to Excel (.xls)' : 'No data to export'}
+              disabled={!hasLoaded || loading || !sortedTickets.length}
+              title={sortedTickets.length ? 'Export to Excel (.xls)' : 'No data to export'}
             >
               <i className="bi bi-file-earmark-excel" />
               Export Excel
@@ -500,10 +527,15 @@ function OfficeTicketHistory() {
           {!loading && actionError ? <p className="error-text">{actionError}</p> : null}
 
           <div className="office-table-wrapper">
-            <table className="office-table">
+            <table ref={historyTableRef} className="office-table history-frozen-columns">
               <thead>
                 <tr>
                   <th className="table-col-no">No</th>
+                  <th>
+                    <button type="button" className="table-sort" onClick={() => toggleSort('request_id')}>
+                      Request ID {renderSortIcon('request_id')}
+                    </button>
+                  </th>
                   <th>
                     <button type="button" className="table-sort" onClick={() => toggleSort('full_name')}>
                       Name {renderSortIcon('full_name')}
@@ -600,25 +632,25 @@ function OfficeTicketHistory() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="20" className="muted">
+                    <td colSpan="21" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="20" className="error-text">
+                    <td colSpan="21" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : !hasLoaded ? (
                   <tr>
-                    <td colSpan="20" className="muted">
+                    <td colSpan="21" className="muted">
                       Select a date range to load travel history.
                     </td>
                   </tr>
-                ) : tickets.length === 0 ? (
+                ) : sortedTickets.length === 0 ? (
                   <tr>
-                    <td colSpan="20" className="muted">
+                    <td colSpan="21" className="muted">
                       No ticket history found.
                     </td>
                   </tr>
@@ -626,6 +658,7 @@ function OfficeTicketHistory() {
                   pagedTickets.map((ticket, index) => (
                     <tr key={ticket.id}>
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
+                      <td className="request-id-cell">{ticket.request_id || '-'}</td>
                       <td>{ticket.full_name || '-'}</td>
                       <td>{ticket.dept_job_position || '-'}</td>
                       <td>{ticket.phone_number || '-'}</td>
@@ -651,10 +684,12 @@ function OfficeTicketHistory() {
                         )}
                       </td>
                       <td>
-                        <div className="table-action-buttons">
+                        <TableActionDropdown
+                          label={`Actions for ${ticket.request_id || 'travel request'}`}
+                          disabled={loading || actionLoadingId === ticket.id}
+                        >
                           <button
                             type="button"
-                            className="btn btn-primary"
                             onClick={() => handleStatusUpdate(ticket, 'approved')}
                             disabled={
                               actionLoadingId === ticket.id ||
@@ -667,11 +702,12 @@ function OfficeTicketHistory() {
                                 : 'Approve pending request'
                             }
                           >
-                            Approve
+                            <i className="bi bi-check-circle" aria-hidden="true" />
+                            <span>Approve</span>
                           </button>
                           <button
                             type="button"
-                            className="btn btn-danger"
+                            className="is-danger"
                             onClick={() => handleStatusUpdate(ticket, 'rejected')}
                             disabled={
                               actionLoadingId === ticket.id ||
@@ -684,9 +720,10 @@ function OfficeTicketHistory() {
                                 : 'Reject pending request'
                             }
                           >
-                            Reject
+                            <i className="bi bi-x-circle" aria-hidden="true" />
+                            <span>Reject</span>
                           </button>
-                        </div>
+                        </TableActionDropdown>
                       </td>
                     </tr>
                   ))

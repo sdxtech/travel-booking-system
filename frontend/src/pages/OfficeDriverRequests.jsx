@@ -22,7 +22,7 @@ function OfficeDriverRequests() {
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
-  const [profile, setProfile] = useState({ name: '' })
+  const [, setProfile] = useState({ name: '' })
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -106,7 +106,7 @@ function OfficeDriverRequests() {
             (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
           )
         )
-      } catch (err) {
+      } catch {
         setDriversError('Network error. Please try again.')
         setDrivers([])
       } finally {
@@ -139,7 +139,7 @@ function OfficeDriverRequests() {
           try {
             const data = await res.json()
             if (data?.detail) detail = data.detail
-          } catch (err) {
+          } catch {
             // ignore parse error
           }
           setError(detail)
@@ -148,7 +148,7 @@ function OfficeDriverRequests() {
           const data = await res.json()
           setBookings(Array.isArray(data) ? data : [])
         }
-      } catch (err) {
+      } catch {
         setError('Network error. Please try again.')
         setBookings([])
       } finally {
@@ -218,7 +218,7 @@ function OfficeDriverRequests() {
         setUnavailableDriverIds(normalized)
         setAvailabilityError('')
       }
-    } catch (err) {
+    } catch {
       if (requestId === availabilityRequestIdRef.current) {
         setUnavailableDriverIds([])
         setAvailabilityError('Network error. Please try again.')
@@ -330,7 +330,7 @@ function OfficeDriverRequests() {
       setBookings((prev) => prev.filter((booking) => booking.id !== assignTarget.id))
       setActionMessage('Driver assigned. Moved to driver history and will appear in driver tasks.')
       closeAssignModal()
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setProcessing((prev) => {
@@ -377,7 +377,7 @@ function OfficeDriverRequests() {
 
       setBookings((prev) => prev.filter((booking) => booking.id !== bookingId))
       setActionMessage('Booking rejected. Moved to driver history.')
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setProcessing((prev) => {

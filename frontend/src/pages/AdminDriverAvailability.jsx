@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
 
-// Super Admin control for allowing or pausing drivers from receiving new bookings.
+// Shared Coordinator and Super Admin control for new driver bookings.
 function AdminDriverAvailability() {
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -42,6 +42,7 @@ function AdminDriverAvailability() {
   }, [])
 
   const toggleDriver = async (driver) => {
+    if (updatingId) return
     const token = localStorage.getItem('authToken')
     if (!token) {
       setError('Authentication token not found. Please login again.')
@@ -81,20 +82,9 @@ function AdminDriverAvailability() {
     <MainLayout title="Driver Availability Settings">
       <section className="office-content admin-settings driver-availability-settings">
         <header className="office-header">
-          <p className="eyebrow">Settings</p>
           <h1>Driver Availability</h1>
-          <p className="muted">Turn a driver off temporarily so they cannot receive new bookings, then turn them on again when ready.</p>
         </header>
 
-        <div className="admin-settings__preview">
-          <i className="bi bi-info-circle" aria-hidden="true" />
-          <span>Turning a driver off does not disable their login or remove existing tasks and calendar schedules.</span>
-        </div>
-
-        <div className="driver-availability-feedback" aria-live="polite">
-          {error ? <p className="error-text">{error}</p> : null}
-          {!error && success ? <p className="success-text">{success}</p> : null}
-        </div>
         {loading ? <p className="muted">Loading drivers...</p> : null}
 
         {!loading && !error ? (
@@ -130,7 +120,7 @@ function AdminDriverAvailability() {
                             disabled={Boolean(updatingId)}
                             title={
                               driver.account_disabled
-                                ? `Super Admin override: turn booking availability ${isAvailable ? 'Off' : 'On'} while the account is disabled`
+                                ? 'This account is disabled. Changing booking availability does not enable login.'
                                 : isAvailable
                                   ? 'Turn driver Off'
                                   : 'Turn driver On'
@@ -149,6 +139,10 @@ function AdminDriverAvailability() {
             </table>
           </div>
         ) : null}
+        <div className="driver-availability-feedback" aria-live="polite">
+          {error ? <p className="error-text">{error}</p> : null}
+          {!error && success ? <p className="success-text">{success}</p> : null}
+        </div>
       </section>
     </MainLayout>
   )

@@ -88,7 +88,7 @@ function OfficeAssignDrivers() {
             (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
           )
         )
-      } catch (err) {
+      } catch {
         setDriversError('Network error. Please try again.')
         setDrivers([])
       } finally {
@@ -298,7 +298,7 @@ function OfficeAssignDrivers() {
         setForm(initialForm)
         setShowSuccessModal(true)
       }
-    } catch (error) {
+    } catch {
       setErrorMessage('Network error. Please try again.')
     } finally {
       setLoading(false)

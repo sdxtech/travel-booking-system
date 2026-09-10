@@ -38,8 +38,8 @@ const officeNavSections = [
     label: 'Status & History',
     icon: 'bi-clock-history',
     items: [
-      { label: 'Travel Status & History', path: '/office/ticket-history', icon: 'bi-card-checklist' },
-      { label: 'Booking Driver Status & History', path: '/office/driver-history', icon: 'bi-journal-check' },
+      { label: 'Travel Request & History', path: '/office/ticket-history', icon: 'bi-card-checklist' },
+      { label: 'Booking Driver Request & History', path: '/office/driver-history', icon: 'bi-journal-check' },
     ],
   },
 ]
@@ -51,6 +51,15 @@ const adminSettingsSection = {
   items: [
     { label: 'Cancel Booking Driver', path: '/admin/settings/cancel-booking', icon: 'bi-calendar-x' },
     { label: 'Driver Availability', path: '/admin/settings/driver-availability', icon: 'bi-person-check' },
+  ],
+}
+
+const officeSettingsSection = {
+  id: 'settings',
+  label: 'Settings',
+  icon: 'bi-gear',
+  items: [
+    { label: 'Driver Availability', path: '/office/settings/driver-availability', icon: 'bi-person-check' },
   ],
 }
 
@@ -82,7 +91,11 @@ function MainLayout({ title, children }) {
   const isDriver = role === 'driver' || location.pathname.startsWith('/driver/')
   const isSuperadmin = role === 'superadmin' || location.pathname.startsWith('/admin/')
   const baseNavSections = isEmployee ? userNavSections : officeNavSections
-  const navSections = isSuperadmin ? [...baseNavSections, adminSettingsSection] : baseNavSections
+  const navSections = isSuperadmin
+    ? [...baseNavSections, adminSettingsSection]
+    : role === 'office_coordinator'
+      ? [...baseNavSections, officeSettingsSection]
+      : baseNavSections
   const homeItem = isEmployee
     ? { label: 'Quick View', path: '/user/home', icon: 'bi-speedometer2' }
     : isDriver

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
+import TableActionDropdown from '../components/TableActionDropdown'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
@@ -60,9 +61,16 @@ function AdminManageUser() {
   const [passwordError, setPasswordError] = useState('')
 
   const pageSize = 10
-  const totalPages = Math.max(1, Math.ceil(users.length / pageSize))
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const filteredUsers = users.filter((user) => {
+    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email]
+      .filter((value) => value != null).join(' ').toLowerCase()
+    return searchTerms.every((term) => text.includes(term))
+  })
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const pagedUsers = users.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const pagedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   // Keep page index within bounds when the list size changes.
   useEffect(() => {
@@ -109,7 +117,7 @@ function AdminManageUser() {
         const data = await res.json()
         setUsers(Array.isArray(data) ? data : [])
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.')
       setUsers([])
     } finally {
@@ -244,7 +252,7 @@ function AdminManageUser() {
       const data = await res.json()
       setImportResult(data)
       await loadUsers()
-    } catch (err) {
+    } catch {
       setImportError('Network error. Please try again.')
     } finally {
       setImportLoading(false)
@@ -302,7 +310,7 @@ function AdminManageUser() {
         setShowCreate(false)
         await loadUsers()
       }
-    } catch (err) {
+    } catch {
       setCreateError('Network error. Please try again.')
     } finally {
       setCreateLoading(false)
@@ -344,7 +352,7 @@ function AdminManageUser() {
         })
         await loadUsers()
       }
-    } catch (err) {
+    } catch {
       setEditError('Network error. Please try again.')
     } finally {
       setEditLoading(false)
@@ -382,7 +390,7 @@ function AdminManageUser() {
 
       setActionSuccess('User deactivated successfully.')
       await loadUsers()
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setActionLoadingId('')
@@ -500,7 +508,7 @@ function AdminManageUser() {
         message: 'User account was deleted successfully.',
       })
       await loadUsers()
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
     } finally {
       setActionLoadingId('')
@@ -542,12 +550,23 @@ function AdminManageUser() {
 
         <section className="office-content">
           <header className="office-header">
-            <p className="eyebrow">Manage User</p>
             <h1>Manage Users</h1>
-            <p className="muted">Create, update, deactivate, or delete accounts</p>
           </header>
 
-          <div className="form-actions">
+          <div className="form-actions history-toolbar">
+            <label className="history-search">
+              <i className="bi bi-search" aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search users"
+                placeholder="Search by name, email, department, or role..."
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setPage(1)
+                }}
+              />
+            </label>
             <button type="button" className="btn btn-primary" onClick={() => setShowCreate((prev) => !prev)}>
               {showCreate ? 'Close Create Form' : 'Create Account'}
             </button>
@@ -737,7 +756,7 @@ function AdminManageUser() {
                       {error}
                     </td>
                   </tr>
-                ) : users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan="8" className="muted">
                       No users found.
@@ -754,44 +773,45 @@ function AdminManageUser() {
                       <td>{user.phone || '-'}</td>
                       <td>{user.email || '-'}</td>
                       <td>
-                        <div className="office-row-actions table-action-buttons">
+                        <TableActionDropdown
+                          label={`Actions for ${user.name || user.email || 'user'}`}
+                          disabled={actionLoadingId === user.uid}
+                        >
                           <button
                             type="button"
-                            className="btn btn-primary"
                             disabled={actionLoadingId === user.uid}
                             onClick={() => handleSelectUser(user)}
                             title="Super Admin override: update user"
                           >
-                            Update
+                            <i className="bi bi-pencil-square" aria-hidden="true" /> Update
                           </button>
                           <button
                             type="button"
-                            className="btn btn-neutral"
                             disabled={actionLoadingId === user.uid}
                             onClick={() => openPasswordModal(user)}
                             title="Super Admin override: reset password"
                           >
-                            Reset Password
+                            <i className="bi bi-key" aria-hidden="true" /> Reset Password
                           </button>
                           <button
                             type="button"
-                            className="btn btn-danger"
+                            className="is-danger"
                             disabled={actionLoadingId === user.uid}
                             onClick={() => handleDeactivate(user)}
                             title="Super Admin override: deactivate user"
                           >
-                            Deactivate
+                            <i className="bi bi-person-slash" aria-hidden="true" /> Deactivate
                           </button>
                           <button
                             type="button"
-                            className="btn btn-outline-danger"
+                            className="is-danger"
                             disabled={actionLoadingId === user.uid}
                             onClick={() => handleDelete(user)}
                             title="Super Admin override: delete user"
                           >
-                            Delete
+                            <i className="bi bi-trash" aria-hidden="true" /> Delete
                           </button>
-                        </div>
+                        </TableActionDropdown>
                       </td>
                     </tr>
                   ))

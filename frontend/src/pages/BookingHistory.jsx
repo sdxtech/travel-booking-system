@@ -54,6 +54,7 @@ function BookingHistory() {
 
   // Match the server-side cutoff so unavailable cancellation actions are disabled in advance.
   const canCancelBooking = (booking) => {
+    if (booking.cancellation_status === 'pending') return false
     if (getBookingStatus(booking) !== 'pending') return false
     if (!cancellationPolicy) return true
 
@@ -165,6 +166,8 @@ function BookingHistory() {
         return a.index - b.index
       })
       .map((entry) => entry.booking)
+  // Sorting helpers are pure and intentionally scoped to this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings, sortConfig])
 
   const totalPages = Math.max(1, Math.ceil(sortedBookings.length / pageSize))
@@ -249,7 +252,9 @@ function BookingHistory() {
 
   // Cancel a booking request (when allowed by status).
   const handleCancel = async (bookingId) => {
-    const confirmed = window.confirm('Cancel this driver booking request?')
+    const confirmed = window.confirm(cancellationPolicy?.auto_approve === false
+      ? 'Request Office Coordinator approval to cancel this booking?'
+      : 'Cancel this driver booking request?')
     if (!confirmed) return
 
     const token = localStorage.getItem('authToken')
@@ -282,6 +287,9 @@ function BookingHistory() {
 
       const updated = await response.json()
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? updated : b)))
+      setActionMessage(updated.cancellation_status === 'pending'
+        ? 'Cancellation requested. Waiting for Office Coordinator approval.'
+        : 'Booking cancelled.')
       window.dispatchEvent(new Event('notifications:refresh'))
     } catch {
       setActionError('Network error. Please try again.')
@@ -400,6 +408,7 @@ function BookingHistory() {
         {cancellationPolicy ? (
           <p className="muted booking-cancellation-policy">
             Pending bookings can be cancelled until {getCancellationPolicyLabel()}.
+            {cancellationPolicy.auto_approve === false ? ' Cancellation requires Office Coordinator approval.' : ''}
           </p>
         ) : null}
 
@@ -449,6 +458,8 @@ function BookingHistory() {
                           <td className="request-id-cell">{booking.request_id || '-'}</td>
                           <td>
                             <span className={`status-badge status-${statusValue}`}>{formatStatusText(statusValue)}</span>
+                            {booking.cancellation_status === 'pending' ? <div className="muted">Cancellation awaiting approval</div> : null}
+                            {booking.cancellation_status === 'rejected' ? <div className="muted">Cancellation rejected</div> : null}
                           </td>
                           <td>
                             <div className="table-row-actions table-action-buttons">
@@ -456,7 +467,7 @@ function BookingHistory() {
                                 type="button"
                                 className="btn btn-outline-brand"
                                 onClick={() => handleEdit(booking)}
-                                disabled={!isPending || actionLoadingId === booking.id}
+                                disabled={!isPending || booking.cancellation_status === 'pending' || actionLoadingId === booking.id}
                                 title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
                               >
                                 Edit
@@ -467,7 +478,9 @@ function BookingHistory() {
                                 onClick={() => handleCancel(booking.id)}
                                 disabled={!canCancel || actionLoadingId === booking.id}
                                 title={
-                                  !isPending
+                                  booking.cancellation_status === 'pending'
+                                    ? 'Cancellation awaiting Office Coordinator approval'
+                                    : !isPending
                                     ? 'Only pending requests can be cancelled'
                                     : canCancel
                                       ? 'Cancel this request'

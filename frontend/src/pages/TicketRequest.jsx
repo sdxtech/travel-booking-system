@@ -126,7 +126,7 @@ function TicketRequest() {
           if (data?.detail) {
             detail = data.detail
           }
-        } catch (error) {
+        } catch {
           // ignore parse error
         }
         setErrorMessage(detail)
@@ -137,7 +137,7 @@ function TicketRequest() {
         window.dispatchEvent(new Event('notifications:refresh'))
         setShowSuccessModal(true)
       }
-    } catch (error) {
+    } catch {
       setErrorMessage('Network error. Please try again.')
     } finally {
       setLoading(false)

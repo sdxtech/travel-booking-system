@@ -3,6 +3,7 @@ import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
 
 const initialPolicy = {
+  auto_approve: true,
   value: '1',
   unit: 'days',
   cutoff_time: '17:00',
@@ -45,6 +46,7 @@ function AdminSettings() {
 
         const data = await response.json()
         setPolicy({
+          auto_approve: data.auto_approve !== false,
           value: String(data.value || 1),
           unit: data.unit === 'hours' ? 'hours' : 'days',
           cutoff_time: data.cutoff_time || '17:00',
@@ -86,7 +88,7 @@ function AdminSettings() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ value, unit: policy.unit, cutoff_time: policy.cutoff_time }),
+        body: JSON.stringify({ value, unit: policy.unit, cutoff_time: policy.cutoff_time, auto_approve: policy.auto_approve }),
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
@@ -96,12 +98,13 @@ function AdminSettings() {
 
       const updated = await response.json()
       const nextPolicy = {
+        auto_approve: updated.auto_approve !== false,
         value: String(updated.value),
         unit: updated.unit,
         cutoff_time: updated.cutoff_time || '17:00',
       }
       setPolicy(nextPolicy)
-      setSuccess(`Cancellation deadline updated to ${getPolicyLabel(nextPolicy)}.`)
+      setSuccess('Cancellation settings saved.')
     } catch {
       setError('Network error. Please try again.')
     } finally {
@@ -119,6 +122,26 @@ function AdminSettings() {
         </header>
 
         <form className="ticket-form admin-settings__form" onSubmit={handleSubmit}>
+          <section className="field-group cancellation-auto-approve">
+            <h2>Auto-approve Employee cancellation</h2>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Auto-approve Employee cancellation"
+              aria-checked={policy.auto_approve}
+              className={`driver-availability-toggle ${policy.auto_approve ? 'is-on' : 'is-off'}`}
+              disabled={loading || saving}
+              onClick={() => setPolicy((prev) => ({ ...prev, auto_approve: !prev.auto_approve }))}
+            >
+              <i className={`bi ${policy.auto_approve ? 'bi-toggle-on' : 'bi-toggle-off'}`} aria-hidden="true" />
+              <span>{policy.auto_approve ? 'On' : 'Off'}</span>
+            </button>
+            <p className="muted">
+              {policy.auto_approve
+                ? 'Eligible cancellations are approved immediately.'
+                : 'Requires Office Coordinator approval. Booking stays active until approved.'}
+            </p>
+          </section>
           <section className="field-group">
             <div className="field-heading">
               <span className="heading-icon" aria-hidden="true">

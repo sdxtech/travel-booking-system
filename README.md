@@ -155,20 +155,32 @@ Frontend otomatis membaca konfigurasi melalui Vite. Mode ini biasanya tersedia d
 
 Email dikirim otomatis bersama notifikasi aplikasi jika `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` terisi. Jika salah satunya kosong atau Resend gagal, notifikasi aplikasi tetap tersimpan dan proses bisnis tidak dibatalkan.
 
-1. Tambahkan dan verifikasi domain pengirim di Resend. Untuk production, alamat default proyek adalah `notifications@booking.plvpilot.space`.
-2. Buat API key dengan izin mengirim email.
-3. Isi file environment yang sesuai. Gunakan `.env.development` untuk lokal dan `.env.production` untuk production. Jangan commit API key asli:
+1. Tambahkan dan verifikasi domain pengirim di Resend. Untuk production, alamat default proyek adalah `no-reply@notify.plvpilot.space`.
+2. Buat API key development baru dengan izin mengirim email.
+3. Di Windows, jalankan script setup berikut dari root project. Key diminta secara tersembunyi dan disimpan pada environment user Windows, bukan di file Git:
 
-```env
-RESEND_API_KEY=re_xxxxxxxxx
-RESEND_FROM_EMAIL=Booking App <notifications@booking.plvpilot.space>
-APP_PUBLIC_URL=https://booking.plvpilot.space
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup-resend-development.ps1
 ```
 
-Untuk Docker Compose, restart backend setelah mengubah environment:
+Setelah setup, terminal baru akan membaca key secara otomatis. Nilai `RESEND_API_KEY` di `.env.development` dan `.env.production` harus tetap kosong agar secret tidak pernah ikut commit:
 
-```bash
+```env
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=BDTR <no-reply@notify.plvpilot.space>
+APP_PUBLIC_URL=http://localhost:5173
+```
+
+Untuk Docker Compose, jalankan perintah ini dari terminal baru setelah setup:
+
+```powershell
 docker compose --env-file .env.development up -d --build backend
+```
+
+Untuk mengganti key, jalankan kembali script setup. Untuk menghapus key development dari Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup-resend-development.ps1 -Clear
 ```
 
 Status pengiriman tersimpan pada koleksi `notifications` melalui field `email_status` (`skipped`, `pending`, `sent`, atau `failed`) dan `email_provider_id` jika berhasil.

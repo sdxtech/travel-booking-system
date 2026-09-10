@@ -139,6 +139,22 @@ function App() {
             }
           />
           <Route
+            path="/office/settings"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/office/settings/driver-availability" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/office/settings/driver-availability"
+            element={
+              <ProtectedRoute>
+                <AdminDriverAvailability />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/home"
             element={
               <ProtectedRoute>

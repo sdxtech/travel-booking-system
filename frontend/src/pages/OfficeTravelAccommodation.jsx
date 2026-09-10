@@ -115,7 +115,7 @@ function OfficeTravelAccommodation() {
         setForm(initialForm)
         setShowSuccessModal(true)
       }
-    } catch (error) {
+    } catch {
       setErrorMessage('Network error. Please try again.')
     } finally {
       setLoading(false)

@@ -5,6 +5,7 @@ import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
+import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
 import { API_BASE_URL } from '../config'
 
 const menuItems = [
@@ -24,6 +25,7 @@ const tripTypeOptions = [
 
 // Driver booking history page for office coordinators (with export + date range).
 function OfficeDriverHistory() {
+  const historyTableRef = useFrozenHistoryColumns()
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const isSuperadmin = localStorage.getItem('authRole') === 'superadmin'
@@ -58,6 +60,7 @@ function OfficeDriverHistory() {
   const [activeRange, setActiveRange] = useState({ mode: 'all', start: '', end: '' })
 
   const pageSize = 10
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -80,6 +83,8 @@ function OfficeDriverHistory() {
   const getBookingSortValue = (booking, key) => {
     if (!booking) return ''
     switch (key) {
+      case 'request_id':
+        return booking.request_id || ''
       case 'requester_name':
         return booking.requester_name || ''
       case 'requester_dept_job_position':
@@ -167,9 +172,15 @@ function OfficeDriverHistory() {
 
   // Sort bookings based on the active column/direction.
   const sortedBookings = useMemo(() => {
-    if (!sortConfig.key) return bookings
+    const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const filtered = bookings.filter((booking) => {
+      const text = [booking.request_id, booking.requester_name, booking.requester_dept_job_position, booking.requester_phone, booking.requester_email, booking.requester_nik, booking.pickup_location, booking.destination, booking.trip_type, booking.driver_name, booking.status]
+        .filter((value) => value != null).join(' ').toLowerCase()
+      return terms.every((term) => text.includes(term))
+    })
+    if (!sortConfig.key) return filtered
 
-    return bookings
+    return filtered
       .map((booking, index) => ({ booking, index }))
       .sort((a, b) => {
         const aValue = getBookingSortValue(a.booking, sortConfig.key)
@@ -183,7 +194,9 @@ function OfficeDriverHistory() {
         return a.index - b.index
       })
       .map((entry) => entry.booking)
-  }, [bookings, sortConfig])
+  // Sorting helpers are pure and intentionally scoped to this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, sortConfig, searchQuery])
 
   const totalPages = Math.max(1, Math.ceil(sortedBookings.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -233,7 +246,7 @@ function OfficeDriverHistory() {
     const trigger = event.currentTarget
     const triggerRect = trigger.getBoundingClientRect()
     const menuWidth = 190
-    const menuHeight = 188
+    const menuHeight = booking.cancellation_status === 'pending' ? 260 : 188
     const viewportGap = 8
     const controlGap = 5
     const hasMoreRoomAbove = triggerRect.top > window.innerHeight - triggerRect.bottom
@@ -396,7 +409,7 @@ function OfficeDriverHistory() {
       } else {
         setBookings(rawBookings)
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.')
       setBookings([])
     } finally {
@@ -743,8 +756,34 @@ function OfficeDriverHistory() {
       const updated = await res.json()
       setBookings((prev) => prev.map((b) => (b.id === booking.id ? { ...b, ...updated } : b)))
       setActionMessage('Booking cancelled.')
-    } catch (err) {
+    } catch {
       setActionError('Network error. Please try again.')
+    } finally {
+      setActionLoadingId('')
+    }
+  }
+
+  const handleCancellationReview = async (booking, decision) => {
+    if (actionLoadingId || !window.confirm(`${decision === 'approved' ? 'Approve' : 'Reject'} cancellation for ${booking.request_id || 'this booking'}?`)) return
+    setActionLoadingId(booking.id)
+    setActionError('')
+    setActionMessage('')
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/${booking.id}/cancellation-review`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ decision }),
+      })
+      const updated = await response.json()
+      if (!response.ok) throw new Error(updated.detail || 'Failed to review cancellation.')
+      setBookings((prev) => prev.map((item) => item.id === booking.id ? { ...item, ...updated } : item))
+      setActionMessage(decision === 'approved' ? 'Cancellation approved.' : 'Cancellation rejected. Booking retained.')
+      window.dispatchEvent(new Event('notifications:refresh'))
+    } catch (error) {
+      setActionError(error.message || 'Network error. Please try again.')
     } finally {
       setActionLoadingId('')
     }
@@ -921,6 +960,7 @@ function OfficeDriverHistory() {
 
     const headers = [
       'No',
+      'Request ID',
       'Name',
       'User Dept/Job Position',
       'Phone',
@@ -949,6 +989,7 @@ function OfficeDriverHistory() {
 
     const rows = sortedBookings.map((booking, index) => [
       index + 1,
+      booking.request_id || '',
       booking.requester_name || '',
       booking.requester_dept_job_position || '',
       booking.requester_phone || '',
@@ -1040,12 +1081,23 @@ function OfficeDriverHistory() {
 
         <section className="office-content">
           <header className="office-header">
-            <p className="eyebrow">Booking Driver Status & History</p>
             <h1>Booking Driver Requests & History</h1>
-            <p className="muted">All booking requests, statuses, and history in one table</p>
           </header>
 
-          <div className="form-actions">
+          <div className="form-actions history-toolbar">
+            <label className="history-search">
+              <i className="bi bi-search" aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search booking history"
+                placeholder="Search by Request ID, name, status, or location..."
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value)
+                  setPage(1)
+                }}
+              />
+            </label>
             <button type="button" className="btn btn-neutral" onClick={openRangeModal} disabled={loading}>
               <i className="bi bi-calendar3" aria-hidden="true" />
               {hasLoaded ? 'Change Date Range' : 'Date Range'}
@@ -1054,8 +1106,8 @@ function OfficeDriverHistory() {
               type="button"
               className="btn btn-outline-brand"
               onClick={handleExport}
-              disabled={!hasLoaded || loading || !bookings.length}
-              title={bookings.length ? 'Export to Excel (.xls)' : 'No data to export'}
+              disabled={!hasLoaded || loading || !sortedBookings.length}
+              title={sortedBookings.length ? 'Export to Excel (.xls)' : 'No data to export'}
             >
               <i className="bi bi-file-earmark-excel" />
               Export Excel
@@ -1067,10 +1119,15 @@ function OfficeDriverHistory() {
           {!loading && actionError ? <p className="error-text">{actionError}</p> : null}
 
           <div className="office-table-wrapper">
-            <table className="office-table">
+            <table ref={historyTableRef} className="office-table history-frozen-columns">
               <thead>
                 <tr>
                   <th className="table-col-no">No</th>
+                  <th>
+                    <button type="button" className="table-sort" onClick={() => toggleSort('request_id')}>
+                      Request ID {renderSortIcon('request_id')}
+                    </button>
+                  </th>
                   <th>
                     <button type="button" className="table-sort" onClick={() => toggleSort('requester_name')}>
                       Name {renderSortIcon('requester_name')}
@@ -1201,25 +1258,25 @@ function OfficeDriverHistory() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="26" className="muted">
+                    <td colSpan="27" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="26" className="error-text">
+                    <td colSpan="27" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : !hasLoaded ? (
                   <tr>
-                    <td colSpan="26" className="muted">
+                    <td colSpan="27" className="muted">
                       Select a date range to load driver history.
                     </td>
                   </tr>
-                ) : bookings.length === 0 ? (
+                ) : sortedBookings.length === 0 ? (
                   <tr>
-                    <td colSpan="26" className="muted">
+                    <td colSpan="27" className="muted">
                       No driver history found.
                     </td>
                   </tr>
@@ -1227,6 +1284,7 @@ function OfficeDriverHistory() {
                   pagedBookings.map((booking, index) => (
                     <tr key={booking.id}>
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
+                      <td>{booking.request_id || '-'}</td>
                       <td>{booking.requester_name || '-'}</td>
                       <td>{booking.requester_dept_job_position || '-'}</td>
                       <td>{booking.requester_phone || '-'}</td>
@@ -1257,6 +1315,8 @@ function OfficeDriverHistory() {
                         ) : (
                           '-'
                         )}
+                        {booking.cancellation_status === 'pending' ? <div className="muted">Cancellation awaiting approval</div> : null}
+                        {booking.cancellation_status === 'rejected' ? <div className="muted">Cancellation rejected</div> : null}
                       </td>
                       <td>{booking.validated_by_name || booking.validated_by || '-'}</td>
                       <td>
@@ -1308,8 +1368,26 @@ function OfficeDriverHistory() {
                   className="superadmin-action-dropdown__menu"
                   role="menu"
                   aria-label={`Actions for ${actionMenu.booking.request_id || 'booking'}`}
-                  style={{ top: actionMenu.top, left: actionMenu.left }}
+                  style={{ top: actionMenu.top, left: actionMenu.left, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
                 >
+                  {actionMenu.booking.cancellation_status === 'pending' ? (
+                    <>
+                      <button type="button" role="menuitem" onClick={() => {
+                        const booking = actionMenu.booking
+                        closeActionMenu()
+                        handleCancellationReview(booking, 'approved')
+                      }}>
+                        <i className="bi bi-check-circle" aria-hidden="true" /> Approve Cancellation
+                      </button>
+                      <button type="button" role="menuitem" className="is-danger" onClick={() => {
+                        const booking = actionMenu.booking
+                        closeActionMenu()
+                        handleCancellationReview(booking, 'rejected')
+                      }}>
+                        <i className="bi bi-x-circle" aria-hidden="true" /> Reject Cancellation
+                      </button>
+                    </>
+                  ) : null}
                   {isSuperadmin ? (
                     <button
                       type="button"
@@ -1327,7 +1405,7 @@ function OfficeDriverHistory() {
                   <button
                     type="button"
                     role="menuitem"
-                    disabled={!isSuperadmin && getBookingStatus(actionMenu.booking) !== 'pending'}
+                    disabled={!isSuperadmin && (getBookingStatus(actionMenu.booking) !== 'pending' || actionMenu.booking.cancellation_status === 'pending')}
                     title={
                       !isSuperadmin && getBookingStatus(actionMenu.booking) !== 'pending'
                         ? 'Approve hanya tersedia untuk booking Pending.'
@@ -1346,7 +1424,7 @@ function OfficeDriverHistory() {
                     type="button"
                     role="menuitem"
                     className="is-danger"
-                    disabled={!isSuperadmin && getBookingStatus(actionMenu.booking) !== 'pending'}
+                    disabled={!isSuperadmin && (getBookingStatus(actionMenu.booking) !== 'pending' || actionMenu.booking.cancellation_status === 'pending')}
                     title={
                       !isSuperadmin && getBookingStatus(actionMenu.booking) !== 'pending'
                         ? 'Reject hanya tersedia untuk booking Pending.'
