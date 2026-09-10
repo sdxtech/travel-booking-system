@@ -357,11 +357,9 @@ const isSuperadmin =
 
         <section className="office-content">
           <header className="office-header">
-            <p className="eyebrow">Assign Drivers</p>
+           
             <h1>Assign a Driver</h1>
-            <p className="muted">
-              Create an approved driver booking on behalf of a user (will go directly to driver history).
-            </p>
+           
           </header>
 
           <form className="ticket-form" onSubmit={handleSubmit}>

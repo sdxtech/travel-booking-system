@@ -143,13 +143,15 @@ function TicketRequest() {
     <MainLayout title="Ticket Request">
       <div className="ticket-request-page">
         <header className="ticket-request-header">
-          <button className="back-link" type="button" onClick={() => navigate(-1)}>
-            &larr; Back
-          </button>
-          <div>
-            <p className="eyebrow">Travel Request</p>
+          
+          <div className='header-title'>
+              <button className="back-link" type="button" onClick={() => navigate(-1)}>
+    <i className="bi bi-arrow-left" aria-hidden="true" />
+    
+  </button>
+            
             <h1>Business Travel Accomodation Request</h1>
-            <p className="muted">Fill out the form to submit a request</p>
+            
           </div>
         </header>
 

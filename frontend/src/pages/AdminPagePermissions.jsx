@@ -5,7 +5,11 @@ import { API_BASE_URL } from '../config'
 import MainLayout from "../components/MainLayout"
 
 const AdminPagePermissions = () => {
-  const selectedRole = "user"
+  const [selectedRole, setSelectedRole] = useState("user")
+  const roles = [
+    { value: 'user', label: 'Employee' },
+    { value: 'office_coordinator', label: 'Office Coordinator' },
+  ]
 
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(false)
@@ -121,13 +125,11 @@ const AdminPagePermissions = () => {
     <MainLayout title="Page Permission Settings">
       <section className="office-content admin-settings driver-availability-settings">
         <header className="office-header">
-          <p className="eyebrow">Settings</p>
+          
 
           <h1>Page Permissions</h1>
 
-          <p className="muted">
-            Control which pages can be accessed.
-          </p>
+         
         </header>
 
         <div className="admin-settings__preview">
@@ -140,7 +142,6 @@ const AdminPagePermissions = () => {
             Turning a page off prevents users from accessing that page.
           </span>
         </div>
-{/*
         <div className="page-permission-role-selector">
           <label htmlFor="permission-role">
             Role
@@ -150,21 +151,18 @@ const AdminPagePermissions = () => {
             id="permission-role"
             value={selectedRole}
             className="permission-role-selector"
-            onChange={(event) =>
-              setSelectedRole(event.target.value)
-            }
+            onChange={(event) => setSelectedRole(event.target.value)}
           >
             {roles.map((role) => (
               <option
-                key={role}
-                value={role}
+                key={role.value}
+                value={role.value}
               >
-                {formatRoleName(role)}
+                {role.label}
               </option>
             ))}
           </select>
         </div>
-        */}
 
         <div
           className="driver-availability-feedback"
@@ -194,7 +192,7 @@ const AdminPagePermissions = () => {
             <table className="simple-table history-summary-table">
               <thead>
                 <tr>
-                  <th>Page</th>
+                 <th>Page</th>
                   <th>Path</th>
                   <th>Permission</th>
                 </tr>

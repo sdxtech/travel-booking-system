@@ -8,7 +8,7 @@ from mongo_client import db
 router = APIRouter(prefix="/pages", tags=["permissions"])
 
 class PagePermissionUpdate(BaseModel):
-    role: Literal["user"]
+    role: Literal["user", "office_coordinator"]
     page_id: str
     enabled: bool
 
@@ -66,7 +66,10 @@ def get_role_permissions(role: str, current_user=Depends(get_current_user),):
             "path": page["path"],
             "enabled": permission_map.get(
                 page["_id"],
-                False
+                # Coordinator pages predate configurable permissions. Keep
+                # existing pages available until an admin explicitly turns
+                # them off; explicit False records still remain respected.
+                role == "office_coordinator"
             ),
         }
         for page in pages

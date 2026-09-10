@@ -21,6 +21,7 @@ function BookingHistory() {
 
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
+  const [searchQuery, setSearchQuery] = useState('')
 
 
   const [viewMode, setViewMode] = useState('card')
@@ -164,9 +165,13 @@ function BookingHistory() {
 
   // Sort bookings based on the active column/direction.
   const sortedBookings = useMemo(() => {
-    if (!sortConfig.key) return bookings
+    const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const filtered = terms.length === 0 ? bookings : bookings.filter((booking) =>
+      terms.every((term) => JSON.stringify(booking).toLowerCase().includes(term))
+    )
+    if (!sortConfig.key) return filtered
 
-    return bookings
+    return filtered
       .map((booking, index) => ({ booking, index }))
       .sort((a, b) => {
         const aValue = getBookingSortValue(a.booking, sortConfig.key)
@@ -182,7 +187,7 @@ function BookingHistory() {
       .map((entry) => entry.booking)
   // Sorting helpers are pure and intentionally scoped to this component.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, sortConfig])
+  }, [bookings, sortConfig, searchQuery])
 
   const totalPages = Math.max(1, Math.ceil(sortedBookings.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -360,16 +365,17 @@ function BookingHistory() {
     <MainLayout title="Booking Driver History">
       <div className="ticket-history">
        <header className="history-header">
-  <button className="back-link" type="button" onClick={() => navigate(-1)}>
-    <i className="bi bi-arrow-left" aria-hidden="true" />
-    <span>Back</span>
-  </button>
+  
 
   <div className="history-header-main">
-    <div className="header-title-group">
-      <span className="eyebrow">Booking Driver Status & History</span>
+    <div className=" header-title">
+      <button className="back-link" type="button" onClick={() => navigate(-1)}>
+    <i className="bi bi-arrow-left" aria-hidden="true" />
+    
+  </button>
+    
       <h1 className="header-title">List of all Booking Driver Request</h1>
-      <p className="muted">Track the status of all your driver booking requests</p>
+     
     </div>
 
     <div className="header-actions">
@@ -377,6 +383,13 @@ function BookingHistory() {
     </div>
   </div>
 </header>
+
+        <div className="form-actions history-toolbar">
+          <label className="history-search">
+            <i className="bi bi-search" aria-hidden="true" />
+            <input type="search" aria-label="Search booking history" placeholder="Search by Request ID, status, or location..." value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setPage(1) }} />
+          </label>
+        </div>
 
 
         {loading ? <p className="muted">Loading bookings...</p> : null}

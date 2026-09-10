@@ -80,22 +80,6 @@ function UserHome() {
           }),
         ])
 
-        if (!ticketsRes.ok) {
-          setError(await getErrorDetail(ticketsRes, 'Failed to load travel requests.'))
-          setTickets([])
-          setBookings([])
-          setDriverSchedules([])
-          return
-        }
-
-        if (!bookingsRes.ok) {
-          setError(await getErrorDetail(bookingsRes, 'Failed to load driver bookings.'))
-          setTickets([])
-          setBookings([])
-          setDriverSchedules([])
-          return
-        }
-
         if (!driverCalendarRes.ok) {
           setError(await getErrorDetail(driverCalendarRes, 'Failed to load driver calendars.'))
           setTickets([])
@@ -104,9 +88,12 @@ function UserHome() {
           return
         }
 
+        // History permissions should not prevent the shared driver calendar
+        // from rendering. Those two responses are only used for the old
+        // summary counts, while the calendar endpoint is the core view.
         const [ticketsData, bookingsData, driverCalendarData] = await Promise.all([
-          ticketsRes.json(),
-          bookingsRes.json(),
+          ticketsRes.ok ? ticketsRes.json() : Promise.resolve([]),
+          bookingsRes.ok ? bookingsRes.json() : Promise.resolve([]),
           driverCalendarRes.json(),
         ])
         setTickets(Array.isArray(ticketsData) ? ticketsData : [])
