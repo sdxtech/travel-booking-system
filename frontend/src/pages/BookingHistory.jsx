@@ -360,16 +360,17 @@ function BookingHistory() {
     <MainLayout title="Booking Driver History">
       <div className="ticket-history">
        <header className="history-header">
-  <button className="back-link" type="button" onClick={() => navigate(-1)}>
-    <i className="bi bi-arrow-left" aria-hidden="true" />
-    <span>Back</span>
-  </button>
+  
 
   <div className="history-header-main">
-    <div className="header-title-group">
-      <span className="eyebrow">Booking Driver Status & History</span>
+    <div className=" header-title">
+      <button className="back-link" type="button" onClick={() => navigate(-1)}>
+    <i className="bi bi-arrow-left" aria-hidden="true" />
+    
+  </button>
+    
       <h1 className="header-title">List of all Booking Driver Request</h1>
-      <p className="muted">Track the status of all your driver booking requests</p>
+     
     </div>
 
     <div className="header-actions">

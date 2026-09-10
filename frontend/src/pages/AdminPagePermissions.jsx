@@ -121,13 +121,11 @@ const AdminPagePermissions = () => {
     <MainLayout title="Page Permission Settings">
       <section className="office-content admin-settings driver-availability-settings">
         <header className="office-header">
-          <p className="eyebrow">Settings</p>
+          
 
           <h1>Page Permissions</h1>
 
-          <p className="muted">
-            Control which pages can be accessed.
-          </p>
+         
         </header>
 
         <div className="admin-settings__preview">
@@ -194,7 +192,7 @@ const AdminPagePermissions = () => {
             <table className="simple-table history-summary-table">
               <thead>
                 <tr>
-                  <th>Page</th>
+                 <th>Page</th>
                   <th>Path</th>
                   <th>Permission</th>
                 </tr>

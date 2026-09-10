@@ -84,18 +84,16 @@ function ResetPassword() {
     <MainLayout title="Reset Password">
       <section className="ticket-history">
         <header className="history-header">
-          <button
-            className="back-link"
-            type="button"
-            onClick={() => navigate(-1)}
-          >
-            &larr; Back
-          </button>
-          <p className="eyebrow">Account Settings</p>
+          <div className="header-title">
+              <button className="back-link" type="button" onClick={() => navigate(-1)}>
+    <i className="bi bi-arrow-left" aria-hidden="true" />
+    
+  </button>
+
           <h1>Reset Password</h1>
-          <p className="muted">
-            Update your password to keep your account secure.
-          </p>
+          </div>
+         
+          
         </header>
 
         <form

@@ -305,20 +305,16 @@ function TicketHistory() {
     <MainLayout title="Ticket History">
       <div className="ticket-history">
         <header className="history-header">
-          <button
-            className="back-link"
-            type="button"
-            onClick={() => navigate(-1)}
-          >
-            &larr; Back
-          </button>
+         
           <div className="history-header-main">
-            <div>
-              <p className="eyebrow">Travel Status & History</p>
+            <div className="header-title">
+                <button className="back-link" type="button" onClick={() => navigate(-1)}>
+    <i className="bi bi-arrow-left" aria-hidden="true" />
+    
+  </button>
+            
               <h1>List of all Travel Request</h1>
-              <p className="muted">
-                Track the status of all your travel requests
-              </p>
+             
             </div>
             <div className="header-actions">
               <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />

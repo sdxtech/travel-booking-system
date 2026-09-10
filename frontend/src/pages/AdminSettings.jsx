@@ -108,9 +108,9 @@ function AdminSettings() {
     <MainLayout title="Cancel Booking Driver Settings">
       <section className="office-content admin-settings">
         <header className="office-header">
-          <p className="eyebrow">Settings</p>
+        
           <h1>Cancel Booking Driver</h1>
-          <p className="muted">Set how long before departure an Employee may cancel a pending driver booking.</p>
+          
         </header>
 
         <form className="ticket-form admin-settings__form" onSubmit={handleSubmit}>

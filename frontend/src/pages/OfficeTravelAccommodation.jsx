@@ -158,9 +158,9 @@ const isSuperadmin =
 
         <section className="office-content">
           <header className="office-header">
-            <p className="eyebrow">Travel Assign</p>
+            
             <h1>Create Travel Accommodation</h1>
-            <p className="muted">Create a travel request on behalf of a user; it will appear in Travel Status & History.</p>
+            
           </header>
 
           <form className="ticket-form" onSubmit={handleSubmit}>
