@@ -515,6 +515,11 @@
   z-index: 1000;
 }
 
+user-dropdown-toogle {
+  display: flex;
+  padding-left: 8px;
+}
+
 
 .logout-button {
   display: flex;
@@ -958,16 +963,18 @@
 
 .eyebrow {
   margin: 0;
-  font-size: 14px;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   color: #64748b;
   text-transform: uppercase;
 }
 
 .muted {
-  margin: 0;
-  color: #475569;
+  margin: 2px 0 0 0;
+  color: #64748b;
   font-size: 14px;
+  line-height: 1.4;
 }
 
 .badge {
@@ -986,8 +993,13 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 
@@ -1029,7 +1041,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .booking-card-item {
@@ -1308,7 +1320,19 @@
   .booking-cards-grid {
     grid-template-columns: 1fr;
   }
+  .history-header-main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 
+  .header-title {
+    font-size: 18px;
+  }
   .actions-grid {
     grid-template-columns: 1fr;
   }
@@ -1316,6 +1340,10 @@
   .stats-grid {
     grid-template-columns: 1fr;
   }
+  .user-dropdown-toogle {
+  display: none;
+  
+}
   .navbar__brand,
   .navbar__actions {
     gap: 6px;
@@ -1378,19 +1406,42 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-
+.header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.header-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+}
 .ticket-request-header h1 {
   margin: 4px 0;
 }
 
 .back-link {
-  background: none;
-  border: none;
-  color: var(--brand-bold);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #334155;
+  font-weight: 500;
+  font-size: 13px;
+  padding: 6px 12px;
   cursor: pointer;
-  padding: 0;
-  font-size: 14px;
+  width: fit-content;
+  transition: all 0.2s ease;
+}
+
+.back-link:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .ticket-form {
@@ -2148,9 +2199,11 @@
 .history-header {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .history-header h1 {
@@ -2234,6 +2287,15 @@
 @media (max-width: 768px) {
   .ticket-request-page {
     padding: 0;
+  }
+  .ticket-history {
+    margin: 10px;
+  }
+  .booking-driver-page {
+    margin: 10px;
+  }
+  .ticket-request-page {
+    margin:10px;
   }
   .layout__main,
   .layout.is-sidebar-collapsed .layout__main {

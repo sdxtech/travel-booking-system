@@ -790,7 +790,7 @@ const getUserNavSections = () => {
   </div>
 
   <div className="navbar__actions">
-    {/* 1. NOTIFICATIONS (Moved to the left of User menu) */}
+    
     <div
       className="navbar-notifications"
       ref={
@@ -942,6 +942,15 @@ const getUserNavSections = () => {
               'Unknown role'}
           </span>
         </div>
+        <div className='user-dropdown-toogle'>
+
+        {userDropdownOpen ? (
+            <i className=' bi-chevron-up'> </i>
+        ):
+          <i className=' bi-chevron-down'> </i> 
+        }
+        </div>
+        
       </button>
 
       {/* DROPDOWN MENU */}

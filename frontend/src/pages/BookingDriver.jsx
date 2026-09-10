@@ -262,7 +262,7 @@ function BookingDriver() {
 
   return (
     <MainLayout title="Booking Driver">
-      <div className="ticket-request-page booking-driver-page">
+      <div className=" booking-driver-page">
         <header className="ticket-request-header">
           <button className="back-link" type="button" onClick={() => navigate(-1)}>
             &larr; Back

@@ -60,19 +60,11 @@ function Login() {
     setLoading(true);
 
     try {
-      const normalizedEmail = email
-        .trim()
-        .toLowerCase();
+      const normalizedEmail = email.trim().toLowerCase();
 
-      const user = await login(
-        normalizedEmail,
-        password,
-        rememberMe
-      );
+      const user = await login(normalizedEmail, password, rememberMe);
 
-      const destination =
-        roleRouteMap[user.role] ||
-        "/dashboard";
+      const destination = roleRouteMap[user.role] || "/dashboard";
 
       navigate(destination, {
         replace: true,
@@ -80,11 +72,7 @@ function Login() {
     } catch (err) {
       console.error("Login error", err);
 
-      setError(
-        getLoginErrorMessage(
-          err?.message
-        )
-      );
+      setError(getLoginErrorMessage(err?.message));
     } finally {
       setLoading(false);
     }
@@ -93,7 +81,6 @@ function Login() {
   return (
     <div className="login-page">
       <div className="login-wrapper">
-
         <div className="login-logo">
           <div className="login-logo__circle">
             {LOGO_SOURCES[logoIndex] ? (
@@ -101,39 +88,25 @@ function Login() {
                 className="login-logo__image"
                 src={LOGO_SOURCES[logoIndex]}
                 alt={APP_NAME}
-                onError={() =>
-                  setLogoIndex(
-                    (prev) => prev + 1
-                  )
-                }
+                onError={() => setLogoIndex((prev) => prev + 1)}
               />
             ) : (
-              <span className="login-logo__fallback">
-                APP LOGO
-              </span>
+              <span className="login-logo__fallback">APP LOGO</span>
             )}
           </div>
         </div>
 
         <div className="login-card login-card-branded">
+          <h1 className="login-title">LOGIN</h1>
 
-          <h1 className="login-title">
-            LOGIN
-          </h1>
-
-          <form
-            className="login-form"
-            onSubmit={handleSubmit}
-          >
+          <form className="login-form" onSubmit={handleSubmit}>
             <label className="form-field">
               <span>Email</span>
 
               <input
                 type="email"
                 value={email}
-                onChange={(e) =>
-                  setEmail(e.target.value)
-                }
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@example.com"
               />
@@ -144,15 +117,9 @@ function Login() {
 
               <div className="password-input-wrapper">
                 <input
-                  type={
-                    showPassword
-                      ? "text"
-                      : "password"
-                  }
+                  type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) =>
-                    setPassword(e.target.value)
-                  }
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="********"
                 />
@@ -160,23 +127,13 @@ function Login() {
                 <button
                   type="button"
                   className="password-toggle"
-                  onClick={() =>
-                    setShowPassword(
-                      (prev) => !prev
-                    )
-                  }
-                  aria-label={
-                    showPassword
-                      ? "Hide password"
-                      : "Show password"
-                  }
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   aria-pressed={showPassword}
                 >
                   <i
                     className={`bi ${
-                      showPassword
-                        ? "bi-eye-slash-fill"
-                        : "bi-eye-fill"
+                      showPassword ? "bi-eye-slash-fill" : "bi-eye-fill"
                     }`}
                     aria-hidden="true"
                   />
@@ -184,23 +141,21 @@ function Login() {
               </div>
             </label>
 
-            <label className="remember-me"> <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked) } /> <span>Remember me</span> </label>
+            <label className="remember-me">
+             
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span>Remember me</span>
+            </label>
 
-            {error && (
-              <p className="error-text">
-                {error}
-              </p>
-            )}
+            {error && <p className="error-text">{error}</p>}
 
-            <button
-              type="submit"
-              disabled={loading}
-            >
-              {loading
-                ? "Signing in..."
-                : "Login"}
+            <button type="submit" disabled={loading}>
+              {loading ? "Signing in..." : "Login"}
             </button>
-
           </form>
         </div>
       </div>

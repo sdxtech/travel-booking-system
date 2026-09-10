@@ -22,12 +22,12 @@ function BookingHistory() {
   const [page, setPage] = useState(1)
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' })
 
-  // View mode toggle: 'table' or 'card'
+  
   const [viewMode, setViewMode] = useState('card')
 
   const pageSize = 10
 
-  // Automatically switch default view based on screen width on mount
+  
   useEffect(() => {
     if (window.innerWidth <= 768) {
       setViewMode('card')
@@ -422,24 +422,24 @@ function BookingHistory() {
   return (
     <MainLayout title="Booking Driver History">
       <div className="ticket-history">
-        <header className="history-header">
-          <button className="back-link" type="button" onClick={() => navigate(-1)}>
-            &larr; Back
-          </button>
-          <div className="history-header-main">
-            <div>
-              <p className="eyebrow">Booking Driver Status & History</p>
-              <h1>List of all Booking Driver Request</h1>
-              <p className="muted">Track the status of all your driver booking requests</p>
-              
-            </div>
+       <header className="history-header">
+  <button className="back-link" type="button" onClick={() => navigate(-1)}>
+    <i className="bi bi-arrow-left" aria-hidden="true" />
+    <span>Back</span>
+  </button>
 
-            {/* View Mode Toggle Controls */}
-            
-          
-          </div>
-           <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
-        </header>
+  <div className="history-header-main">
+    <div className="header-title-group">
+      <span className="eyebrow">Booking Driver Status & History</span>
+      <h1 className="header-title">List of all Booking Driver Request</h1>
+      <p className="muted">Track the status of all your driver booking requests</p>
+    </div>
+
+    <div className="header-actions">
+      <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+    </div>
+  </div>
+</header>
         
 
         {loading ? <p className="muted">Loading bookings...</p> : null}

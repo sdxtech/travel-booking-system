@@ -82,8 +82,8 @@ function ResetPassword() {
 
   return (
     <MainLayout title="Reset Password">
-      <section className="office-content admin-settings driver-availability-settings">
-        <header className="office-header">
+      <section className="ticket-history">
+        <header className="history-header">
           <button
             className="back-link"
             type="button"
