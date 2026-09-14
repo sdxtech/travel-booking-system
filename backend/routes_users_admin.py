@@ -10,7 +10,7 @@ from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from auth_utils import hash_password
 from main import get_current_user
@@ -21,7 +21,15 @@ router = APIRouter(prefix="/users", tags=["users"])
 Role = Literal["user", "driver", "office_coordinator", "superadmin"]
 
 
+def normalize_plate(value):
+    plate = " ".join(str(value or "").upper().split())
+    if not re.fullmatch(r"[A-Z]{1,3}\s*\d{1,4}\s*[A-Z]{0,3}", plate):
+        raise ValueError("Plat No is required for Driver and must be valid, for example B 1234 ABC")
+    return plate
+
+
 class UserCreate(BaseModel):
+    plate_number: Optional[str] = Field(default=None, max_length=20)
     name: str = Field(..., min_length=1)
     dept_job_position: str = Field(..., min_length=1)
     role: Role
@@ -30,8 +38,14 @@ class UserCreate(BaseModel):
     email: str = Field(..., min_length=3)
     password: str = Field(..., min_length=6)
 
+    @model_validator(mode="after")
+    def validate_driver_plate(self):
+        self.plate_number = normalize_plate(self.plate_number) if self.role == "driver" else None
+        return self
+
 
 class UserUpdate(BaseModel):
+    plate_number: Optional[str] = Field(default=None, max_length=20)
     name: Optional[str] = Field(default=None, min_length=1)
     dept_job_position: Optional[str] = Field(default=None, min_length=1)
     role: Optional[Role] = None
@@ -45,6 +59,7 @@ class UserPasswordUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    plate_number: Optional[str] = None
     uid: str
     name: Optional[str] = None
     dept_job_position: Optional[str] = None
@@ -97,6 +112,7 @@ def serialize_user(doc_snapshot) -> UserResponse:
         name=data.get("name"),
         dept_job_position=data.get("dept_job_position") or data.get("department") or data.get("job_position"),
         role=data.get("role"),
+        plate_number=data.get("plate_number") if data.get("role") == "driver" else None,
         nik=data.get("nik") or data.get("national_id"),
         phone=data.get("phone") or data.get("phone_number"),
         email=data.get("email"),
@@ -127,6 +143,8 @@ HEADER_TO_FIELD: dict[str, str] = {
     "job_position": "dept_job_position",
     "position": "dept_job_position",
     "role": "role",
+    "plate_number": "plate_number",
+    "plat_no": "plate_number",
     "nik": "nik",
     "national_id": "nik",
     "nationalid": "nik",
@@ -427,8 +445,8 @@ def xml_escape_text(value: str) -> str:
 
 def build_user_import_template_xlsx() -> bytes:
     """Build an in-memory .xlsx template for user import (headers + example row)."""
-    headers = ["name", "dept_job_position", "role", "nik", "phone", "email", "password"]
-    example_row = ["John Doe", "Finance", "user", "1234567890", "081234567890", "john@example.com", "password123"]
+    headers = ["name", "dept_job_position", "role", "nik", "phone", "email", "password", "plate_number"]
+    example_row = ["John Doe", "Finance", "user", "1234567890", "081234567890", "john@example.com", "password123", ""]
 
     def make_row(row_number: int, values: list[str]) -> str:
         """Generate a <row> element with inline string <c> cells."""
@@ -615,6 +633,7 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
                             "name": user_payload.name,
                             "dept_job_position": user_payload.dept_job_position,
                             "role": user_payload.role,
+                            "plate_number": user_payload.plate_number,
                             "nik": user_payload.nik,
                             "phone": user_payload.phone,
                             "email": user_payload.email,
@@ -633,6 +652,7 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
                         "name": user_payload.name,
                         "dept_job_position": user_payload.dept_job_position,
                         "role": user_payload.role,
+                        "plate_number": user_payload.plate_number,
                         "nik": user_payload.nik,
                         "phone": user_payload.phone,
                         "email": user_payload.email,
@@ -686,6 +706,7 @@ def create_user(payload: UserCreate, current_user=Depends(get_current_user)):
             "name": payload.name,
             "dept_job_position": payload.dept_job_position,
             "role": payload.role,
+            "plate_number": payload.plate_number,
             "nik": payload.nik,
             "phone": payload.phone,
             "email": normalized_email,
@@ -716,7 +737,7 @@ def update_user(user_id: str, payload: UserUpdate, current_user=Depends(get_curr
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     updates = payload.model_dump(exclude_none=True)
-    if not updates:
+    if not updates and "plate_number" not in payload.model_fields_set:
         return serialize_user(snapshot)
 
     if current_role == "office_coordinator" and "role" in updates:
@@ -731,7 +752,7 @@ def update_user(user_id: str, payload: UserUpdate, current_user=Depends(get_curr
         elif target_role not in ("user", "driver") and next_role != target_role:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
-    if not updates:
+    if not updates and "plate_number" not in payload.model_fields_set:
         return serialize_user(snapshot)
 
     if "email" in updates:
@@ -740,6 +761,18 @@ def update_user(user_id: str, payload: UserUpdate, current_user=Depends(get_curr
         if existing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
         updates["email"] = normalized_email
+
+    next_role = updates.get("role", target_data.get("role"))
+    if next_role == "driver":
+        if "role" in updates or "plate_number" in payload.model_fields_set:
+            try:
+                updates["plate_number"] = normalize_plate(
+                    payload.plate_number if "plate_number" in payload.model_fields_set else target_data.get("plate_number")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+    else:
+        updates["plate_number"] = None
 
     updates["updated_at"] = utc_now()
     updates["updated_by"] = uid

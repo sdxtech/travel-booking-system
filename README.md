@@ -155,7 +155,7 @@ Frontend otomatis membaca konfigurasi melalui Vite. Mode ini biasanya tersedia d
 
 Email dikirim otomatis bersama notifikasi aplikasi jika `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` terisi. Jika salah satunya kosong atau Resend gagal, notifikasi aplikasi tetap tersimpan dan proses bisnis tidak dibatalkan.
 
-1. Tambahkan dan verifikasi domain pengirim di Resend. Untuk production, alamat default proyek adalah `no-reply@notify.plvpilot.space`.
+1. Tambahkan dan verifikasi domain pengirim di Resend. Untuk production, alamat default proyek adalah `info@notif.plvpilot.space`.
 2. Buat API key development baru dengan izin mengirim email.
 3. Di Windows, jalankan script setup berikut dari root project. Key diminta secara tersembunyi dan disimpan pada environment user Windows, bukan di file Git:
 
@@ -167,7 +167,7 @@ Setelah setup, terminal baru akan membaca key secara otomatis. Nilai `RESEND_API
 
 ```env
 RESEND_API_KEY=
-RESEND_FROM_EMAIL=BDTR <no-reply@notify.plvpilot.space>
+RESEND_FROM_EMAIL=BDTR <info@notif.plvpilot.space>
 APP_PUBLIC_URL=http://localhost:5173
 ```
 

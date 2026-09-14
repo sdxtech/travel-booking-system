@@ -20,6 +20,7 @@ const initialCreate = {
   name: '',
   dept_job_position: '',
   role: 'user',
+  plate_number: '',
   nik: '',
   phone: '',
   email: '',
@@ -68,7 +69,7 @@ const isSuperadmin =
   const [searchQuery, setSearchQuery] = useState('')
   const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const filteredUsers = users.filter((user) => {
-    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email]
+    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email, user.plate_number]
       .filter((value) => value != null).join(' ').toLowerCase()
     return searchTerms.every((term) => text.includes(term))
   })
@@ -266,6 +267,7 @@ const isSuperadmin =
       name: user.name || '',
       dept_job_position: user.dept_job_position || '',
       role: user.role || 'user',
+      plate_number: user.plate_number || '',
       nik: user.nik || '',
       phone: user.phone || '',
       email: user.email || '',
@@ -290,7 +292,7 @@ const isSuperadmin =
 
         },
          credentials:'include',
-        body: JSON.stringify(createForm),
+        body: JSON.stringify({ ...createForm, plate_number: createForm.role === 'driver' ? createForm.plate_number : null }),
       })
       if (!res.ok) {
         let detail = 'Failed to create user.'
@@ -328,7 +330,7 @@ const isSuperadmin =
     setSuccessModal(null)
 
     try {
-      const updatePayload = { ...editForm }
+      const updatePayload = { ...editForm, plate_number: editForm.role === 'driver' ? editForm.plate_number : null }
       if (selectedUser?.role && !['user', 'driver'].includes(selectedUser.role)) {
         delete updatePayload.role
       }
@@ -577,6 +579,12 @@ const isSuperadmin =
                       <option value="driver">driver</option>
                     </select>
                   </label>
+                  {createForm.role === 'driver' ? (
+                    <label className="inline-label">
+                      <span>Plat No</span>
+                      <input placeholder="B 1234 ABC" value={createForm.plate_number} onChange={handleCreateChange('plate_number')} maxLength={20} required />
+                    </label>
+                  ) : null}
                   <label className="inline-label">
                     <span>National ID</span>
                     <input
@@ -663,6 +671,12 @@ const isSuperadmin =
                       ) : null}
                     </select>
                   </label>
+                  {editForm.role === 'driver' ? (
+                    <label className="inline-label">
+                      <span>Plat No</span>
+                      <input placeholder="B 1234 ABC" value={editForm.plate_number} onChange={handleEditChange('plate_number')} maxLength={20} required />
+                    </label>
+                  ) : null}
                   <label className="inline-label">
                     <span>National ID</span>
                     <input placeholder="National ID" value={editForm.nik} onChange={handleEditChange('nik')} required />
@@ -748,7 +762,7 @@ const isSuperadmin =
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td>{user.name || '-'}</td>
                       <td>{user.dept_job_position || '-'}</td>
-                      <td>{user.role || '-'}</td>
+                      <td>{user.role || '-'}{user.role === 'driver' ? <div className="muted">{user.plate_number || 'Plat No belum diisi'}</div> : null}</td>
                       <td>{user.nik || '-'}</td>
                       <td>{user.phone || '-'}</td>
                       <td>{user.email || '-'}</td>
@@ -1008,7 +1022,7 @@ const isSuperadmin =
 
                 <p className="muted" style={{ marginTop: 0 }}>
                   Required columns: <code>name</code>, <code>dept_job_position</code>, <code>nik</code>, <code>phone</code>
-                  , <code>email</code>, <code>password</code>. Optional: <code>role</code>.
+                  , <code>email</code>, <code>password</code>. Optional: <code>role</code>. <code>plate_number</code> is required for Driver (example: B 1234 ABC).
                 </p>
 
                 {importError ? <p className="error-text">{importError}</p> : null}

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
+import { formatDriverPlate } from '../components/driverPlate'
 import { API_BASE_URL } from '../config'
 
 const tripTypeOptions = [
@@ -385,7 +386,7 @@ function BookingDriver() {
                   value={form.driver_id}
                   options={drivers.map((driver, index) => ({
                     value: driver.driver_id,
-                    label: driver.driver_name || driver.driver_email || 'Driver',
+                    label: `${driver.driver_name || driver.driver_email || 'Driver'} — ${formatDriverPlate(driver.plate_number)}`,
                     status: availabilityChecked
                       ? unavailableDriverIds.has(String(driver.driver_id))
                         ? 'Unavailable'

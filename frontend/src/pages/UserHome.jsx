@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import QuickViewScheduler from '../components/QuickViewScheduler'
+import { formatDriverPlate } from '../components/driverPlate'
 import {
   addMinutes,
   formatStatusLabel,
@@ -121,6 +122,7 @@ function UserHome() {
       driverSchedules.map((driver, index) => ({
         id: driver.driver_id,
         name: driver.driver_name || driver.driver_email || `Driver ${index + 1}`,
+        plateLabel: formatDriverPlate(driver.plate_number),
         color: driverCalendarColors[index % driverCalendarColors.length],
       })),
     [driverSchedules]

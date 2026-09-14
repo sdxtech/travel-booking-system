@@ -94,6 +94,7 @@ class DriverCalendarBookingResponse(BaseModel):
 
 
 class DriverCalendarResponse(BaseModel):
+    plate_number: Optional[str] = None
     driver_id: str
     driver_name: Optional[str] = None
     driver_email: Optional[str] = None
@@ -602,6 +603,7 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
 
         results.append(
             DriverCalendarResponse(
+                plate_number=data.get("plate_number"),
                 driver_id=driver_id,
                 driver_name=data.get("name") or data.get("email") or "Driver",
                 driver_email=data.get("email"),

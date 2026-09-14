@@ -254,7 +254,7 @@ function QuickViewScheduler({
                             onChange={() => toggleCalendar(calendarId)}
                           />
                           <span className="quick-driver-multiselect__color" style={{ backgroundColor: calendar.color }} />
-                          <span>{calendar.name}</span>
+                          <span>{calendar.name}{calendar.plateLabel ? ` — ${calendar.plateLabel}` : ''}</span>
                         </label>
                       )
                     })}
