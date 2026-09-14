@@ -105,8 +105,8 @@ const accountSettingsSection = {
   icon: 'bi-person-gear',
   items: [
     {
-      label: 'Reset Password',
-      path: '/reset-password',
+      label: 'Change Password',
+      path: '/change-password',
       icon: 'bi-key',
     },
   ],
@@ -161,7 +161,7 @@ function MainLayout({ title, children }) {
     ['/user/', '/driver/', '/office/', '/admin/'].some((prefix) =>
       location.pathname.startsWith(prefix)
     ) ||
-    location.pathname === '/reset-password'
+    location.pathname === '/change-password'
 
   const isEmployee = role === 'user'
   const isDriver = role === 'driver'

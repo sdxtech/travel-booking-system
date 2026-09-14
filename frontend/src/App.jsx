@@ -19,8 +19,10 @@ import AdminDriverAvailability from './pages/AdminDriverAvailability'
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 import Unauthorized from './pages/Unauthorized'
-import ResetPassword from './pages/ResetPassword'
 import AdminPagePermissions from './pages/AdminPagePermissions'
+import ForgotPassword from './pages/ForgotPassword'
+import ChangePassword from './pages/ChangePassword'
+import ResetPassword from './pages/ResetPassword'
 
 
 // Main router for all app pages.
@@ -208,14 +210,16 @@ function App() {
             }
           />
           <Route
-            path="/reset-password"
+            path="/change-password"
             element={
               <ProtectedRoute allowedRoles={["user", "driver"]}>
-                <ResetPassword />
+                <ChangePassword />
               </ProtectedRoute>
             }
           />
           <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/forgot-password" element={<ForgotPassword/>} />
+          <Route path="/reset-password" element={<ResetPassword/>} />
         </Routes>
       </div>
     </Router>

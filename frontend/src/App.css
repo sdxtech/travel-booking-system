@@ -16,6 +16,25 @@
   overflow-x: hidden;
 }
 
+.auth-links {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.forgot-password-link {
+  color: var(--brand-nav);
+  text-decoration: none;
+}
+
+.back-to-login-wrapper {
+  padding-top: 12px;
+}
+
+.back-to-login-button {
+  padding-top: 12px;
+}
+
 .layout {
   min-height: 100vh;
 
@@ -769,6 +788,11 @@ user-dropdown-toogle {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.forgot-password-form {
+   display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .form-field {
