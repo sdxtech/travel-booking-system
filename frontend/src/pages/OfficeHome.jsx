@@ -65,8 +65,12 @@ function buildDriverBookingEvent(booking, calendarId, color) {
   return {
     id: `driver-calendar-${calendarId}-${booking.id}`,
     calendarId,
-    title: booking.destination || 'Busy',
+    title: booking.requester_name || 'Employee',
     meta: `${booking.requester_name || 'Employee'} - ${formatStatusLabel(status)}`,
+    statusLabel: formatStatusLabel(status),
+    tripType: booking.trip_type,
+    departurePoint: booking.pickup_location,
+    destinationPoint: booking.destination,
     start,
     end,
     color: getBookingEventColor(status, color),

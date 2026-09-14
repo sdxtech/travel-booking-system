@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { addMinutes, parseApiDate, toDateKey } from './quickViewSchedulerUtils'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -6,6 +6,14 @@ const DAYS_IN_WEEK = WEEKDAYS.length
 const START_HOUR = 0
 const END_HOUR = 24
 const HOUR_HEIGHT = 64
+
+function formatTripType(value) {
+  return { antar: 'Drop-off', jemput: 'Pick-up', fulltrip: 'Full Trip' }[value] || value || '-'
+}
+
+function formatEventDateTime(value) {
+  return value.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+}
 
 function startOfWorkWeek(date) {
   const base = parseApiDate(date) || new Date()
@@ -92,6 +100,12 @@ function QuickViewScheduler({
 }) {
   const today = useMemo(() => new Date(), [])
   const [selectedDate, setSelectedDate] = useState(today)
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const eventDialogRef = useRef(null)
+
+  useEffect(() => {
+    if (selectedEvent) eventDialogRef.current?.showModal()
+  }, [selectedEvent])
   const [selectedCalendarIds, setSelectedCalendarIds] = useState([])
   const availableCalendarIds = useMemo(() => new Set(calendars.map((calendar) => String(calendar.id))), [calendars])
   const activeCalendarIds = useMemo(
@@ -326,9 +340,20 @@ function QuickViewScheduler({
                             placement.segmentEnd
                           )}`
                           const compact = placement.height < 42
+                          const tripType = formatTripType(event.tripType)
+                          const details = [
+                            tripType,
+                            event.departurePoint || '-',
+                            'To',
+                            event.destinationPoint || '-',
+                          ]
+                          const eventDescription = [event.title, timeRange, ...details, event.meta].filter(Boolean).join('\n')
 
                           return (
-                          <article
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEvent({ ...event, driverName: calendar.name })}
+                            aria-haspopup="dialog"
                             key={`${event.id}-${placement.dayIndex}`}
                             className={`quick-scheduler-event ${compact ? 'is-compact' : ''}`}
                             style={{
@@ -338,13 +363,13 @@ function QuickViewScheduler({
                               width: `calc((100% / ${DAYS_IN_WEEK}) - 8px)`,
                               backgroundColor: event.color || calendar.color,
                             }}
-                            title={`${event.title} - ${timeRange}${event.meta ? ` - ${event.meta}` : ''}`}
-                            aria-label={`${event.title}, ${timeRange}${event.meta ? `, ${event.meta}` : ''}`}
+                            title={eventDescription}
+                            aria-label={eventDescription}
                           >
                             <strong>{event.title}</strong>
                             <span className="quick-scheduler-event__time">{timeRange}</span>
-                            {!compact && event.meta ? <span>{event.meta}</span> : null}
-                          </article>
+                            {!compact ? details.map((detail, index) => <span key={index}>{detail}</span>) : null}
+                          </button>
                           )
                         })
                       )}
@@ -356,6 +381,44 @@ function QuickViewScheduler({
           </div>
         )}
       </div>
+      {selectedEvent ? (
+        <dialog
+          ref={eventDialogRef}
+          className="modal quick-scheduler-event-dialog"
+          aria-labelledby="scheduler-event-details-title"
+          onClose={() => setSelectedEvent(null)}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return
+            const bounds = event.currentTarget.getBoundingClientRect()
+            if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
+              event.currentTarget.close()
+            }
+          }}
+        >
+          <div className="modal-header">
+            <h2 id="scheduler-event-details-title">Booking Driver Details</h2>
+            <button type="button" className="modal-close" aria-label="Close details" onClick={() => eventDialogRef.current?.close()}>
+              <i className="bi bi-x-lg" aria-hidden="true" />
+            </button>
+          </div>
+          <dl className="ticket-details-grid">
+            {[
+              ['Driver', selectedEvent.driverName],
+              ['Status', selectedEvent.statusLabel],
+              ['Departure Date & Time', formatEventDateTime(selectedEvent.start)],
+              ['Estimated Arrival Date & Time', formatEventDateTime(selectedEvent.end)],
+              ['TYPE TRIP', formatTripType(selectedEvent.tripType)],
+              ['DEPARTURE POINT', selectedEvent.departurePoint],
+              ['DESTINATION POINT', selectedEvent.destinationPoint],
+            ].map(([label, value]) => (
+              <div key={label} className="ticket-details-item ticket-details-item--full">
+                <dt>{label}</dt>
+                <dd>{value || '-'}</dd>
+              </div>
+            ))}
+          </dl>
+        </dialog>
+      ) : null}
     </section>
   )
 }

@@ -39,6 +39,11 @@ function BookingDriver() {
   const [availabilityChecked, setAvailabilityChecked] = useState(false)
   const [availabilityError, setAvailabilityError] = useState('')
   const [submissionStatus, setSubmissionStatus] = useState('')
+  const selectedDriverUnavailable = Boolean(form.driver_id) && (
+    unavailableDriverIds.has(String(form.driver_id)) ||
+    !drivers.some((driver) => String(driver.driver_id) === String(form.driver_id))
+  )
+  const submitBlocked = loading || driversLoading || availabilityLoading || !availabilityChecked || selectedDriverUnavailable
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -96,9 +101,10 @@ function BookingDriver() {
     loadDrivers()
   }, [])
 
-  // Resolve driver status for the requested interval while still allowing conflicting requests to become pending.
+  // Only allow submission after checking availability for the requested interval.
   useEffect(() => {
     setAvailabilityChecked(false)
+    setAvailabilityLoading(false)
     setAvailabilityError('')
     setUnavailableDriverIds(new Set())
 
@@ -121,7 +127,7 @@ function BookingDriver() {
       setAvailabilityLoading(true)
       try {
         const response = await fetch(
-          `${API_BASE_URL}/bookings/unavailable-drivers?departure_time=${encodeURIComponent(departureDateTime.toISOString())}&estimated_arrival_time=${encodeURIComponent(estimatedArrivalDateTime.toISOString())}`,
+          `${API_BASE_URL}/bookings/unavailable-drivers?departure_time=${encodeURIComponent(departureDateTime.toISOString())}&estimated_arrival_time=${encodeURIComponent(estimatedArrivalDateTime.toISOString())}${editingBookingId ? `&exclude_booking_id=${encodeURIComponent(editingBookingId)}` : ''}`,
           {
            credentials: 'include',
             signal: controller.signal,
@@ -129,10 +135,12 @@ function BookingDriver() {
         )
         if (!response.ok) throw new Error('Failed to check driver availability')
         const data = await response.json()
+        if (controller.signal.aborted) return
+        if (!Array.isArray(data)) throw new Error('Invalid availability response')
         setUnavailableDriverIds(new Set(Array.isArray(data) ? data.map(String) : []))
         setAvailabilityChecked(true)
       } catch (error) {
-        if (error?.name !== 'AbortError') {
+        if (!controller.signal.aborted && error?.name !== 'AbortError') {
           setAvailabilityError('Unable to check driver availability. Please try again.')
         }
       } finally {
@@ -142,7 +150,7 @@ function BookingDriver() {
 
     loadAvailability()
     return () => controller.abort()
-  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time])
+  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time, editingBookingId])
 
   // Prefill the form when navigating from history with an existing booking.
   useEffect(() => {
@@ -175,6 +183,12 @@ function BookingDriver() {
   // Submit a new booking or save changes to an existing one.
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (submitBlocked) {
+      setErrorMessage(selectedDriverUnavailable
+        ? 'The selected driver is unavailable. Please choose another driver or time.'
+        : 'Please wait until driver availability has been checked successfully.')
+      return
+    }
     setLoading(true)
     setErrorMessage('')
     setSubmissionStatus('')
@@ -403,9 +417,12 @@ function BookingDriver() {
 
           {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
           {availabilityError ? <p className="error-text">{availabilityError}</p> : null}
+          {!driversLoading && selectedDriverUnavailable ? (
+            <p className="error-text">The selected driver is unavailable. Please choose another driver or time.</p>
+          ) : null}
 
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            <button type="submit" className="btn btn-primary" disabled={submitBlocked}>
               {loading ? 'Submitting...' : editingBookingId ? 'Save Changes' : 'Submit Request'}
             </button>
             <button type="button" className="btn btn-outline-danger" onClick={() => navigate('/user/home')}>
@@ -426,7 +443,7 @@ function BookingDriver() {
               <p className="success-modal-message">
                 {submissionStatus === 'approved'
                   ? 'The selected driver is available, so your booking was approved automatically by the system.'
-                  : 'The selected driver has an overlapping booking. Your request is pending Office Coordinator review.'}
+                  : 'Your booking changes have been saved.'}
               </p>
               <div className="success-modal-actions">
                 <button

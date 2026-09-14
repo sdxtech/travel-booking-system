@@ -105,6 +105,53 @@ class BookingConflictTests(unittest.TestCase):
         self.collection.find.return_value = [self.booking("a", "A")]
         self.assertFalse(bookings.is_driver_busy("driver-1", self.end, self.end + timedelta(hours=1)))
 
+    def employee_payload(self):
+        return bookings.BookingCreate(
+            driver_id="driver-1", pickup_location="Office", destination="Site",
+            trip_type="antar", passenger_count=1,
+            departure_time=self.start, estimated_arrival_time=self.end,
+        )
+
+    def test_employee_cannot_submit_or_edit_into_unavailable_slot(self):
+        bookings.ensure_role.return_value = "user"
+        self.pending["user_id"] = "employee"
+        for status in ("pending", "approved", "in_progress"):
+            for edit in (False, True):
+                with self.subTest(status=status, edit=edit):
+                    self.collection.find.return_value = [self.booking("other", "OTHER", status)]
+                    with patch.object(bookings, "enforce_employee_page_permission"), self.assertRaises(HTTPException) as raised:
+                        if edit:
+                            bookings.update_booking("request-b", self.employee_payload(), {"uid": "employee"})
+                        else:
+                            bookings.create_booking(self.employee_payload(), {"uid": "employee"})
+                    self.assertEqual(raised.exception.status_code, 409)
+                    self.assertIn("unavailable", raised.exception.detail)
+        self.collection.insert_one.assert_not_called()
+        self.collection.update_one.assert_not_called()
+        bookings.create_user_notification.assert_not_called()
+
+    def test_employee_edit_excludes_itself_and_auto_approves_available_slot(self):
+        bookings.ensure_role.return_value = "user"
+        self.pending["user_id"] = "employee"
+        self.collection.find.return_value = [self.pending]
+        with patch.object(bookings, "enforce_employee_page_permission"):
+            bookings.update_booking("request-b", self.employee_payload(), {"uid": "employee"})
+        self.assertEqual(self.collection.update_one.call_args.args[1]["$set"]["status"], "approved")
+
+    def test_availability_excludes_only_employees_own_booking(self):
+        bookings.ensure_role.return_value = "user"
+        self.pending["user_id"] = "employee"
+        self.collection.find.return_value = [self.pending]
+        users = Mock()
+        users.find.return_value = []
+        with patch.dict(bookings.db, {"users": users}), patch.object(bookings, "enforce_employee_page_permission"):
+            for uid, expected in (("employee", []), ("someone-else", ["driver-1"])):
+                with self.subTest(uid=uid):
+                    result = bookings.list_unavailable_drivers(
+                        self.start, self.end, {"uid": uid}, exclude_booking_id="request-b",
+                    )
+                    self.assertEqual(result, expected)
+
 
 if __name__ == "__main__":
     unittest.main()

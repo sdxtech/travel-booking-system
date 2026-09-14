@@ -80,6 +80,10 @@ class DriverCalendarBookingResponse(BaseModel):
     id: str
     driver_id: str
     status: str
+    requester_name: Optional[str] = None
+    trip_type: Optional[str] = None
+    pickup_location: Optional[str] = None
+    destination: Optional[str] = None
     departure_time: datetime
     estimated_arrival_time: Optional[datetime] = None
     started_at: Optional[datetime] = None
@@ -281,7 +285,7 @@ def is_driver_busy(
 
 @router.post("", response_model=BookingResponse)
 def create_booking(payload: BookingCreate, current_user=Depends(get_current_user)):
-    """Auto-approve a free driver slot, otherwise keep the request pending."""
+    """Only accept Employee bookings when the selected driver is available."""
     uid = current_user["uid"]
     ensure_role(uid, ("user",))
     enforce_employee_page_permission(uid, "booking_driver")
@@ -294,7 +298,9 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
         payload.estimated_arrival_time,
         blocking_statuses=("pending", "approved", "in_progress"),
     )
-    booking_status = "pending" if has_conflict else "approved"
+    if has_conflict:
+        raise HTTPException(status_code=409, detail="The selected driver is unavailable for this schedule. Please choose another driver or time.")
+    booking_status = "approved"
 
     requester_name = None
     requester_phone = None
@@ -493,6 +499,7 @@ def list_unavailable_drivers(
     departure_time: datetime,
     estimated_arrival_time: Optional[datetime] = None,
     current_user=Depends(get_current_user),
+    exclude_booking_id: Optional[str] = None,
 ):
     """Return driver ids unavailable for the caller's booking flow and requested interval."""
     uid = current_user["uid"]
@@ -523,6 +530,10 @@ def list_unavailable_drivers(
 
     for doc in snapshots:
         data = doc or {}
+        if exclude_booking_id and str(data.get("_id")) == exclude_booking_id and (
+            role in ("office_coordinator", "superadmin") or data.get("user_id") == uid
+        ):
+            continue
         driver_id = data.get("driver_id")
         if not driver_id:
             continue
@@ -537,7 +548,7 @@ def list_unavailable_drivers(
 def list_driver_calendars(current_user=Depends(get_current_user)):
     """Return driver busy schedules for employee quick-view calendars."""
     uid = current_user["uid"]
-    ensure_role(uid, ("user", "office_coordinator", "superadmin"))
+    role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
 
     drivers = list(db["users"].find({"role": "driver", "disabled": {"$ne": True}}))
 
@@ -570,7 +581,11 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
                 DriverCalendarBookingResponse(
                     id=str(data.get("_id")),
                     driver_id=driver_id,
+                    requester_name=data.get("requester_name") if role in ("office_coordinator", "superadmin") else None,
                     status=data.get("status", "approved"),
+                    trip_type=data.get("trip_type"),
+                    pickup_location=data.get("pickup_location"),
+                    destination=data.get("destination"),
                     departure_time=departure_time,
                     estimated_arrival_time=data.get("estimated_arrival_time"),
                     started_at=data.get("started_at"),
@@ -781,7 +796,9 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
         exclude_booking_id=booking_id,
         blocking_statuses=("pending", "approved", "in_progress"),
     )
-    booking_status = "pending" if has_conflict else "approved"
+    if has_conflict:
+        raise HTTPException(status_code=409, detail="The selected driver is unavailable for this schedule. Please choose another driver or time.")
+    booking_status = "approved"
 
     result = db["bookings"].update_one(
         {"_id": booking_id, "status": "pending", "cancellation_status": {"$ne": "pending"}},

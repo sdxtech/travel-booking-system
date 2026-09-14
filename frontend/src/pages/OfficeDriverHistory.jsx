@@ -8,6 +8,7 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
+import { getNightOvertimeMinutes } from '../components/bookingOvertime'
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -114,8 +115,10 @@ function OfficeDriverHistory() {
         return toDate(booking.estimated_arrival_time)?.getTime() ?? null
       case 'starting_time':
         return toDate(booking.started_at)?.getTime() ?? null
+      case 'finish_time':
+        return toDate(booking.driver_finished_at)?.getTime() ?? null
       case 'ending_time':
-        return toDate(booking.driver_finished_at || booking.completed_at)?.getTime() ?? null
+        return toDate(booking.validated_at)?.getTime() ?? null
       case 'total_duration':
         return getDurationMinutes(booking) ?? null
       case 'ot_hour':
@@ -839,12 +842,12 @@ function OfficeDriverHistory() {
     }
   }
 
-  // Compute trip duration in minutes based on started/completed timestamps.
+  // Compute trip duration from the driver's Finish time minus Start time.
   function getDurationMinutes(booking) {
     const startedAt = toDate(booking?.started_at)
-    const completedAt = toDate(booking?.driver_finished_at || booking?.completed_at)
-    if (!startedAt || !completedAt) return null
-    const diffMs = completedAt.getTime() - startedAt.getTime()
+    const finishedAt = toDate(booking?.driver_finished_at)
+    if (!startedAt || !finishedAt) return null
+    const diffMs = finishedAt.getTime() - startedAt.getTime()
     if (diffMs < 0) return null
     return Math.floor(diffMs / 60000)
   }
@@ -858,12 +861,9 @@ function OfficeDriverHistory() {
     return `${hours}h ${String(mins).padStart(2, '0')}m`
   }
 
-  // Compute overtime minutes beyond an 8-hour baseline.
+  // Count worked time between 17:00 and 08:00 WIB once it reaches 30 minutes.
   function getOvertimeMinutes(booking) {
-    const minutes = getDurationMinutes(booking)
-    if (minutes === null) return null
-    const overtime = minutes - 8 * 60
-    return overtime > 0 ? overtime : 0
+    return getNightOvertimeMinutes(toDate(booking?.started_at), toDate(booking?.driver_finished_at))
   }
 
   // Format overtime hours for exports/table.
@@ -947,6 +947,7 @@ function OfficeDriverHistory() {
       'Estimated Arrival Date',
       'Estimated Arrival Time',
       'Starting Time',
+      'Finish Time',
       'Ending Time',
       'Total Duration',
       'OT hour',
@@ -976,7 +977,8 @@ function OfficeDriverHistory() {
       formatDate(booking.estimated_arrival_time),
       formatTime(booking.estimated_arrival_time),
       formatTime(booking.started_at),
-      formatTime(booking.driver_finished_at || booking.completed_at),
+      formatTime(booking.driver_finished_at),
+      formatTime(booking.validated_at),
       formatDuration(booking),
       formatOvertimeHours(booking),
       formatOvertimeMinutes(booking),
@@ -1171,6 +1173,11 @@ function OfficeDriverHistory() {
                     </button>
                   </th>
                   <th>
+                    <button type="button" className="table-sort" onClick={() => toggleSort('finish_time')}>
+                      Finish Time {renderSortIcon('finish_time')}
+                    </button>
+                  </th>
+                  <th>
                     <button type="button" className="table-sort" onClick={() => toggleSort('ending_time')}>
                       Ending Time {renderSortIcon('ending_time')}
                     </button>
@@ -1231,25 +1238,25 @@ function OfficeDriverHistory() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="27" className="muted">
+                    <td colSpan="28" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="27" className="error-text">
+                    <td colSpan="28" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : !hasLoaded ? (
                   <tr>
-                    <td colSpan="27" className="muted">
+                    <td colSpan="28" className="muted">
                       Select a date range to load driver history.
                     </td>
                   </tr>
                 ) : sortedBookings.length === 0 ? (
                   <tr>
-                    <td colSpan="27" className="muted">
+                    <td colSpan="28" className="muted">
                       No driver history found.
                     </td>
                   </tr>
@@ -1271,7 +1278,8 @@ function OfficeDriverHistory() {
                       <td>{formatDate(booking.estimated_arrival_time)}</td>
                       <td>{formatTime(booking.estimated_arrival_time)}</td>
                       <td>{formatTime(booking.started_at)}</td>
-                      <td>{formatTime(booking.driver_finished_at || booking.completed_at)}</td>
+                      <td>{formatTime(booking.driver_finished_at)}</td>
+                      <td>{formatTime(booking.validated_at)}</td>
                       <td>{formatDuration(booking)}</td>
                       <td>{formatOvertimeHours(booking)}</td>
                       <td>{formatOvertimeMinutes(booking)}</td>
