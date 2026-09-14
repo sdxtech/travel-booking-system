@@ -141,6 +141,9 @@ function Login() {
               </div>
             </label>
 
+            <div className="auth-links">
+
+
             <label className="remember-me">
 
               <input
@@ -150,6 +153,10 @@ function Login() {
               />
               <span>Remember me</span>
             </label>
+
+            <a href="/forgot-password" className="forgot-password-link">Forgot Password?</a>
+            </div>
+
 
             {error && <p className="error-text">{error}</p>}
 

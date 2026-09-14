@@ -105,3 +105,129 @@ def send_notification_email(
     if not email_id:
         raise EmailDeliveryError("Resend response did not include an email id")
     return str(email_id)
+
+def send_password_reset_email(
+    *,
+    to_email: str,
+    recipient_name: Optional[str],
+    reset_url: str,
+) -> Optional[str]:
+    config = get_email_config()
+
+    if not (
+        config["api_key"]
+        and config["from_email"]
+        and to_email
+    ):
+        return None
+
+    safe_name = html.escape(
+        (recipient_name or "User").strip() or "User"
+    )
+
+    safe_url = html.escape(
+        reset_url,
+        quote=True,
+    )
+
+    subject = "Reset Your Booking App Password"
+
+    html_content = (
+        '<div style="margin:0;background:#f4f6f8;padding:24px;'
+        'font-family:Segoe UI,Arial,sans-serif;color:#1f2937">'
+        
+        '<div style="max-width:560px;margin:0 auto;'
+        'border:1px solid #dbe1ea;border-radius:10px;'
+        'background:#ffffff;padding:24px">'
+
+        '<h1 style="margin:0 0 16px;color:#273896;'
+        'font-size:22px;line-height:30px">'
+        'Reset Your Password'
+        '</h1>'
+
+        f'<p style="margin:0 0 12px;font-size:14px;'
+        f'line-height:22px">'
+        f'Hello {safe_name},'
+        f'</p>'
+
+        '<p style="margin:0 0 16px;font-size:14px;'
+        'line-height:22px">'
+        'We received a request to reset your Booking App password.'
+        '</p>'
+
+        '<p style="margin:24px 0">'
+        f'<a href="{safe_url}" '
+        'style="display:inline-block;padding:10px 16px;'
+        'border-radius:6px;background:#273896;'
+        'color:#ffffff;text-decoration:none;font-weight:600">'
+        'Reset Password'
+        '</a>'
+        '</p>'
+
+        '<p style="margin:0;font-size:13px;'
+        'line-height:20px;color:#64748b">'
+        'This link will expire in 30 minutes and can only be used once.'
+        '</p>'
+
+        '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;'
+        'padding-top:16px;color:#64748b;font-size:12px;'
+        'line-height:18px">'
+        'If you did not request a password reset, you can safely ignore '
+        'this email.'
+        '</p>'
+
+        '</div>'
+        '</div>'
+    )
+
+    text_content = (
+        f"Hello {recipient_name or 'User'},\n\n"
+        "We received a request to reset your Booking App password.\n\n"
+        f"Reset your password here:\n{reset_url}\n\n"
+        "This link will expire in 30 minutes and can only be used once.\n\n"
+        "If you did not request a password reset, you can safely ignore "
+        "this email."
+    )
+
+    response = requests.post(
+        RESEND_EMAILS_URL,
+        headers={
+            "Authorization": f"Bearer {config['api_key']}",
+            "Content-Type": "application/json",
+            "User-Agent": "booking-app/1.0",
+        },
+        json={
+            "from": config["from_email"],
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+            "text": text_content,
+        },
+        timeout=10,
+    )
+
+    if not response.ok:
+        detail = (
+            response.text.strip()[:500]
+            or f"HTTP {response.status_code}"
+        )
+
+        raise EmailDeliveryError(
+            f"Resend email delivery failed: {detail}"
+        )
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise EmailDeliveryError(
+            "Resend returned an invalid JSON response"
+        ) from exc
+
+    email_id = payload.get("id")
+
+    if not email_id:
+        raise EmailDeliveryError(
+            "Resend response did not include an email id"
+        )
+
+    return str(email_id)

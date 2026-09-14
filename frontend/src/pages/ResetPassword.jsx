@@ -1,243 +1,235 @@
-import { useState } from "react";
-import MainLayout from "../components/MainLayout";
-import { API_BASE_URL } from "../config";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-const initialForm = {
-  current_password: "",
-  new_password: "",
-  confirm_password: "",
-};
+import { API_BASE_URL } from "../config";
 
 function ResetPassword() {
-  const [form, setForm] = useState(initialForm);
-  const [saving, setSaving] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const token = searchParams.get("token");
+
+  const [password, setPassword] = useState("");
+  
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const handleChange = (field) => (event) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: event.target.value,
-    }));
-  };
-
-  const togglePasswordVisibility = () => {
-    setShowPassword((prev) => !prev);
-  };
+  const [message, setMessage] = useState("");
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     setError("");
-    setSuccess("");
+    setMessage("");
 
-    if (form.new_password !== form.confirm_password) {
-      setError("New password and confirmation password do not match.");
+    if (!token) {
+      setError(
+        "Invalid or missing reset token. Please request a new password reset link."
+      );
       return;
     }
 
-    if (form.new_password.length < 6) {
-      setError("New password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
       return;
     }
 
-    setSaving(true);
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          current_password: form.current_password,
-          new_password: form.new_password,
-          confirm_password: form.confirm_password,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/auth/reset-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token,
+            new_password: password,
+            confirm_password: confirmPassword,
+          }),
+        }
+      );
 
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(data?.detail || "Failed to change password.");
-        return;
+        throw new Error(
+          data?.detail ||
+            data?.message ||
+            "Failed to reset password."
+        );
       }
 
-      setSuccess(data?.message || "Password changed successfully.");
+      setMessage(
+        data?.message ||
+          "Your password has been reset successfully."
+      );
 
-      setForm(initialForm);
-      setShowPassword(false);
-    } catch {
-      setError("Network error. Please try again.");
+      setPassword("");
+      setConfirmPassword("");
+
+      // Redirect to login after a short delay.
+      setTimeout(() => {
+        navigate("/login", {
+          replace: true,
+        });
+      }, 2000);
+    } catch (err) {
+      console.error("Reset password error:", err);
+
+      setError(
+        err?.message ||
+          "Something went wrong. Please try again."
+      );
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
-  const inputType = showPassword ? "text" : "password";
 
   return (
-    <MainLayout title="Reset Password">
-      <section className="ticket-history">
-        <header className="history-header">
-          <div className="header-title">
-              <button className="back-link" type="button" onClick={() => navigate(-1)}>
-    <i className="bi bi-arrow-left" aria-hidden="true" />
-    
-  </button>
+    <div className="login-page">
+      <div className="login-card login-card-branded">
+        <h1 className="login-title">
+          Reset Password
+        </h1>
 
-          <h1>Reset Password</h1>
+        <p>
+          Enter your new password below.
+        </p>
+
+        {!token && (
+          <div>
+            Invalid or missing reset token. Please request
+            a new password reset link.
           </div>
-         
-          
-        </header>
+        )}
 
-        <form
-          className="ticket-form admin-settings__form"
-          onSubmit={handleSubmit}
-        >
-          <section className="field-group">
-            <div className="field-heading">
-              <span className="heading-icon" aria-hidden="true">
-                <i className="bi bi-key" />
-              </span>
+        {error && (
+          <div>
+            {error}
+          </div>
+        )}
 
-              <div>
-                <h2>Change password</h2>
-                <p className="muted">
-                  Enter your current password and choose a new password.
-                </p>
-              </div>
-            </div>
+        {message && (
+          <div>
+            {message}
+          </div>
+        )}
 
-            <div className="field-grid">
-              <label className="form-field" style={{ position: "relative" }}>
-                <span>Current password</span>
+        {token && !message && (
+          <form
+            className="login-form"
+            onSubmit={handleSubmit}
+          >
+            <label className="form-field">
+              <span>New Password</span>
+
+              <div className="password-input-wrapper">
                 <input
-                  type={inputType}
-                  value={form.current_password}
-                  onChange={handleChange("current_password")}
-                  placeholder="Enter your current password"
-                  disabled={saving}
-                  autoComplete="current-password"
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
                   required
-                  style={{ paddingRight: "40px" }}
-                />
-                <button
-                  type="button"
-                  onClick={togglePasswordVisibility}
-                  style={{
-                    position: "absolute",
-                    right: "10px",
-                    top: "38px",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#6c757d",
-                  }}
-                  title={showPassword ? "Hide password" : "Show password"}
-                >
-                  <i
-                    className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"}
-                  />
-                </button>
-              </label>
-
-              <label className="form-field" style={{ position: "relative" }}>
-                <span>New password</span>
-                <input
-                  type={inputType}
-                  value={form.new_password}
-                  onChange={handleChange("new_password")}
+                  minLength={8}
                   placeholder="Enter your new password"
-                  disabled={saving}
-                  autoComplete="new-password"
-                  minLength="6"
-                  required
-                  style={{ paddingRight: "40px" }}
+                  disabled={loading}
                 />
+
                 <button
                   type="button"
-                  onClick={togglePasswordVisibility}
-                  style={{
-                    position: "absolute",
-                    right: "10px",
-                    top: "38px",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#6c757d",
-                  }}
+                  className="password-toggle"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
                 >
                   <i
-                    className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"}
+                    className={`bi ${
+                      showPassword ? "bi-eye-slash-fill" : "bi-eye-fill"
+                    }`}
+                    aria-hidden="true"
                   />
                 </button>
-              </label>
+              </div>
+            </label>
 
-              <label className="form-field" style={{ position: "relative" }}>
-                <span>Confirm new password</span>
+            <label className="form-field">
+              <span>Confirm Password</span>
+
+              <div className="password-input-wrapper">
                 <input
-                  type={inputType}
-                  value={form.confirm_password}
-                  onChange={handleChange("confirm_password")}
-                  placeholder="Re-enter your new password"
-                  disabled={saving}
-                  autoComplete="new-password"
-                  minLength="6"
+                  type={
+                    showConfirmPassword
+                      ? "text"
+                      : "password"
+                  }
+                  value={confirmPassword}
+                  onChange={(event) =>
+                    setConfirmPassword(
+                      event.target.value
+                    )
+                  }
                   required
-                  style={{ paddingRight: "40px" }}
+                  minLength={8}
+                  placeholder="Confirm your new password"
+                  disabled={loading}
                 />
+
                 <button
                   type="button"
-                  onClick={togglePasswordVisibility}
-                  style={{
-                    position: "absolute",
-                    right: "10px",
-                    top: "38px",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#6c757d",
-                  }}
+                  className="password-toggle"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showConfirmPassword}
                 >
                   <i
-                    className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"}
+                    className={`bi ${
+                      showConfirmPassword ? "bi-eye-slash-fill" : "bi-eye-fill"
+                    }`}
+                    aria-hidden="true"
                   />
                 </button>
-              </label>
-            </div>
+              </div>
+            </label>
 
-            <div className="admin-settings__preview">
-              <i className="bi bi-shield-lock" aria-hidden="true" />
-              <span>
-                Your new password must be at least 6 characters and should not
-                be shared with anyone else.
-              </span>
-            </div>
+            <button
+              type="submit"
+              disabled={loading}
+            >
+              {loading
+                ? "RESETTING PASSWORD..."
+                : "RESET PASSWORD"}
+            </button>
+          </form>
+        )}
+<div className="back-to-login-wrapper">
 
-            {error ? <p className="error-text">{error}</p> : null}
-
-            {success ? <p className="success-text">{success}</p> : null}
-
-            <div className="form-actions">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving}
-              >
-                <i className="bi bi-key" aria-hidden="true" />
-                {saving ? "Changing password..." : "Change password"}
-              </button>
-            </div>
-          </section>
-        </form>
-      </section>
-    </MainLayout>
+        <a
+          href="/login"
+          className="back-to-login-button"
+         
+        >
+          BACK TO LOGIN
+        </a>
+</div>
+      </div>
+    </div>
   );
 }
 
