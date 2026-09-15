@@ -19,6 +19,7 @@ const initialCreate = {
   name: '',
   dept_job_position: '',
   role: 'user',
+  plate_number: '',
   nik: '',
   phone: '',
   telegram_chat_id: '',
@@ -66,7 +67,7 @@ function AdminManageUser() {
   const [searchQuery, setSearchQuery] = useState('')
   const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const filteredUsers = users.filter((user) => {
-    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email, user.telegram_chat_id]
+    const text = [user.name, user.dept_job_position, user.role, user.plate_number, user.nik, user.phone, user.email, user.telegram_chat_id]
       .filter((value) => value != null).join(' ').toLowerCase()
     return searchTerms.every((term) => text.includes(term))
   })
@@ -261,6 +262,7 @@ function AdminManageUser() {
       name: user.name || '',
       dept_job_position: user.dept_job_position || '',
       role: user.role || 'user',
+      plate_number: user.plate_number || '',
       nik: user.nik || '',
       phone: user.phone || '',
       telegram_chat_id: user.telegram_chat_id || '',
@@ -286,7 +288,10 @@ function AdminManageUser() {
 
         },
          credentials:'include' ,
-        body: JSON.stringify(createForm),
+        body: JSON.stringify({
+          ...createForm,
+          plate_number: createForm.role === 'driver' ? createForm.plate_number : null,
+        }),
       })
       if (!res.ok) {
         let detail = 'Failed to create user.'
@@ -336,7 +341,10 @@ function AdminManageUser() {
 
         credentials: 'include',
 
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({
+          ...editForm,
+          plate_number: editForm.role === 'driver' ? editForm.plate_number : null,
+        }),
       }
     )
 
@@ -625,6 +633,18 @@ function AdminManageUser() {
                       <option value="superadmin">superadmin</option>
                     </select>
                   </label>
+                  {createForm.role === 'driver' ? (
+                    <label className="inline-label">
+                      <span>Plat No</span>
+                      <input
+                        placeholder="B 1234 ABC"
+                        value={createForm.plate_number}
+                        onChange={handleCreateChange('plate_number')}
+                        maxLength={20}
+                        required
+                      />
+                    </label>
+                  ) : null}
                   <label className="inline-label">
                     <span>National ID</span>
                     <input placeholder="National ID" value={createForm.nik} onChange={handleCreateChange('nik')} required />
@@ -709,6 +729,18 @@ function AdminManageUser() {
                       <option value="superadmin">superadmin</option>
                     </select>
                   </label>
+                  {editForm.role === 'driver' ? (
+                    <label className="inline-label">
+                      <span>Plat No</span>
+                      <input
+                        placeholder="B 1234 ABC"
+                        value={editForm.plate_number}
+                        onChange={handleEditChange('plate_number')}
+                        maxLength={20}
+                        required
+                      />
+                    </label>
+                  ) : null}
                   <label className="inline-label">
                     <span>National ID</span>
                     <input placeholder="National ID" value={editForm.nik} onChange={handleEditChange('nik')} required />
@@ -787,7 +819,12 @@ function AdminManageUser() {
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td>{user.name || '-'}</td>
                       <td>{user.dept_job_position || '-'}</td>
-                      <td>{user.role || '-'}</td>
+                      <td>
+                        {user.role || '-'}
+                        {user.role === 'driver' ? (
+                          <div className="muted">{user.plate_number || 'Plat No belum diisi'}</div>
+                        ) : null}
+                      </td>
                       <td>{user.nik || '-'}</td>
                       <td>{user.phone || '-'}</td>
                       <td>{user.telegram_chat_id || '-'}</td>
