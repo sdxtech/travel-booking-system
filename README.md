@@ -153,6 +153,8 @@ Frontend otomatis membaca konfigurasi melalui Vite. Mode ini biasanya tersedia d
 
 ## Email Notification dengan Resend
 
+Telegram tambahan khusus Driver tersedia melalui @BookingDriverBot. Email tetap aktif. Panduan token, webhook, dan penghubungan akun ada di [TELEGRAM.md](TELEGRAM.md).
+
 Email dikirim otomatis bersama notifikasi aplikasi jika `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` terisi. Jika salah satunya kosong atau Resend gagal, notifikasi aplikasi tetap tersimpan dan proses bisnis tidak dibatalkan.
 
 1. Tambahkan dan verifikasi domain pengirim di Resend. Untuk production, alamat default proyek adalah `info@notif.plvpilot.space`.

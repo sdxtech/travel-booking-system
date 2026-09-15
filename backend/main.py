@@ -115,6 +115,7 @@ from routes_settings import router as settings_router
 from routes_tickets import router as tickets_router
 from routes_users_admin import router as users_router
 from routes_page_permissions import router as pages_router
+from routes_telegram import router as telegram_router
 
 
 @app.get("/health")
@@ -142,6 +143,7 @@ def get_me(current_user=Depends(get_current_user)):
         "uid": uid,
         "email": current_user.get("email"),
         "name": data.get("name"),
+        "telegram_chat_id": data.get("telegram_chat_id"),
         "role": data.get("role"),
     }
 
@@ -153,3 +155,4 @@ app.include_router(settings_router)
 app.include_router(tickets_router)
 app.include_router(users_router)
 app.include_router(pages_router)
+app.include_router(telegram_router)

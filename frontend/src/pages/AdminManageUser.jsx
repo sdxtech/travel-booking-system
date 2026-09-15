@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import TableActionDropdown from '../components/TableActionDropdown'
+import TelegramIdField from '../components/TelegramIdField'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 
@@ -20,6 +21,7 @@ const initialCreate = {
   role: 'user',
   nik: '',
   phone: '',
+  telegram_chat_id: '',
   email: '',
   password: '',
 }
@@ -64,7 +66,7 @@ function AdminManageUser() {
   const [searchQuery, setSearchQuery] = useState('')
   const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const filteredUsers = users.filter((user) => {
-    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email]
+    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email, user.telegram_chat_id]
       .filter((value) => value != null).join(' ').toLowerCase()
     return searchTerms.every((term) => text.includes(term))
   })
@@ -261,6 +263,7 @@ function AdminManageUser() {
       role: user.role || 'user',
       nik: user.nik || '',
       phone: user.phone || '',
+      telegram_chat_id: user.telegram_chat_id || '',
       email: user.email || '',
     })
     setEditError('')
@@ -293,7 +296,7 @@ function AdminManageUser() {
         } catch {
           // ignore parse error
         }
-        setCreateError(detail)
+        setCreateError(Array.isArray(detail) ? detail.map((item) => item.msg || 'Invalid field').join('; ') : detail)
       } else {
         setSuccessModal({
           mode: 'create',
@@ -350,7 +353,7 @@ function AdminManageUser() {
         // ignore parse error
       }
 
-      setEditError(detail)
+      setEditError(Array.isArray(detail) ? detail.map((item) => item.msg || 'Invalid field').join('; ') : detail)
       return
     }
 
@@ -630,6 +633,7 @@ function AdminManageUser() {
                     <span>Phone</span>
                     <input placeholder="Phone" value={createForm.phone} onChange={handleCreateChange('phone')} required />
                   </label>
+                  <TelegramIdField value={createForm.telegram_chat_id} onChange={handleCreateChange('telegram_chat_id')} />
                   <label className="inline-label">
                     <span>Email</span>
                     <input
@@ -713,6 +717,7 @@ function AdminManageUser() {
                     <span>Phone</span>
                     <input placeholder="Phone" value={editForm.phone} onChange={handleEditChange('phone')} required />
                   </label>
+                  <TelegramIdField value={editForm.telegram_chat_id} onChange={handleEditChange('telegram_chat_id')} />
                   <label className="inline-label">
                     <span>Email</span>
                     <input type="email" placeholder="Email" value={editForm.email} onChange={handleEditChange('email')} required />
@@ -752,6 +757,7 @@ function AdminManageUser() {
                   <th>Role</th>
                   <th>National ID</th>
                   <th>Phone</th>
+                  <th>Telegram ID</th>
                   <th>Email</th>
                   <th>Action</th>
                 </tr>
@@ -759,19 +765,19 @@ function AdminManageUser() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="8" className="muted">
+                    <td colSpan="9" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="8" className="error-text">
+                    <td colSpan="9" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="muted">
+                    <td colSpan="9" className="muted">
                       No users found.
                     </td>
                   </tr>
@@ -784,6 +790,7 @@ function AdminManageUser() {
                       <td>{user.role || '-'}</td>
                       <td>{user.nik || '-'}</td>
                       <td>{user.phone || '-'}</td>
+                      <td>{user.telegram_chat_id || '-'}</td>
                       <td>{user.email || '-'}</td>
                       <td>
                         <TableActionDropdown
@@ -1026,7 +1033,7 @@ function AdminManageUser() {
 
                 <p className="muted" style={{ marginTop: 0 }}>
                   Required columns: <code>name</code>, <code>dept_job_position</code>, <code>nik</code>, <code>phone</code>
-                  , <code>email</code>, <code>password</code>. Optional: <code>role</code>.
+                  , <code>email</code>, <code>password</code>. Optional: <code>role</code>, <code>telegram_id</code>.
                 </p>
 
                 {importError ? <p className="error-text">{importError}</p> : null}

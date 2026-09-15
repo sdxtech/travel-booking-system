@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import TableActionDropdown from '../components/TableActionDropdown'
+import TelegramIdField from '../components/TelegramIdField'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
@@ -23,6 +24,7 @@ const initialCreate = {
   plate_number: '',
   nik: '',
   phone: '',
+  telegram_chat_id: '',
   email: '',
   password: '',
 }
@@ -69,7 +71,7 @@ const isSuperadmin =
   const [searchQuery, setSearchQuery] = useState('')
   const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const filteredUsers = users.filter((user) => {
-    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email, user.plate_number]
+    const text = [user.name, user.dept_job_position, user.role, user.nik, user.phone, user.email, user.plate_number, user.telegram_chat_id]
       .filter((value) => value != null).join(' ').toLowerCase()
     return searchTerms.every((term) => text.includes(term))
   })
@@ -270,6 +272,7 @@ const isSuperadmin =
       plate_number: user.plate_number || '',
       nik: user.nik || '',
       phone: user.phone || '',
+      telegram_chat_id: user.telegram_chat_id || '',
       email: user.email || '',
     })
     setEditError('')
@@ -302,7 +305,7 @@ const isSuperadmin =
         } catch {
           // ignore parse error
         }
-        setCreateError(detail)
+        setCreateError(Array.isArray(detail) ? detail.map((item) => item.msg || 'Invalid field').join('; ') : detail)
       } else {
         setSuccessModal({
           mode: 'create',
@@ -352,7 +355,7 @@ const isSuperadmin =
         } catch {
           // ignore parse error
         }
-        setEditError(detail)
+        setEditError(Array.isArray(detail) ? detail.map((item) => item.msg || 'Invalid field').join('; ') : detail)
       } else {
         setSuccessModal({
           mode: 'update',
@@ -598,6 +601,7 @@ const isSuperadmin =
                     <span>Phone</span>
                     <input placeholder="Phone" value={createForm.phone} onChange={handleCreateChange('phone')} required />
                   </label>
+                  <TelegramIdField value={createForm.telegram_chat_id} onChange={handleCreateChange('telegram_chat_id')} />
                   <label className="inline-label">
                     <span>Email</span>
                     <input
@@ -685,6 +689,7 @@ const isSuperadmin =
                     <span>Phone</span>
                     <input placeholder="Phone" value={editForm.phone} onChange={handleEditChange('phone')} required />
                   </label>
+                  <TelegramIdField value={editForm.telegram_chat_id} onChange={handleEditChange('telegram_chat_id')} />
                   <label className="inline-label">
                     <span>Email</span>
                     <input
@@ -730,6 +735,7 @@ const isSuperadmin =
                   <th>Role</th>
                   <th>National ID</th>
                   <th>Phone</th>
+                  <th>Telegram ID</th>
                   <th>Email</th>
                   <th>Action</th>
                 </tr>
@@ -737,19 +743,19 @@ const isSuperadmin =
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="8" className="muted">
+                    <td colSpan="9" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="8" className="error-text">
+                    <td colSpan="9" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="muted">
+                    <td colSpan="9" className="muted">
                       No users found.
                     </td>
                   </tr>
@@ -765,6 +771,7 @@ const isSuperadmin =
                       <td>{user.role || '-'}{user.role === 'driver' ? <div className="muted">{user.plate_number || 'Plat No belum diisi'}</div> : null}</td>
                       <td>{user.nik || '-'}</td>
                       <td>{user.phone || '-'}</td>
+                      <td>{user.telegram_chat_id || '-'}</td>
                       <td>{user.email || '-'}</td>
                       <td>
                         <TableActionDropdown
@@ -1022,7 +1029,7 @@ const isSuperadmin =
 
                 <p className="muted" style={{ marginTop: 0 }}>
                   Required columns: <code>name</code>, <code>dept_job_position</code>, <code>nik</code>, <code>phone</code>
-                  , <code>email</code>, <code>password</code>. Optional: <code>role</code>. <code>plate_number</code> is required for Driver (example: B 1234 ABC).
+                  , <code>email</code>, <code>password</code>. Optional: <code>role</code>, <code>telegram_id</code>. <code>plate_number</code> is required for Driver (example: B 1234 ABC).
                 </p>
 
                 {importError ? <p className="error-text">{importError}</p> : null}

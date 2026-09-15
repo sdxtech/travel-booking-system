@@ -10,7 +10,8 @@ from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator, field_validator
+from pymongo.errors import DuplicateKeyError
 
 from auth_utils import hash_password
 from main import get_current_user
@@ -28,7 +29,21 @@ def normalize_plate(value):
     return plate
 
 
-class UserCreate(BaseModel):
+class TelegramUserFields(BaseModel):
+    telegram_chat_id: Optional[str] = None
+
+    @field_validator("telegram_chat_id", mode="before")
+    @classmethod
+    def validate_telegram_id(cls, value):
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        text = str(value).strip()
+        if not re.fullmatch(r"[0-9]{1,16}", text) or not 0 < int(text) < 2**52:
+            raise ValueError("Telegram ID must be a positive personal numeric ID, not a phone number or @username")
+        return str(int(text))
+
+
+class UserCreate(TelegramUserFields):
     plate_number: Optional[str] = Field(default=None, max_length=20)
     name: str = Field(..., min_length=1)
     dept_job_position: str = Field(..., min_length=1)
@@ -44,7 +59,7 @@ class UserCreate(BaseModel):
         return self
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(TelegramUserFields):
     plate_number: Optional[str] = Field(default=None, max_length=20)
     name: Optional[str] = Field(default=None, min_length=1)
     dept_job_position: Optional[str] = Field(default=None, min_length=1)
@@ -59,6 +74,7 @@ class UserPasswordUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    telegram_chat_id: Optional[str] = None
     plate_number: Optional[str] = None
     uid: str
     name: Optional[str] = None
@@ -115,6 +131,7 @@ def serialize_user(doc_snapshot) -> UserResponse:
         plate_number=data.get("plate_number") if data.get("role") == "driver" else None,
         nik=data.get("nik") or data.get("national_id"),
         phone=data.get("phone") or data.get("phone_number"),
+        telegram_chat_id=data.get("telegram_chat_id"),
         email=data.get("email"),
         disabled=data.get("disabled", False),
         booking_enabled=data.get("booking_enabled", True) is not False,
@@ -123,6 +140,30 @@ def serialize_user(doc_snapshot) -> UserResponse:
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def telegram_profile_changes(payload, existing=None):
+    if "telegram_chat_id" not in payload.model_fields_set:
+        return {}
+    changes = {"telegram_chat_id": payload.telegram_chat_id}
+    if payload.telegram_chat_id != (existing or {}).get("telegram_chat_id"):
+        # Revoke old connect links so they cannot overwrite the administrator's edit.
+        changes.update(telegram_link_hash=None, telegram_link_expires_at=None, telegram_connected_at=None)
+    return changes
+
+
+def insert_user_profile(document):
+    try:
+        return db["users"].insert_one(document)
+    except DuplicateKeyError:
+        raise HTTPException(409, "Email or Telegram ID is already assigned to another user") from None
+
+
+def update_user_profile(user_id, changes):
+    try:
+        return db["users"].update_one({"_id": user_id}, {"$set": changes})
+    except DuplicateKeyError:
+        raise HTTPException(409, "Email or Telegram ID is already assigned to another user") from None
 
 
 def normalize_header(value: str) -> str:
@@ -149,6 +190,8 @@ HEADER_TO_FIELD: dict[str, str] = {
     "national_id": "nik",
     "nationalid": "nik",
     "phone": "phone",
+    "telegram_id": "telegram_chat_id",
+    "telegram_chat_id": "telegram_chat_id",
     "phone_number": "phone",
     "phone_no": "phone",
     "no_hp": "phone",
@@ -445,8 +488,8 @@ def xml_escape_text(value: str) -> str:
 
 def build_user_import_template_xlsx() -> bytes:
     """Build an in-memory .xlsx template for user import (headers + example row)."""
-    headers = ["name", "dept_job_position", "role", "nik", "phone", "email", "password", "plate_number"]
-    example_row = ["John Doe", "Finance", "user", "1234567890", "081234567890", "john@example.com", "password123", ""]
+    headers = ["name", "dept_job_position", "role", "nik", "phone", "email", "password", "plate_number", "telegram_id"]
+    example_row = ["John Doe", "Finance", "user", "1234567890", "081234567890", "john@example.com", "password123", "", ""]
 
     def make_row(row_number: int, values: list[str]) -> str:
         """Generate a <row> element with inline string <c> cells."""
@@ -626,10 +669,10 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
                         )
                         continue
 
-                db["users"].update_one(
-                    {"_id": existing.get("_id")},
-                    {
-                        "$set": {
+                update_user_profile(
+                    existing.get("_id"),
+                        {
+                            **telegram_profile_changes(user_payload, existing),
                             "name": user_payload.name,
                             "dept_job_position": user_payload.dept_job_position,
                             "role": user_payload.role,
@@ -640,15 +683,15 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
                             "password_hash": hash_password(user_payload.password),
                             "updated_at": utc_now(),
                             "updated_by": uid,
-                        }
-                    },
+                        },
                 )
                 updated += 1
             else:
                 user_id = uuid4().hex
-                db["users"].insert_one(
+                insert_user_profile(
                     {
                         "_id": user_id,
+                        "telegram_chat_id": user_payload.telegram_chat_id,
                         "name": user_payload.name,
                         "dept_job_position": user_payload.dept_job_position,
                         "role": user_payload.role,
@@ -700,9 +743,10 @@ def create_user(payload: UserCreate, current_user=Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
 
     user_id = uuid4().hex
-    db["users"].insert_one(
+    insert_user_profile(
         {
             "_id": user_id,
+            "telegram_chat_id": payload.telegram_chat_id,
             "name": payload.name,
             "dept_job_position": payload.dept_job_position,
             "role": payload.role,
@@ -737,6 +781,7 @@ def update_user(user_id: str, payload: UserUpdate, current_user=Depends(get_curr
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
     updates = payload.model_dump(exclude_none=True)
+    updates.update(telegram_profile_changes(payload, target_data))
     if not updates and "plate_number" not in payload.model_fields_set:
         return serialize_user(snapshot)
 
@@ -776,7 +821,7 @@ def update_user(user_id: str, payload: UserUpdate, current_user=Depends(get_curr
 
     updates["updated_at"] = utc_now()
     updates["updated_by"] = uid
-    db["users"].update_one({"_id": user_id}, {"$set": updates})
+    update_user_profile(user_id, updates)
 
     updated_snapshot = db["users"].find_one({"_id": user_id})
     return serialize_user(updated_snapshot)

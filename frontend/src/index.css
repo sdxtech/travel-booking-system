@@ -34,3 +34,22 @@ textarea {
 a {
   color: inherit;
 }
+/* Optional Telegram connection above Driver tasks. */
+.driver-telegram {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #dbe1ea;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+}
+.driver-telegram p { margin: 4px 0 0; font-size: 13px; }
+.driver-telegram-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.driver-telegram .btn { padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+.driver-telegram .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.driver-telegram .error { flex-basis: 100%; color: #b91c1c; }

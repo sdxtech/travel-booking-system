@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import MainLayout from '../components/MainLayout'
+import DriverTelegram from '../components/DriverTelegram'
 import { API_BASE_URL } from '../config'
 
 const STATUS_STEPS = [
@@ -432,6 +433,7 @@ function DriverHome() {
 
   return (
     <MainLayout title="Driver Tasks">
+      <DriverTelegram />
       <div className="driver-page">
         <section className="driver-calendar" aria-label="Task calendar">
           <div className="calendar-header">

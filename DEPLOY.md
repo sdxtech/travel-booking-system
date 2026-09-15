@@ -21,6 +21,9 @@ Rekomendasi production:
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
 - `APP_PUBLIC_URL`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_BOT_USERNAME` (default `BookingDriverBot`)
+- `TELEGRAM_WEBHOOK_SECRET`
 
 ### Frontend
 

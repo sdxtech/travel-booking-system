@@ -14,8 +14,11 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
       APP_ENV: ${APP_ENV:-development}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-BookingDriverBot}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Booking App <notifications@booking.plvpilot.space>}
-      APP_PUBLIC_URL: ${DOCKER_APP_PUBLIC_URL:-http://localhost:8080}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8080}
       PORT: 8000
     ports:
       - "${BACKEND_PORT:-8000}:8000"

@@ -57,6 +57,12 @@ def init_mongo():
     """Initialize Mongo connection early (useful for startup checks)."""
     database = db.get_db()
 
+    # Required for safe one-to-one Telegram linking; do not silently skip failure.
+    database["users"].create_index(
+        [("telegram_chat_id", ASCENDING)], unique=True,
+        partialFilterExpression={"telegram_chat_id": {"$type": "string"}},
+    )
+
     try:
         database["users"].create_index([("email", ASCENDING)], unique=True)
         database["users"].create_index([("role", ASCENDING)])
