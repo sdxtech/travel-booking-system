@@ -787,6 +787,7 @@ function AdminManageUser() {
                   <th>User Name</th>
                   <th>User Dept/Job Position</th>
                   <th>Role</th>
+                  <th>Plat No</th>
                   <th>National ID</th>
                   <th>Phone</th>
                   <th>Telegram ID</th>
@@ -797,19 +798,19 @@ function AdminManageUser() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="9" className="muted">
+                    <td colSpan="10" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="9" className="error-text">
+                    <td colSpan="10" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="muted">
+                    <td colSpan="10" className="muted">
                       No users found.
                     </td>
                   </tr>
@@ -819,12 +820,8 @@ function AdminManageUser() {
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td>{user.name || '-'}</td>
                       <td>{user.dept_job_position || '-'}</td>
-                      <td>
-                        {user.role || '-'}
-                        {user.role === 'driver' ? (
-                          <div className="muted">{user.plate_number || 'Plat No belum diisi'}</div>
-                        ) : null}
-                      </td>
+                      <td>{user.role || '-'}</td>
+                      <td>{user.role === 'driver' ? user.plate_number || '-' : '-'}</td>
                       <td>{user.nik || '-'}</td>
                       <td>{user.phone || '-'}</td>
                       <td>{user.telegram_chat_id || '-'}</td>
