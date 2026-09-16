@@ -928,6 +928,23 @@ user-dropdown-toogle {
   min-height: 20px;
 }
 
+.location-points-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.location-points-add input {
+  min-width: min(360px, 100%);
+}
+
+@media (max-width: 520px) {
+  .location-points-add {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .driver-availability-feedback p {
   margin: 0;
 }

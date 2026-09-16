@@ -116,6 +116,7 @@ from routes_tickets import router as tickets_router
 from routes_users_admin import router as users_router
 from routes_page_permissions import router as pages_router
 from routes_telegram import router as telegram_router
+from routes_locations import router as locations_router
 
 
 @app.get("/health")
@@ -156,3 +157,4 @@ app.include_router(tickets_router)
 app.include_router(users_router)
 app.include_router(pages_router)
 app.include_router(telegram_router)
+app.include_router(locations_router)

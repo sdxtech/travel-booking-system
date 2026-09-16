@@ -9,6 +9,7 @@ import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
 import { getNightOvertimeMinutes } from '../components/bookingOvertime'
+import useBookingLocations from '../hooks/useBookingLocations'
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -42,6 +43,7 @@ function OfficeDriverHistory() {
   const [selectedDriverId, setSelectedDriverId] = useState('')
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(null)
+  const { locations, locationsLoading, locationsError } = useBookingLocations()
   const [actionMenu, setActionMenu] = useState(null)
   const availabilityRequestIdRef = useRef(0)
   const actionMenuRef = useRef(null)
@@ -635,8 +637,8 @@ function OfficeDriverHistory() {
     event.preventDefault()
     if (!isSuperadmin || !editTarget?.id || !editForm) return
 
-    if (!editForm.driver_id) {
-      setActionError('Please select a driver.')
+    if (!editForm.driver_id || !editForm.pickup_location || !editForm.destination) {
+      setActionError('Driver, pickup location, and destination are required.')
       return
     }
 
@@ -1490,26 +1492,14 @@ function OfficeDriverHistory() {
                       required
                     />
                   </label>
-                  <label className="inline-label">
+                  <div className="inline-label">
                     <span>Pickup Location</span>
-                    <input
-                      type="text"
-                      value={editForm.pickup_location}
-                      onChange={handleEditFormChange('pickup_location')}
-                      disabled={Boolean(actionLoadingId)}
-                      required
-                    />
-                  </label>
-                  <label className="inline-label">
+                    <BookingFormSelect value={editForm.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select pickup location" onChange={(value) => setEditForm((current) => ({ ...current, pickup_location: value }))} />
+                  </div>
+                  <div className="inline-label">
                     <span>Destination</span>
-                    <input
-                      type="text"
-                      value={editForm.destination}
-                      onChange={handleEditFormChange('destination')}
-                      disabled={Boolean(actionLoadingId)}
-                      required
-                    />
-                  </label>
+                    <BookingFormSelect value={editForm.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select destination" onChange={(value) => setEditForm((current) => ({ ...current, destination: value }))} />
+                  </div>
                   <label className="inline-label">
                     <span>Total Passenger</span>
                     <input
@@ -1535,6 +1525,7 @@ function OfficeDriverHistory() {
                 </div>
 
                 {driversError ? <p className="error-text">{driversError}</p> : null}
+                {locationsError ? <p className="error-text">{locationsError}</p> : null}
                 {availabilityError ? <p className="error-text">{availabilityError}</p> : null}
                 {actionError ? <p className="error-text">{actionError}</p> : null}
 
@@ -1551,7 +1542,7 @@ function OfficeDriverHistory() {
                     Cancel
                   </button>
                 </div>
-              </form>
+                </form>
             </div>
           ) : null}
 

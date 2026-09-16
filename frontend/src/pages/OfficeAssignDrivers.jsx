@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
+import useBookingLocations from '../hooks/useBookingLocations'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
@@ -41,6 +42,7 @@ function OfficeAssignDrivers() {
 const isSuperadmin =
   user?.role === 'superadmin'
   const [form, setForm] = useState(initialForm)
+  const { locations, locationsLoading, locationsError } = useBookingLocations()
   const [loading, setLoading] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -226,6 +228,12 @@ const isSuperadmin =
     setSuccessMessage('')
     setErrorMessage('')
     setShowSuccessModal(false)
+
+    if (!form.pickup_location || !form.destination) {
+      setErrorMessage('Pickup location and destination are required.')
+      setLoading(false)
+      return
+    }
 
     if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) {
       setErrorMessage('Departure and estimated arrival date/time are required.')
@@ -436,26 +444,14 @@ const isSuperadmin =
                 </div>
               </div>
               <div className="field-grid">
-                <label className="inline-label">
+                <div className="inline-label">
                   <span>Pickup location</span>
-                  <input
-                    type="text"
-                    placeholder="Pickup location"
-                    value={form.pickup_location}
-                    onChange={handleChange('pickup_location')}
-                    required
-                  />
-                </label>
-                <label className="inline-label">
+                  <BookingFormSelect value={form.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select pickup location" onChange={(value) => setForm((current) => ({ ...current, pickup_location: value }))} />
+                </div>
+                <div className="inline-label">
                   <span>Destination</span>
-                  <input
-                    type="text"
-                    placeholder="Destination"
-                    value={form.destination}
-                    onChange={handleChange('destination')}
-                    required
-                  />
-                </label>
+                  <BookingFormSelect value={form.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select destination" onChange={(value) => setForm((current) => ({ ...current, destination: value }))} />
+                </div>
                 <label className="inline-label">
                   <span>Departure date</span>
                   <input type="date" value={form.departure_date} onChange={handleChange('departure_date')} required />
@@ -539,6 +535,7 @@ const isSuperadmin =
 
             {successMessage ? <p className="success-text">{successMessage}</p> : null}
             {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
+            {locationsError ? <p className="error-text">{locationsError}</p> : null}
 
             <div className="form-actions">
               <button type="submit" className="btn btn-primary" disabled={loading || availabilityLoading}>

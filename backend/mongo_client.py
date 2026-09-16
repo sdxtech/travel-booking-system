@@ -76,6 +76,7 @@ def init_mongo():
         database["notifications"].create_index([("user_id", ASCENDING)])
         database["notifications"].create_index([("read", ASCENDING)])
         database["notifications"].create_index([("created_at", ASCENDING)])
+        database["booking_locations"].create_index([("name", ASCENDING)], unique=True)
     except Exception as exc:
         print(f"Mongo index setup skipped: {exc}")
 

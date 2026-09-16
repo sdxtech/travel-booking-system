@@ -4,6 +4,7 @@ import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import { formatDriverPlate } from '../components/driverPlate'
+import useBookingLocations from '../hooks/useBookingLocations'
 import { API_BASE_URL } from '../config'
 
 const initialForm = {
@@ -33,11 +34,12 @@ function BookingDriver() {
   const [availabilityChecked, setAvailabilityChecked] = useState(false)
   const [availabilityError, setAvailabilityError] = useState('')
   const [submissionStatus, setSubmissionStatus] = useState('')
+  const { locations, locationsLoading, locationsError } = useBookingLocations()
   const selectedDriverUnavailable = Boolean(form.driver_id) && (
     unavailableDriverIds.has(String(form.driver_id)) ||
     !drivers.some((driver) => String(driver.driver_id) === String(form.driver_id))
   )
-  const submitBlocked = loading || driversLoading || availabilityLoading || !availabilityChecked || selectedDriverUnavailable
+  const submitBlocked = loading || driversLoading || availabilityLoading || locationsLoading || !locations.length || !form.pickup_location || !form.destination || !availabilityChecked || selectedDriverUnavailable
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -331,26 +333,14 @@ function BookingDriver() {
                   required
                 />
               </label>
-              <label className="form-field">
+              <div className="form-field">
                 <span>Pickup Location</span>
-                <input
-                  type="text"
-                  placeholder="Office Lobby"
-                  value={form.pickup_location}
-                  onChange={handleChange('pickup_location')}
-                  required
-                />
-              </label>
-              <label className="form-field">
+                <BookingFormSelect value={form.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select pickup location" onChange={(value) => setForm((current) => ({ ...current, pickup_location: value }))} />
+              </div>
+              <div className="form-field">
                 <span>Destination</span>
-                <input
-                  type="text"
-                  placeholder="Soekarno-Hatta Airport"
-                  value={form.destination}
-                  onChange={handleChange('destination')}
-                  required
-                />
-              </label>
+                <BookingFormSelect value={form.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select destination" onChange={(value) => setForm((current) => ({ ...current, destination: value }))} />
+              </div>
               <label className="form-field">
                 <span>Total Passenger</span>
                 <input
@@ -399,6 +389,7 @@ function BookingDriver() {
 
           {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
           {availabilityError ? <p className="error-text">{availabilityError}</p> : null}
+          {locationsError ? <p className="error-text">{locationsError}</p> : null}
           {!driversLoading && selectedDriverUnavailable ? (
             <p className="error-text">The selected driver is unavailable. Please choose another driver or time.</p>
           ) : null}

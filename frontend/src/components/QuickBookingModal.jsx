@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import BookingFormSelect from './BookingFormSelect'
 import { API_BASE_URL } from '../config'
+import useBookingLocations from '../hooks/useBookingLocations'
 
 function formatDateInput(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -31,11 +33,16 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submissionStatus, setSubmissionStatus] = useState('')
+  const { locations, locationsLoading, locationsError } = useBookingLocations()
 
   const updateField = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
 
   const submit = async (event) => {
     event.preventDefault()
+    if (!form.pickup_location || !form.destination) {
+      setError('Pickup location and destination are required.')
+      return
+    }
     const departure = new Date(`${form.departure_date}T${form.departure_time}`)
     const arrival = new Date(`${form.arrival_date}T${form.arrival_time}`)
     if (Number.isNaN(departure.getTime()) || Number.isNaN(arrival.getTime()) || arrival <= departure) {
@@ -101,13 +108,14 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
               <label className="form-field"><span>Departure Time</span><input type="time" required value={form.departure_time} onChange={updateField('departure_time')} /></label>
               <label className="form-field"><span>Estimated Arrival Time</span><input type="time" required value={form.arrival_time} onChange={updateField('arrival_time')} /></label>
               <label className="form-field"><span>Estimated Arrival Date</span><input type="date" required value={form.arrival_date} onChange={updateField('arrival_date')} /></label>
-              <label className="form-field"><span>Pickup Location</span><input type="text" required placeholder="Office Lobby" value={form.pickup_location} onChange={updateField('pickup_location')} /></label>
-              <label className="form-field"><span>Destination</span><input type="text" required placeholder="Soekarno-Hatta Airport" value={form.destination} onChange={updateField('destination')} /></label>
+              <div className="form-field"><span>Pickup Location</span><BookingFormSelect value={form.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select pickup location" onChange={(value) => setForm((current) => ({ ...current, pickup_location: value }))} /></div>
+              <div className="form-field"><span>Destination</span><BookingFormSelect value={form.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select destination" onChange={(value) => setForm((current) => ({ ...current, destination: value }))} /></div>
               <label className="form-field"><span>Total Passenger</span><input type="number" min="1" required value={form.passenger_count} onChange={updateField('passenger_count')} /></label>
             </div>
             {error ? <p className="error-text">{error}</p> : null}
+            {locationsError ? <p className="error-text">{locationsError}</p> : null}
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Request'}</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting || locationsLoading || !locations.length}>{submitting ? 'Submitting...' : 'Submit Request'}</button>
               <button type="button" className="btn btn-outline-danger" onClick={onClose} disabled={submitting}>Cancel</button>
             </div>
           </form>

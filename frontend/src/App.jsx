@@ -20,6 +20,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 import Unauthorized from './pages/Unauthorized'
 import AdminPagePermissions from './pages/AdminPagePermissions'
+import AdminLocationPoints from './pages/AdminLocationPoints'
 import ForgotPassword from './pages/ForgotPassword'
 import ChangePassword from './pages/ChangePassword'
 import ResetPassword from './pages/ResetPassword'
@@ -206,6 +207,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminDriverAvailability />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings/location-points"
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <AdminLocationPoints />
               </ProtectedRoute>
             }
           />

@@ -96,6 +96,11 @@ const adminSettingsSection = {
       path: '/admin/settings/page-permissions',
       icon: 'bi-arrow-through-heart',
     },
+    {
+      label: 'Location Points',
+      path: '/admin/settings/location-points',
+      icon: 'bi-geo-alt',
+    },
   ],
 }
 
