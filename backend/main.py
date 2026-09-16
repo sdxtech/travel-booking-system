@@ -17,7 +17,8 @@ def load_backend_env() -> None:
 
 load_backend_env()
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, WebSocket, WebSocketDisconnect
+from websocket_manager import manager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -115,6 +116,7 @@ from routes_settings import router as settings_router
 from routes_tickets import router as tickets_router
 from routes_users_admin import router as users_router
 from routes_page_permissions import router as pages_router
+from routes_websocket import router as websocket_router
 
 
 @app.get("/health")
@@ -145,6 +147,70 @@ def get_me(current_user=Depends(get_current_user)):
         "role": data.get("role"),
     }
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    token = websocket.cookies.get("access_token")
+
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    try:
+        decoded = decode_access_token(token)
+
+    except ExpiredSignatureError:
+        await websocket.close(code=1008)
+        return
+
+    except InvalidTokenError:
+        await websocket.close(code=1008)
+        return
+
+    uid = decoded.get("sub")
+
+    if not uid:
+        await websocket.close(code=1008)
+        return
+
+    user_doc = db["users"].find_one({
+        "_id": uid
+    })
+
+    if not user_doc:
+        await websocket.close(code=1008)
+        return
+
+    if user_doc.get("disabled"):
+        await websocket.close(code=1008)
+        return
+
+    # Authentication successful
+    await manager.connect(websocket)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+
+            print(
+                f"WebSocket message from {uid}:",
+                data
+            )
+
+            await manager.send_personal_message(
+                {
+                    "type": "message",
+                    "message": "Message received",
+                    "data": data,
+                },
+                websocket,
+            )
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+        print(
+            f"WebSocket disconnected: {uid}"
+        )
 
 app.include_router(bookings_router)
 app.include_router(auth_router)
@@ -153,3 +219,4 @@ app.include_router(settings_router)
 app.include_router(tickets_router)
 app.include_router(users_router)
 app.include_router(pages_router)
+app.include_router(websocket_router)

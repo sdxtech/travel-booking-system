@@ -94,7 +94,7 @@ def login(payload: LoginRequest, response: Response):
     }
 
 @router.patch("/change-password")
-def change_password(
+async def change_password(
     payload: ChangePasswordRequest,
     current_user=Depends(get_current_user),
 ):
@@ -146,7 +146,7 @@ def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update password"
         )
-    create_user_notification(
+    await create_user_notification(
         user_id=user_id,
         message="Your password was changed successfully.",
         event="password_changed",
@@ -349,7 +349,7 @@ def reset_password(
             detail="Failed to reset password"
         )
 
-    # Make token single-use
+    
     db[
         "password_reset_tokens"
     ].update_one(

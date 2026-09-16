@@ -151,7 +151,7 @@ def list_ticket_history(current_user=Depends(get_current_user)):
 
 
 @router.post("", response_model=TicketResponse)
-def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_user)):
+async def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_user)):
     """Create a new travel request using the current user's saved profile fields."""
     uid = current_user["uid"]
     user_profile = ensure_user_role(uid)
@@ -203,7 +203,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
     data["request_id"] = generate_request_id(db, "TR", created_at)
     db["tickets"].insert_one(data)
 
-    create_user_notification(
+    await create_user_notification(
         uid,
         "Your travel request was submitted successfully. Status is pending and waiting for office coordinator approval.",
         event="submitted",
@@ -213,7 +213,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
         actor_id=uid,
     )
 
-    notify_roles(
+    await notify_roles(
         ("office_coordinator", "superadmin"),
         "New travel request submitted. Status is pending and awaiting review.",
         event="incoming_request",
@@ -228,7 +228,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
 
 
 @router.post("/accommodation", response_model=TicketResponse)
-def create_travel_accommodation(payload: TicketCreate, current_user=Depends(get_current_user)):
+async def create_travel_accommodation(payload: TicketCreate, current_user=Depends(get_current_user)):
     """Office-side endpoint to create a travel request on behalf of a user."""
     uid = current_user["uid"]
     ensure_role(uid, ("office_coordinator", "superadmin"))
@@ -261,7 +261,7 @@ def create_travel_accommodation(payload: TicketCreate, current_user=Depends(get_
     db["tickets"].insert_one(data)
 
     if linked_user_id:
-        create_user_notification(
+        await create_user_notification(
             linked_user_id,
             "A travel request has been created for you by the office coordinator. Status is pending and waiting for approval.",
         event="created_by_office",
@@ -276,7 +276,7 @@ def create_travel_accommodation(payload: TicketCreate, current_user=Depends(get_
 
 
 @router.patch("/{ticket_id}/status", response_model=TicketResponse)
-def update_ticket_status(ticket_id: str, payload: TicketStatusUpdate, current_user=Depends(get_current_user)):
+async def update_ticket_status(ticket_id: str, payload: TicketStatusUpdate, current_user=Depends(get_current_user)):
     """Approve or reject a ticket request and notify the requester if linked."""
     uid = current_user["uid"]
     ensure_role(uid, ("office_coordinator", "superadmin"))
@@ -305,7 +305,7 @@ def update_ticket_status(ticket_id: str, payload: TicketStatusUpdate, current_us
         else:
             message = "Your travel request has been rejected."
 
-        create_user_notification(
+        await create_user_notification(
             user_id,
             message,
             event="status_updated",
@@ -320,7 +320,7 @@ def update_ticket_status(ticket_id: str, payload: TicketStatusUpdate, current_us
 
 
 @router.patch("/{ticket_id}", response_model=TicketResponse)
-def update_ticket(ticket_id: str, payload: TicketUserCreate, current_user=Depends(get_current_user)):
+async def update_ticket(ticket_id: str, payload: TicketUserCreate, current_user=Depends(get_current_user)):
     """Allow a user to edit their own pending travel request."""
     uid = current_user["uid"]
     ensure_user_role(uid)
@@ -349,7 +349,7 @@ def update_ticket(ticket_id: str, payload: TicketUserCreate, current_user=Depend
 
     db["tickets"].update_one({"_id": ticket_id}, {"$set": update_data})
 
-    create_user_notification(
+    await create_user_notification(
         uid,
         "Your travel request was updated successfully. Status is pending and waiting for office coordinator approval.",
         event="updated",
@@ -364,7 +364,7 @@ def update_ticket(ticket_id: str, payload: TicketUserCreate, current_user=Depend
 
 
 @router.patch("/{ticket_id}/cancel", response_model=TicketResponse)
-def cancel_ticket(ticket_id: str, current_user=Depends(get_current_user)):
+async def cancel_ticket(ticket_id: str, current_user=Depends(get_current_user)):
     """Allow a user to cancel their own pending travel request."""
     uid = current_user["uid"]
     ensure_user_role(uid)
@@ -392,7 +392,7 @@ def cancel_ticket(ticket_id: str, current_user=Depends(get_current_user)):
         },
     )
 
-    create_user_notification(
+    await create_user_notification(
         uid,
         "Your travel request has been cancelled.",
         event="cancelled",

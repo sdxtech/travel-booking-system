@@ -46,41 +46,110 @@ function DriverHome() {
   }, [activeBooking?.starting_mileage, endingMileage])
 
   // Load bookings assigned to the signed-in driver.
-  useEffect(() => {
+ 
+useEffect(() => {
+  
+  const loadAssigned = async () => {
+    setLoading(true)
+    setError('')
 
+    try {
+      const res = await fetch(`${API_BASE_URL}/bookings/assigned`, {
+        credentials: 'include',
+      })
 
-    // Fetch assigned bookings for the driver.
-    const loadAssigned = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const res = await fetch(`${API_BASE_URL}/bookings/assigned`, {
-           credentials: 'include',
-        })
-        if (!res.ok) {
-          let detail = 'Failed to load assignments.'
-          try {
-            const data = await res.json()
-            if (data?.detail) detail = data.detail
-          } catch {
-            // ignore parse error
-          }
-          setError(detail)
-          setBookings([])
-        } else {
+      if (!res.ok) {
+        let detail = 'Failed to load assignments.'
+
+        try {
           const data = await res.json()
-          setBookings(Array.isArray(data) ? data : [])
+          if (data?.detail) detail = data.detail
+        } catch {
+          // ignore parse error
         }
-      } catch {
-        setError('Network error. Please try again.')
-        setBookings([])
-      } finally {
-        setLoading(false)
-      }
-    }
 
-    loadAssigned()
-  }, [])
+        setError(detail)
+        setBookings([])
+      } else {
+        const data = await res.json()
+        setBookings(Array.isArray(data) ? data : [])
+      }
+    } catch {
+      setError('Network error. Please try again.')
+      setBookings([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  loadAssigned()
+
+  const WS_BASE_URL = API_BASE_URL
+    .replace(/^http:/, 'ws:')
+    .replace(/^https:/, 'wss:')
+
+  const socket = new WebSocket(
+    `${WS_BASE_URL}/ws/bookings/assigned`
+  )
+
+  socket.onopen = () => {
+    console.log('Assigned bookings WebSocket connected')
+  }
+
+  socket.onmessage = (event) => {
+    try {
+      const message = JSON.parse(event.data)
+
+      
+      if (message.type === 'booking_assigned') {
+        const booking = message.data
+
+        setBookings((prev) => {
+          
+          if (prev.some((item) => item.id === booking.id)) {
+            return prev
+          }
+
+          return [booking, ...prev]
+        })
+      }
+      // Existing booking was updated
+      if (message.type === 'booking_updated') {
+        const booking = message.data
+
+        setBookings((prev) =>
+          prev.map((item) =>
+            item.id === booking.id ? booking : item
+          )
+        )
+      }
+      // Booking was cancelled/removed
+      if (message.type === 'booking_cancelled') {
+        const bookingId = message.data.booking_id
+
+        setBookings((prev) =>
+          prev.filter((item) => item.id !== bookingId)
+        )
+      }
+    } catch (error) {
+      console.error('Failed to parse WebSocket message:', error)
+    }
+  }
+
+  socket.onerror = (error) => {
+    console.error('Assigned bookings WebSocket error:', error)
+  }
+
+  socket.onclose = () => {
+    console.log('Assigned bookings WebSocket disconnected')
+  }
+
+  return () => {
+    socket.close()
+  }
+}, [])
+
+
 
   // Update a booking record in local state after actions.
   const updateBookingInState = (bookingId, updatedFields) => {

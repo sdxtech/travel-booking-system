@@ -119,7 +119,7 @@ def list_driver_availability(current_user=Depends(get_current_user)):
 
 
 @router.patch("/drivers/{driver_id}", response_model=DriverAvailabilityResponse)
-def update_driver_availability(
+async def update_driver_availability(
     driver_id: str,
     payload: DriverAvailabilityUpdate,
     current_user=Depends(get_current_user),
@@ -147,7 +147,7 @@ def update_driver_availability(
     )
 
     actor_label = "Super Admin" if current_user.get("role") == "superadmin" else "Office Coordinator"
-    create_user_notification(
+    await create_user_notification(
         driver_id,
         (
             f"Your availability for new driver bookings has been turned on by {actor_label}."

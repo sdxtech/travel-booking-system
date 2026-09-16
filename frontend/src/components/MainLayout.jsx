@@ -125,6 +125,9 @@ const officeSettingsSection = {
 function MainLayout({ title, children }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const WS_BASE_URL = API_BASE_URL
+  .replace(/^http:/, 'ws:')
+  .replace(/^https:/, 'wss:')
 
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
@@ -148,10 +151,6 @@ function MainLayout({ title, children }) {
     settings: true,
     'account-settings': true,
   })
-
-
-
-
 
   const notificationsContainerRef = useRef(null)
 
@@ -350,32 +349,99 @@ function MainLayout({ title, children }) {
   }
 
 
-  useEffect(() => {
+ useEffect(() => {
+  // Load existing notifications first.
+  fetchNotifications()
+
+  // Listen for notification refresh events
+  // from other parts of the application.
+  const handleRefresh = () => {
     fetchNotifications()
+  }
 
-    const intervalId =
-      window.setInterval(() => {
-        fetchNotifications()
-      }, 30000)
+  window.addEventListener(
+    'notifications:refresh',
+    handleRefresh
+  )
 
-    const handleRefresh = () => {
-      fetchNotifications()
+
+  const socket = new WebSocket(
+    `${WS_BASE_URL}/ws/notifications`
+  )
+
+  socket.onopen = () => {
+    console.log(
+      'Notification WebSocket connected'
+    )
+  }
+
+  socket.onmessage = (event) => {
+    try {
+      const message = JSON.parse(event.data)
+
+      // Ignore messages that aren't notifications.
+      if (
+        message?.type !== 'notification'
+      ) {
+        return
+      }
+
+      const notification = message?.data
+
+      if (!notification?.id) {
+        return
+      }
+
+      setNotifications((prev) => {
+
+        // Prevent duplicate notifications.
+        const alreadyExists = prev.some(
+          (item) =>
+            item.id === notification.id
+        )
+
+        if (alreadyExists) {
+          return prev
+        }
+
+        // Add newest notification to the top.
+        return [
+          notification,
+          ...prev,
+        ].slice(0, 25)
+      })
+
+    } catch (error) {
+      console.error(
+        'Failed to process notification:',
+        error
+      )
     }
+  }
 
-    window.addEventListener(
+  socket.onclose = (event) => {
+    console.log(
+      'Notification WebSocket disconnected:',
+      event.code
+    )
+  }
+
+  socket.onerror = (error) => {
+    console.error(
+      'Notification WebSocket error:',
+      error
+    )
+  }
+
+  return () => {
+    socket.close()
+
+    window.removeEventListener(
       'notifications:refresh',
       handleRefresh
     )
-
-    return () => {
-      window.clearInterval(intervalId)
-
-      window.removeEventListener(
-        'notifications:refresh',
-        handleRefresh
-      )
-    }
-  }, [])
+  }
+}, [])
 
   useEffect(() => {
     if (!notificationsOpen) return
@@ -798,7 +864,7 @@ function MainLayout({ title, children }) {
           if (!nextOpen) return
 
           await markAllNotificationsRead()
-          await fetchNotifications()
+         
         }}
       >
         <i

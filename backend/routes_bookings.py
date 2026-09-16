@@ -4,6 +4,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from websocket_manager import manager
+from booking_service import notify_booking_assigned
 
 from main import get_current_user
 from mongo_client import db
@@ -283,40 +285,65 @@ def is_driver_busy(
         blocking_statuses=blocking_statuses,
     ))
 
-
 @router.post("", response_model=BookingResponse)
-def create_booking(payload: BookingCreate, current_user=Depends(get_current_user)):
+async def create_booking(
+    payload: BookingCreate,
+    current_user=Depends(get_current_user),
+):
     """Only accept Employee bookings when the selected driver is available."""
     uid = current_user["uid"]
+
     ensure_role(uid, ("user",))
     enforce_employee_page_permission(uid, "booking_driver")
-    validate_booking_interval(payload.departure_time, payload.estimated_arrival_time)
+
+    validate_booking_interval(
+        payload.departure_time,
+        payload.estimated_arrival_time,
+    )
+
     driver_data = resolve_driver(payload.driver_id)
     driver_name = driver_data.get("name") or driver_data.get("email") or "Driver"
+
     has_conflict = is_driver_busy(
         payload.driver_id,
         payload.departure_time,
         payload.estimated_arrival_time,
         blocking_statuses=("pending", "approved", "in_progress"),
     )
+
     if has_conflict:
-        raise HTTPException(status_code=409, detail="The selected driver is unavailable for this schedule. Please choose another driver or time.")
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The selected driver is unavailable for this schedule. "
+                "Please choose another driver or time."
+            ),
+        )
+
     booking_status = "approved"
 
     requester_name = None
     requester_phone = None
     requester_dept_job_position = None
     requester_nik = None
+
     doc = db["users"].find_one({"_id": uid})
+
     if doc:
         data = doc or {}
+
         requester_name = data.get("name")
         requester_phone = data.get("phone_number") or data.get("phone")
-        requester_dept_job_position = data.get("dept_job_position") or data.get("department") or data.get("job_position")
+        requester_dept_job_position = (
+            data.get("dept_job_position")
+            or data.get("department")
+            or data.get("job_position")
+        )
         requester_nik = data.get("nik") or data.get("national_id")
 
     booking_id = uuid4().hex
     created_at = utc_now()
+
     data = {
         "_id": booking_id,
         "request_id": generate_request_id(db, "BD", created_at),
@@ -336,24 +363,45 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
         "created_at": created_at,
         "updated_at": created_at,
     }
+
     if requester_name:
         data["requester_name"] = requester_name
+
     if requester_phone:
         data["requester_phone"] = requester_phone
+
     if requester_dept_job_position:
         data["requester_dept_job_position"] = requester_dept_job_position
+
     if requester_nik:
         data["requester_nik"] = requester_nik
+
+    # Save booking first
     db["bookings"].insert_one(data)
 
-    create_user_notification(
+    # Get the actual saved booking
+    snapshot = db["bookings"].find_one({
+        "_id": booking_id
+    })
+
+    # =========================
+    # User notification
+    # =========================
+    await create_user_notification(
         uid,
         (
-            "Your driver booking was automatically approved because the selected driver is available."
+            "Your driver booking was automatically approved because "
+            "the selected driver is available."
             if booking_status == "approved"
-            else "Your driver booking conflicts with another request and is pending Office Coordinator approval."
+            else
+            "Your driver booking conflicts with another request and "
+            "is pending Office Coordinator approval."
         ),
-        event="auto_approved" if booking_status == "approved" else "submitted",
+        event=(
+            "auto_approved"
+            if booking_status == "approved"
+            else "submitted"
+        ),
         entity_type="booking",
         entity_id=booking_id,
         status=booking_status,
@@ -361,7 +409,9 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
     )
 
     if booking_status == "approved":
-        create_user_notification(
+
+        # Existing notification
+        await create_user_notification(
             payload.driver_id,
             "You have been assigned a new driver task by the booking system.",
             event="assigned",
@@ -370,8 +420,13 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
             status="approved",
             actor_id="system",
         )
+
+        # Real-time calendar update
+        await notify_booking_assigned(snapshot)
+
     else:
-        notify_roles(
+
+        await notify_roles(
             ("office_coordinator", "superadmin"),
             "A conflicting driver booking request requires your review.",
             event="incoming_request",
@@ -381,12 +436,12 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
             actor_id=uid,
         )
 
-    snapshot = db["bookings"].find_one({"_id": booking_id})
     return serialize_booking(snapshot)
 
 
+
 @router.post("/assign", response_model=BookingOfficeHistoryResponse)
-def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current_user)):
+async def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current_user)):
     """Create an approved booking directly and assign it to a specific driver (office flow)."""
     uid = current_user["uid"]
     current_role = ensure_role(uid, ("office_coordinator", "superadmin"))
@@ -451,7 +506,7 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
     booking = serialize_booking(snapshot)
 
     if linked_user_id:
-        create_user_notification(
+       await create_user_notification(
             linked_user_id,
             "A driver booking has been created for you and has been approved.",
         event="created_by_office",
@@ -461,7 +516,7 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
         actor_id=uid,
     )
 
-    create_user_notification(
+    await create_user_notification(
         driver_uid,
         "You have been assigned a new driver task. Please check Driver Tasks for details.",
         event="assigned",
@@ -616,7 +671,7 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
 
 
 @router.patch("/{booking_id}/status", response_model=BookingResponse)
-def update_booking_status(
+async def update_booking_status(
     booking_id: str,
     payload: BookingStatusUpdate,
     current_user=Depends(get_current_user),
@@ -698,7 +753,7 @@ def update_booking_status(
         else:
             message = f"Your driver booking request status has been updated to {payload.status}."
 
-        create_user_notification(
+        await create_user_notification(
             user_id,
             message,
             event="status_updated",
@@ -709,7 +764,7 @@ def update_booking_status(
         )
 
     if payload.status == "approved" and payload.driver_id:
-        create_user_notification(
+        await create_user_notification(
             payload.driver_id,
             "You have been assigned a new driver task. Please check Driver Tasks for details.",
             event="assigned",
@@ -724,7 +779,7 @@ def update_booking_status(
 
 
 @router.patch("/{booking_id}", response_model=BookingResponse)
-def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends(get_current_user)):
+async def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends(get_current_user)):
     """Edit an Employee pending request or allow Super Admin to overwrite any booking."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "superadmin"))
@@ -769,7 +824,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
 
         target_user_id = data.get("user_id")
         if target_user_id:
-            create_user_notification(
+            await create_user_notification(
                 target_user_id,
                 "Your driver booking details were updated by Super Admin.",
                 event="updated_by_superadmin",
@@ -778,7 +833,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
                 status=data.get("status", "pending"),
                 actor_id=uid,
             )
-        create_user_notification(
+        await create_user_notification(
             payload.driver_id,
             "A driver booking assignment was updated by Super Admin. Please check Driver Tasks.",
             event="assignment_updated",
@@ -825,7 +880,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
     if not result.modified_count:
         raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
 
-    create_user_notification(
+    await create_user_notification(
         uid,
         (
             "Your updated driver booking was automatically approved because the selected driver is available."
@@ -840,7 +895,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
     )
 
     if booking_status == "approved":
-        create_user_notification(
+        await create_user_notification(
             payload.driver_id,
             "You have been assigned a new driver task by the booking system.",
             event="assigned",
@@ -850,7 +905,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
             actor_id="system",
         )
     else:
-        notify_roles(
+        await notify_roles(
             ("office_coordinator", "superadmin"),
             "A conflicting driver booking request was updated and requires your review.",
             event="incoming_request",
@@ -865,7 +920,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
 
 
 @router.patch("/{booking_id}/cancel", response_model=BookingResponse)
-def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
+async def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
     """Cancel a booking with role-based rules (user: pending only, office: approved before start)."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
@@ -975,7 +1030,7 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
         message = f"Your driver booking has been cancelled by {actor_label}."
 
     if target_user_id:
-        create_user_notification(
+        await create_user_notification(
             target_user_id,
             message,
             event="cancelled",
@@ -1061,7 +1116,7 @@ def start_booking(booking_id: str, payload: BookingStart, current_user=Depends(g
 
 
 @router.patch("/{booking_id}/complete", response_model=BookingResponse)
-def complete_booking(booking_id: str, payload: BookingComplete, current_user=Depends(get_current_user)):
+async def complete_booking(booking_id: str, payload: BookingComplete, current_user=Depends(get_current_user)):
     """Driver action: submit ending mileage and request completion validation."""
     uid = current_user["uid"]
     ensure_role(uid, ("driver",))
@@ -1109,7 +1164,7 @@ def complete_booking(booking_id: str, payload: BookingComplete, current_user=Dep
 
     target_user_id = data.get("user_id")
     if target_user_id:
-        create_user_notification(
+        await create_user_notification(
             target_user_id,
             "The driver has finished your trip. Please validate the completion from Booking Driver Status & History.",
             event="completion_validation_requested",
@@ -1119,7 +1174,7 @@ def complete_booking(booking_id: str, payload: BookingComplete, current_user=Dep
             actor_id=uid,
         )
     else:
-        notify_roles(
+        await notify_roles(
             ("office_coordinator", "superadmin"),
             "A driver trip without a linked Employee account is waiting for completion validation.",
             event="completion_validation_requested",
@@ -1134,7 +1189,7 @@ def complete_booking(booking_id: str, payload: BookingComplete, current_user=Dep
 
 
 @router.patch("/{booking_id}/validate-completion", response_model=BookingResponse)
-def validate_booking_completion(booking_id: str, current_user=Depends(get_current_user)):
+async def validate_booking_completion(booking_id: str, current_user=Depends(get_current_user)):
     """Confirm a driver's finish report through the linked Employee or Office fallback."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
@@ -1178,7 +1233,7 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
 
     driver_id = data.get("driver_id")
     if driver_id:
-        create_user_notification(
+        await create_user_notification(
             driver_id,
             "Your trip completion has been validated.",
             event="completion_validated",
