@@ -1,7 +1,15 @@
+import { useMemo, useState } from 'react'
+
 // Shared custom single-select used by Employee, Office Coordinator, and Super Admin booking flows.
-function BookingFormSelect({ value, options, placeholder, disabled = false, ariaLabel, onChange }) {
+function BookingFormSelect({ value, options, placeholder, disabled = false, ariaLabel, onChange, searchable = false }) {
   const selectedOption = options.find((option) => option.value === value)
   const selectionDisabled = disabled || options.length === 0
+  const [searchQuery, setSearchQuery] = useState('')
+  const visibleOptions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return options
+    return options.filter((option) => String(option.label || '').toLowerCase().includes(query))
+  }, [options, searchQuery])
 
   const selectOption = (event, option) => {
     if (option.disabled) return
@@ -41,7 +49,14 @@ function BookingFormSelect({ value, options, placeholder, disabled = false, aria
       </summary>
       {!selectionDisabled ? (
         <div className="quick-driver-multiselect__menu booking-form-select__menu" role="listbox" aria-label={ariaLabel}>
-          {options.map((option) => (
+          {searchable ? (
+            <label className="booking-form-select__search">
+              <i className="bi bi-search" aria-hidden="true" />
+              <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search location..." aria-label={`Search ${ariaLabel}`} />
+            </label>
+          ) : null}
+          {visibleOptions.length === 0 ? <p className="booking-form-select__empty">No locations found.</p> : null}
+          {visibleOptions.map((option) => (
             <button
               key={option.value}
               type="button"

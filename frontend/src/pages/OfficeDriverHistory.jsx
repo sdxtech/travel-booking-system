@@ -1494,11 +1494,11 @@ function OfficeDriverHistory() {
                   </label>
                   <div className="inline-label">
                     <span>Pickup Location</span>
-                    <BookingFormSelect value={editForm.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select pickup location" onChange={(value) => setEditForm((current) => ({ ...current, pickup_location: value }))} />
+                    <BookingFormSelect value={editForm.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select pickup location" searchable onChange={(value) => setEditForm((current) => ({ ...current, pickup_location: value }))} />
                   </div>
                   <div className="inline-label">
                     <span>Destination</span>
-                    <BookingFormSelect value={editForm.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select destination" onChange={(value) => setEditForm((current) => ({ ...current, destination: value }))} />
+                    <BookingFormSelect value={editForm.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select destination" searchable onChange={(value) => setEditForm((current) => ({ ...current, destination: value }))} />
                   </div>
                   <label className="inline-label">
                     <span>Total Passenger</span>

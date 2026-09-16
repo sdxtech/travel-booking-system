@@ -3383,6 +3383,35 @@ user-dropdown-toogle {
   color: #64748b !important;
 }
 
+.booking-form-select__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #64748b;
+}
+
+.booking-form-select__search input {
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.booking-form-select__empty {
+  margin: 0;
+  padding: 10px 12px;
+  color: #64748b;
+  font-size: 13px;
+}
+
 .booking-form-select__text {
   min-width: 0;
   flex: 1;

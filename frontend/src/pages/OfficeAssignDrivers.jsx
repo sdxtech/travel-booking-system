@@ -446,11 +446,11 @@ const isSuperadmin =
               <div className="field-grid">
                 <div className="inline-label">
                   <span>Pickup location</span>
-                  <BookingFormSelect value={form.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select pickup location" onChange={(value) => setForm((current) => ({ ...current, pickup_location: value }))} />
+                  <BookingFormSelect value={form.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select pickup location" searchable onChange={(value) => setForm((current) => ({ ...current, pickup_location: value }))} />
                 </div>
                 <div className="inline-label">
                   <span>Destination</span>
-                  <BookingFormSelect value={form.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select destination" onChange={(value) => setForm((current) => ({ ...current, destination: value }))} />
+                  <BookingFormSelect value={form.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select destination" searchable onChange={(value) => setForm((current) => ({ ...current, destination: value }))} />
                 </div>
                 <label className="inline-label">
                   <span>Departure date</span>
