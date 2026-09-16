@@ -3394,15 +3394,22 @@ user-dropdown-toogle {
   color: #64748b;
 }
 
-.booking-form-select__search input {
+.form-field .booking-form-select__search input,
+.inline-label .booking-form-select__search input {
   width: 100%;
   height: 32px;
   min-width: 0;
   padding: 0;
-  border: 0;
-  outline: 0;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
   background: transparent;
   font: inherit;
+}
+
+.booking-form-select__search:focus-within {
+  border-color: var(--brand-bold);
+  box-shadow: inset 0 0 0 1px var(--brand-bold);
 }
 
 .booking-form-select__empty {

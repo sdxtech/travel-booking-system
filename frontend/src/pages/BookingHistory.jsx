@@ -71,7 +71,7 @@ function BookingHistory() {
   // Match the server-side cutoff so unavailable cancellation actions are disabled in advance.
   const canCancelBooking = (booking) => {
     if (booking.cancellation_status === 'pending') return false
-    if (getBookingStatus(booking) !== 'pending') return false
+    if (!['pending', 'approved'].includes(getBookingStatus(booking))) return false
     if (!cancellationPolicy) return true
 
     const departureTime = toDate(booking?.departure_time)
@@ -388,7 +388,7 @@ function BookingHistory() {
         {actionMessage ? <p className="success-text">{actionMessage}</p> : null}
         {cancellationPolicy ? (
           <p className="muted booking-cancellation-policy">
-            Pending bookings can be cancelled until {getCancellationPolicyLabel()}.
+            Pending and approved bookings can be cancelled until {getCancellationPolicyLabel()}.
             {cancellationPolicy.auto_approve === false ? ' Cancellation requires Office Coordinator approval.' : ''}
           </p>
         ) : null}

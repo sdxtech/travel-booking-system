@@ -189,7 +189,7 @@ function AdminSettings() {
             <div className="admin-settings__preview">
               <i className="bi bi-info-circle" aria-hidden="true" />
               <span>
-                Employees can cancel a pending booking until {getPolicyLabel(policy)}.
+                Employees can cancel a pending or approved booking until {getPolicyLabel(policy)}.
               </span>
             </div>
 

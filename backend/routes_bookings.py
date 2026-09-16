@@ -856,7 +856,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
 
 @router.patch("/{booking_id}/cancel", response_model=BookingResponse)
 def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
-    """Cancel a booking with role-based rules (user: pending only, office: approved before start)."""
+    """Cancel a booking with role-based rules (user: pending/approved before cutoff, office: approved before start)."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
     enforce_employee_page_permission(uid, "booking_history")
@@ -875,8 +875,8 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
         if data.get("cancellation_status") == "pending":
             raise HTTPException(status_code=409, detail="Cancellation is already awaiting Coordinator approval")
 
-        if booking_status != "pending":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending bookings can be canceled")
+        if booking_status not in ("pending", "approved"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only pending or approved bookings can be canceled")
 
         departure_time = normalize_datetime(data.get("departure_time"))
         policy = get_booking_cancellation_policy()
@@ -898,7 +898,7 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
                 )
         if not policy.get("auto_approve", True):
             result = db["bookings"].update_one(
-                {"_id": booking_id, "status": "pending", "cancellation_status": {"$ne": "pending"},
+                {"_id": booking_id, "status": booking_status, "cancellation_status": {"$ne": "pending"},
                  "updated_at": data.get("updated_at")},
                 {"$set": {
                     "cancellation_status": "pending",

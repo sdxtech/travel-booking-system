@@ -3,6 +3,8 @@ import BookingFormSelect from './BookingFormSelect'
 import { API_BASE_URL } from '../config'
 import useBookingLocations from '../hooks/useBookingLocations'
 
+const OTHER_LOCATION_VALUE = '__other_location__'
+
 function formatDateInput(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
@@ -34,6 +36,9 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
   const [error, setError] = useState('')
   const [submissionStatus, setSubmissionStatus] = useState('')
   const { locations, locationsLoading, locationsError } = useBookingLocations()
+  const [pickupLocationOther, setPickupLocationOther] = useState(false)
+  const [destinationOther, setDestinationOther] = useState(false)
+  const locationOptions = [...locations.map((item) => ({ value: item.name, label: item.name })), { value: OTHER_LOCATION_VALUE, label: 'Others' }]
 
   const updateField = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
 
@@ -108,14 +113,14 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
               <label className="form-field"><span>Departure Time</span><input type="time" required value={form.departure_time} onChange={updateField('departure_time')} /></label>
               <label className="form-field"><span>Estimated Arrival Time</span><input type="time" required value={form.arrival_time} onChange={updateField('arrival_time')} /></label>
               <label className="form-field"><span>Estimated Arrival Date</span><input type="date" required value={form.arrival_date} onChange={updateField('arrival_date')} /></label>
-              <div className="form-field"><span>Pickup Location</span><BookingFormSelect value={form.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select pickup location" searchable onChange={(value) => setForm((current) => ({ ...current, pickup_location: value }))} /></div>
-              <div className="form-field"><span>Destination</span><BookingFormSelect value={form.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select destination" searchable onChange={(value) => setForm((current) => ({ ...current, destination: value }))} /></div>
+              <div className="form-field"><span>Pickup Location</span><BookingFormSelect value={pickupLocationOther ? OTHER_LOCATION_VALUE : form.pickup_location} options={locationOptions} placeholder={locationsLoading ? 'Loading locations...' : 'Select pickup location...'} disabled={locationsLoading} ariaLabel="Select pickup location" searchable onChange={(value) => { setPickupLocationOther(value === OTHER_LOCATION_VALUE); setForm((current) => ({ ...current, pickup_location: value === OTHER_LOCATION_VALUE ? '' : value })) }} />{pickupLocationOther ? <input type="text" placeholder="Enter pickup location" value={form.pickup_location} onChange={updateField('pickup_location')} required /> : null}</div>
+              <div className="form-field"><span>Destination</span><BookingFormSelect value={destinationOther ? OTHER_LOCATION_VALUE : form.destination} options={locationOptions} placeholder={locationsLoading ? 'Loading locations...' : 'Select destination...'} disabled={locationsLoading} ariaLabel="Select destination" searchable onChange={(value) => { setDestinationOther(value === OTHER_LOCATION_VALUE); setForm((current) => ({ ...current, destination: value === OTHER_LOCATION_VALUE ? '' : value })) }} />{destinationOther ? <input type="text" placeholder="Enter destination" value={form.destination} onChange={updateField('destination')} required /> : null}</div>
               <label className="form-field"><span>Total Passenger</span><input type="number" min="1" required value={form.passenger_count} onChange={updateField('passenger_count')} /></label>
             </div>
             {error ? <p className="error-text">{error}</p> : null}
             {locationsError ? <p className="error-text">{locationsError}</p> : null}
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary" disabled={submitting || locationsLoading || !locations.length}>{submitting ? 'Submitting...' : 'Submit Request'}</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting || locationsLoading}>{submitting ? 'Submitting...' : 'Submit Request'}</button>
               <button type="button" className="btn btn-outline-danger" onClick={onClose} disabled={submitting}>Cancel</button>
             </div>
           </form>

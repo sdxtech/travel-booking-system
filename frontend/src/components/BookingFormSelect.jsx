@@ -14,6 +14,7 @@ function BookingFormSelect({ value, options, placeholder, disabled = false, aria
   const selectOption = (event, option) => {
     if (option.disabled) return
     onChange(option.value)
+    setSearchQuery('')
     event.currentTarget.closest('details')?.removeAttribute('open')
   }
 

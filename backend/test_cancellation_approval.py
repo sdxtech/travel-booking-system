@@ -98,8 +98,13 @@ class CancellationApprovalTests(unittest.TestCase):
                 self.cancel(uid)
         self.collection.update_one.assert_not_called()
 
-    def test_employee_cannot_cancel_approved_or_review_requests(self):
+    def test_employee_can_cancel_approved_before_deadline(self):
         self.document["status"] = "approved"
+        self.policy["auto_approve"] = True
+        self.assertEqual(self.cancel().status, "cancelled")
+
+    def test_employee_cannot_cancel_active_or_review_requests(self):
+        self.document["status"] = "in_progress"
         with self.assertRaises(HTTPException):
             self.cancel()
         self.document["cancellation_status"] = "pending"

@@ -13,6 +13,7 @@ function BookingActions({
   onDetails,
 }) {
   const isPending = statusValue === 'pending'
+  const isCancellableStatus = statusValue === 'pending' || statusValue === 'approved'
   const isAwaitingValidation = statusValue === 'awaiting_validation'
 
   return (
@@ -34,8 +35,8 @@ function BookingActions({
         onClick={() => onCancel(booking.id)}
         disabled={!canCancel || actionLoadingId === booking.id}
         title={
-          !isPending
-            ? 'Only pending requests can be cancelled'
+          !isCancellableStatus
+            ? 'Only pending or approved bookings can be cancelled'
             : canCancel
               ? 'Cancel this request'
               : `Cancellation closes ${cancellationPolicyLabel}`
