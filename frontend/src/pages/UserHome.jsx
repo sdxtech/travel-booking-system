@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import QuickViewScheduler from '../components/QuickViewScheduler'
+import QuickBookingModal from '../components/QuickBookingModal'
 import { formatDriverPlate } from '../components/driverPlate'
 import {
   addMinutes,
@@ -64,6 +65,8 @@ function UserHome() {
   const [driverSchedules, setDriverSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [quickBookingSlot, setQuickBookingSlot] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
 
@@ -115,7 +118,7 @@ function UserHome() {
     }
 
     loadQuickView()
-  }, [])
+  }, [refreshKey])
 
   const driverCalendars = useMemo(
     () =>
@@ -175,7 +178,15 @@ function UserHome() {
           loading={loading}
           error={error}
           emptyMessage="No driver schedule for this work week."
+          onEmptySlotClick={setQuickBookingSlot}
         />
+        {quickBookingSlot ? (
+          <QuickBookingModal
+            slot={quickBookingSlot}
+            onClose={() => setQuickBookingSlot(null)}
+            onBooked={() => setRefreshKey((current) => current + 1)}
+          />
+        ) : null}
       </div>
     </MainLayout>
   )

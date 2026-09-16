@@ -3086,6 +3086,26 @@ user-dropdown-toogle {
   border-left: 1px solid #545454;
 }
 
+button.quick-scheduler-lane__day {
+  appearance: none;
+  padding: 0;
+  background: transparent;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+button.quick-scheduler-lane__day.is-bookable {
+  cursor: pointer;
+}
+
+button.quick-scheduler-lane__day.is-bookable:hover,
+button.quick-scheduler-lane__day.is-bookable:focus-visible {
+  background-color: rgba(37, 99, 235, 0.08);
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
 .quick-scheduler-lane__day:first-child {
   border-left: 0;
 }
@@ -3116,6 +3136,22 @@ user-dropdown-toogle {
   margin: auto;
   width: calc(100% - 32px);
   box-sizing: border-box;
+}
+
+.modal.quick-booking-modal {
+  width: min(760px, calc(100% - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.quick-booking-modal__form {
+  padding: 20px;
+}
+
+.quick-booking-modal__driver {
+  margin: 0 0 16px;
+  color: #1e3a8a;
+  font-weight: 600;
 }
 
 .quick-scheduler-event-dialog::backdrop {

@@ -97,6 +97,7 @@ function QuickViewScheduler({
   events,
   loading = false,
   error = '',
+  onEmptySlotClick,
 }) {
   const today = useMemo(() => new Date(), [])
   const [selectedDate, setSelectedDate] = useState(today)
@@ -107,10 +108,16 @@ function QuickViewScheduler({
     if (selectedEvent) eventDialogRef.current?.showModal()
   }, [selectedEvent])
   const [selectedCalendarIds, setSelectedCalendarIds] = useState([])
+  const [hasCustomizedCalendarSelection, setHasCustomizedCalendarSelection] = useState(false)
   const availableCalendarIds = useMemo(() => new Set(calendars.map((calendar) => String(calendar.id))), [calendars])
+  // Until the user changes the selection, immediately show the first two
+  // driver calendars returned by the API.
+  const defaultCalendarIds = useMemo(() => calendars.slice(0, 2).map((calendar) => String(calendar.id)), [calendars])
+  const effectiveSelectedCalendarIds = hasCustomizedCalendarSelection ? selectedCalendarIds : defaultCalendarIds
+
   const activeCalendarIds = useMemo(
-    () => new Set(selectedCalendarIds.filter((calendarId) => availableCalendarIds.has(calendarId))),
-    [availableCalendarIds, selectedCalendarIds]
+    () => new Set(effectiveSelectedCalendarIds.filter((calendarId) => availableCalendarIds.has(calendarId))),
+    [availableCalendarIds, effectiveSelectedCalendarIds]
   )
 
   const weekDays = useMemo(() => {
@@ -208,6 +215,17 @@ function QuickViewScheduler({
       }
       return [...next]
     })
+    setHasCustomizedCalendarSelection(true)
+  }
+
+  const selectEmptySlot = (event, date, calendar) => {
+    if (!onEmptySlotClick) return
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const clickedMinutes = Math.max(0, Math.min(1439, ((event.clientY - bounds.top) / HOUR_HEIGHT) * 60))
+    const roundedMinutes = Math.floor(clickedMinutes / 30) * 30
+    const start = new Date(date)
+    start.setHours(Math.floor(roundedMinutes / 60), roundedMinutes % 60, 0, 0)
+    onEmptySlotClick({ calendar, start })
   }
 
   const selectedDriverLabel = visibleCalendars.length
@@ -318,7 +336,17 @@ function QuickViewScheduler({
                     </div>
                     <div className="quick-scheduler-lane__body">
                       {weekDays.map((date) => (
-                        <div key={toDateKey(date)} className="quick-scheduler-lane__day" />
+                        onEmptySlotClick ? (
+                          <button
+                            key={toDateKey(date)}
+                            type="button"
+                            className="quick-scheduler-lane__day is-bookable"
+                            onClick={(event) => selectEmptySlot(event, date, calendar)}
+                            aria-label={`Create booking for ${calendar.name} on ${date.toLocaleDateString('en-GB')}`}
+                          />
+                        ) : (
+                          <div key={toDateKey(date)} className="quick-scheduler-lane__day" />
+                        )
                       ))}
 
                       {currentTimePlacement ? (
