@@ -25,7 +25,7 @@ function formatDriverHeader(calendar) {
 
 function QuickBookingModal({ slot, onClose, onBooked }) {
   const defaultEnd = new Date(slot.start)
-  defaultEnd.setHours(defaultEnd.getHours() + 1)
+  defaultEnd.setMinutes(defaultEnd.getMinutes() + 30)
   const [form, setForm] = useState({
     pickup_location: '',
     destination: '',
@@ -107,9 +107,9 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
             <p className="quick-booking-modal__driver"><i className="bi bi-car-front" aria-hidden="true" /> {formatDriverHeader(slot.calendar)}</p>
             <div className="booking-grid">
               <label className="form-field"><span>Departure Date</span><input type="date" required value={form.departure_date} onChange={updateField('departure_date')} /></label>
-              <label className="form-field"><span>Estimated Arrival Date</span><input type="date" required value={form.arrival_date} onChange={updateField('arrival_date')} /></label>
               <label className="form-field"><span>Departure Time</span><input type="time" required value={form.departure_time} onChange={updateField('departure_time')} /></label>
               <label className="form-field"><span>Estimated Arrival Time</span><input type="time" required value={form.arrival_time} onChange={updateField('arrival_time')} /></label>
+              <label className="form-field"><span>Estimated Arrival Date</span><input type="date" required value={form.arrival_date} onChange={updateField('arrival_date')} /></label>
               <label className="form-field"><span>Pickup Location</span><input type="text" required placeholder="Office Lobby" value={form.pickup_location} onChange={updateField('pickup_location')} /></label>
               <label className="form-field"><span>Destination</span><input type="text" required placeholder="Soekarno-Hatta Airport" value={form.destination} onChange={updateField('destination')} /></label>
               <div className="form-field"><span>Trip Type</span><BookingFormSelect value={form.trip_type} options={tripTypeOptions} placeholder="Select type..." ariaLabel="Select trip type" onChange={(value) => setForm((current) => ({ ...current, trip_type: value }))} /></div>
