@@ -10,7 +10,6 @@ function DataCard({
   actionLoadingId,
   formatDateOnly,
   formatDateTime,
-  formatTripType,
   formatStatusText,
   onEdit,
   onCancel,
@@ -43,10 +42,6 @@ function DataCard({
           <span className="meta-value truncate">
             {booking.pickup_location || '-'} &rarr; {booking.destination || '-'}
           </span>
-        </div>
-        <div className="booking-card-meta">
-          <span className="meta-label">Trip Type</span>
-          <span className="meta-value">{formatTripType(booking.trip_type)}</span>
         </div>
       </div>
 

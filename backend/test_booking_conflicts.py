@@ -37,7 +37,6 @@ class BookingConflictTests(unittest.TestCase):
             "estimated_arrival_time": end or self.end,
             "pickup_location": "Office",
             "destination": "Site",
-            "trip_type": "antar",
             "passenger_count": 1,
         }
 
@@ -108,7 +107,7 @@ class BookingConflictTests(unittest.TestCase):
     def employee_payload(self):
         return bookings.BookingCreate(
             driver_id="driver-1", pickup_location="Office", destination="Site",
-            trip_type="antar", passenger_count=1,
+            passenger_count=1,
             departure_time=self.start, estimated_arrival_time=self.end,
         )
 

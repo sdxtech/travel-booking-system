@@ -16,7 +16,7 @@ class CancellationApprovalTests(unittest.TestCase):
             "_id": "booking-1", "request_id": "SDX-BD-09092026-001",
             "user_id": "employee", "status": "pending",
             "pickup_location": "Office", "destination": "Airport",
-            "trip_type": "antar", "passenger_count": 1,
+            "passenger_count": 1,
             "departure_time": self.now + timedelta(days=5),
         }
         self.policy = {"auto_approve": False, "unit": "days", "value": 1, "cutoff_time": "17:00"}

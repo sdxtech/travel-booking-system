@@ -388,15 +388,6 @@ function OfficeDriverRequests() {
     })
   }
 
-  // Format trip type values into user-facing labels.
-  const formatTripType = (value) => {
-    if (!value) return '-'
-    if (value === 'antar') return 'Drop-off'
-    if (value === 'jemput') return 'Pick-up'
-    if (value === 'fulltrip') return 'Full Trip'
-    return value
-  }
-
   // Handle sidebar navigation clicks.
   const handleNavigate = (item) => {
     const quickViewRoute = isSuperadmin ? '/admin/home' : '/office/home'
@@ -473,7 +464,6 @@ function OfficeDriverRequests() {
                   <th>Departure Time</th>
                   <th>Estimated Arrival Date</th>
                   <th>Estimated Arrival Time</th>
-                  <th>Type of Trip</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
@@ -481,19 +471,19 @@ function OfficeDriverRequests() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="17" className="muted">
+                    <td colSpan="16" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="17" className="error-text">
+                    <td colSpan="16" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : bookings.length === 0 ? (
                   <tr>
-                    <td colSpan="17" className="muted">
+                    <td colSpan="16" className="muted">
                       No driver requests found.
                     </td>
                   </tr>
@@ -517,7 +507,6 @@ function OfficeDriverRequests() {
                         <td>{formatTime(booking.departure_time)}</td>
                         <td>{formatDate(booking.estimated_arrival_time)}</td>
                         <td>{formatTime(booking.estimated_arrival_time)}</td>
-                        <td>{formatTripType(booking.trip_type)}</td>
                         <td>
                           <span className={`status-badge status-${statusValue}`}>{booking.status || 'pending'}</span>
                         </td>

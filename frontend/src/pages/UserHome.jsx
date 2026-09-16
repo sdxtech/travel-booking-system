@@ -49,7 +49,6 @@ function buildDriverBookingEvent(booking, calendarId, color) {
     title: 'Busy',
     meta: formatStatusLabel(booking.status),
     statusLabel: formatStatusLabel(booking.status),
-    tripType: booking.trip_type,
     departurePoint: booking.pickup_location,
     destinationPoint: booking.destination,
     start,

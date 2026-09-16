@@ -131,8 +131,6 @@ function BookingHistory() {
         const count = Number(booking.passenger_count)
         return Number.isFinite(count) ? count : null
       }
-      case 'trip_type':
-        return booking.trip_type || ''
       case 'departure_time':
         return toDate(booking.departure_time)?.getTime() ?? null
       case 'estimated_arrival_time':
@@ -337,14 +335,6 @@ function BookingHistory() {
     })
   }
 
-  const formatTripType = (value) => {
-    if (!value) return '-'
-    if (value === 'antar') return 'Drop-off'
-    if (value === 'jemput') return 'Pick-up'
-    if (value === 'fulltrip') return 'Full Trip'
-    return value
-  }
-
   const formatDateTime = (value) => {
     const date = toDate(value)
     if (!date) return '-'
@@ -443,7 +433,6 @@ function BookingHistory() {
                       actionLoadingId={actionLoadingId}
                       formatDateOnly={formatDateOnly}
                       formatDateTime={formatDateTime}
-                      formatTripType={formatTripType}
                       formatStatusText={formatStatusText}
                       onEdit={handleEdit}
                       onCancel={handleCancel}
@@ -559,10 +548,6 @@ function BookingHistory() {
                   <section className="ticket-details-section">
                     <h3>Trip & Driver</h3>
                     <dl className="ticket-details-grid">
-                      <div className="ticket-details-item">
-                        <dt>Trip Type</dt>
-                        <dd>{formatTripType(selectedBooking.trip_type)}</dd>
-                      </div>
                       <div className="ticket-details-item">
                         <dt>Total Passenger</dt>
                         <dd>{selectedBooking.passenger_count ?? '-'}</dd>

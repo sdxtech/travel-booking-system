@@ -1,12 +1,5 @@
 import { useState } from 'react'
-import BookingFormSelect from './BookingFormSelect'
 import { API_BASE_URL } from '../config'
-
-const tripTypeOptions = [
-  { value: 'antar', label: 'Drop-off', icon: 'bi-box-arrow-right' },
-  { value: 'jemput', label: 'Pick-up', icon: 'bi-box-arrow-in-left' },
-  { value: 'fulltrip', label: 'Full Trip', icon: 'bi-arrow-left-right' },
-]
 
 function formatDateInput(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -29,7 +22,6 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
   const [form, setForm] = useState({
     pickup_location: '',
     destination: '',
-    trip_type: '',
     passenger_count: 1,
     departure_date: formatDateInput(slot.start),
     departure_time: formatTimeInput(slot.start),
@@ -62,7 +54,6 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
           driver_id: slot.calendar.id,
           pickup_location: form.pickup_location,
           destination: form.destination,
-          trip_type: form.trip_type,
           passenger_count: Number(form.passenger_count) || 1,
           departure_time: departure.toISOString(),
           estimated_arrival_time: arrival.toISOString(),
@@ -112,7 +103,6 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
               <label className="form-field"><span>Estimated Arrival Date</span><input type="date" required value={form.arrival_date} onChange={updateField('arrival_date')} /></label>
               <label className="form-field"><span>Pickup Location</span><input type="text" required placeholder="Office Lobby" value={form.pickup_location} onChange={updateField('pickup_location')} /></label>
               <label className="form-field"><span>Destination</span><input type="text" required placeholder="Soekarno-Hatta Airport" value={form.destination} onChange={updateField('destination')} /></label>
-              <div className="form-field"><span>Trip Type</span><BookingFormSelect value={form.trip_type} options={tripTypeOptions} placeholder="Select type..." ariaLabel="Select trip type" onChange={(value) => setForm((current) => ({ ...current, trip_type: value }))} /></div>
               <label className="form-field"><span>Total Passenger</span><input type="number" min="1" required value={form.passenger_count} onChange={updateField('passenger_count')} /></label>
             </div>
             {error ? <p className="error-text">{error}</p> : null}

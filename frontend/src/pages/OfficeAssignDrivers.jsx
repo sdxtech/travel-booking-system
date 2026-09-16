@@ -25,7 +25,6 @@ const initialForm = {
   driver_email: '',
   pickup_location: '',
   destination: '',
-  trip_type: '',
   departure_date: '',
   departure_time: '',
   arrival_date: '',
@@ -258,7 +257,6 @@ const isSuperadmin =
       driver_email: form.driver_email,
       pickup_location: form.pickup_location,
       destination: form.destination,
-      trip_type: form.trip_type,
       departure_time: departureDateTime.toISOString(),
       estimated_arrival_time: estimatedArrivalDateTime.toISOString(),
       passenger_count: Number(form.passenger_count) || 1,
@@ -457,17 +455,6 @@ const isSuperadmin =
                     onChange={handleChange('destination')}
                     required
                   />
-                </label>
-                <label className="inline-label">
-                  <span>Type of trip</span>
-                  <select value={form.trip_type} onChange={handleChange('trip_type')} required>
-                    <option value="" disabled>
-                      Type of trip
-                    </option>
-                    <option value="antar">Drop-off</option>
-                    <option value="jemput">Pick-up</option>
-                    <option value="fulltrip">Full Trip</option>
-                  </select>
                 </label>
                 <label className="inline-label">
                   <span>Departure date</span>

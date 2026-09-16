@@ -3201,24 +3201,12 @@ user-dropdown-toogle {
   color: rgba(255, 255, 255, 0.82);
 }
 
-.quick-scheduler-event .quick-scheduler-event__time {
-  color: #ffffff;
-  font-weight: 700;
-}
-
 .quick-scheduler-event.is-compact {
   padding: 1px 5px;
 }
 
-.quick-scheduler-event.is-compact strong,
-.quick-scheduler-event.is-compact span:not(.quick-scheduler-event__time) {
+.quick-scheduler-event.is-compact span {
   display: none;
-}
-
-.quick-scheduler-event.is-compact .quick-scheduler-event__time {
-  margin: 0;
-  font-size: 10px;
-  line-height: 14px;
 }
 
 .quick-scheduler__now-line {

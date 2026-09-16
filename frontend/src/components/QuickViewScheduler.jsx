@@ -7,10 +7,6 @@ const START_HOUR = 0
 const END_HOUR = 24
 const HOUR_HEIGHT = 64
 
-function formatTripType(value) {
-  return { antar: 'Drop-off', jemput: 'Pick-up', fulltrip: 'Full Trip' }[value] || value || '-'
-}
-
 function formatEventDateTime(value) {
   return value.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 }
@@ -43,11 +39,6 @@ function formatTimeLabel(hour) {
   const suffix = normalizedHour >= 12 ? 'PM' : 'AM'
   const value = normalizedHour % 12 || 12
   return `${value} ${suffix}`
-}
-
-function formatEventTime(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function getEventSegments(event, weekDays) {
@@ -372,18 +363,13 @@ function QuickViewScheduler({
 
                       {laneEvents.flatMap((event) =>
                         getEventSegments(event, weekDays).map((placement) => {
-                          const timeRange = `${formatEventTime(placement.segmentStart)}-${formatEventTime(
-                            placement.segmentEnd
-                          )}`
                           const compact = placement.height < 42
-                          const tripType = formatTripType(event.tripType)
                           const details = [
-                            tripType,
                             event.departurePoint || '-',
                             'To',
                             event.destinationPoint || '-',
                           ]
-                          const eventDescription = [event.title, timeRange, ...details, event.meta].filter(Boolean).join('\n')
+                          const eventDescription = [event.title, ...details, event.meta].filter(Boolean).join('\n')
 
                           return (
                           <button
@@ -403,7 +389,6 @@ function QuickViewScheduler({
                             aria-label={eventDescription}
                           >
                             <strong>{event.title}</strong>
-                            <span className="quick-scheduler-event__time">{timeRange}</span>
                             {!compact ? details.map((detail, index) => <span key={index}>{detail}</span>) : null}
                           </button>
                           )
@@ -443,7 +428,6 @@ function QuickViewScheduler({
               ['Status', selectedEvent.statusLabel],
               ['Departure Date & Time', formatEventDateTime(selectedEvent.start)],
               ['Estimated Arrival Date & Time', formatEventDateTime(selectedEvent.end)],
-              ['TYPE TRIP', formatTripType(selectedEvent.tripType)],
               ['DEPARTURE POINT', selectedEvent.departurePoint],
               ['DESTINATION POINT', selectedEvent.destinationPoint],
             ].map(([label, value]) => (

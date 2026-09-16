@@ -19,12 +19,6 @@ const menuItems = [
   { label: 'Manage User', icon: 'bi-people' },
 ]
 
-const tripTypeOptions = [
-  { value: 'antar', label: 'Drop-off', icon: 'bi-arrow-right-circle' },
-  { value: 'jemput', label: 'Pick-up', icon: 'bi-arrow-left-circle' },
-  { value: 'fulltrip', label: 'Full Trip', icon: 'bi-arrow-repeat' },
-]
-
 // Driver booking history page for office coordinators (with export + date range).
 function OfficeDriverHistory() {
   const historyTableRef = useFrozenHistoryColumns()
@@ -131,8 +125,6 @@ function OfficeDriverHistory() {
           const minutes = getOvertimeMinutes(booking)
           return minutes === null ? null : minutes % 60
         }
-      case 'trip_type':
-        return booking.trip_type || ''
       case 'driver':
         return booking.driver_name || booking.driver_id || ''
       case 'starting_mileage':
@@ -179,7 +171,7 @@ function OfficeDriverHistory() {
   const sortedBookings = useMemo(() => {
     const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
     const filtered = bookings.filter((booking) => {
-      const text = [booking.request_id, booking.requester_name, booking.requester_dept_job_position, booking.requester_phone, booking.requester_email, booking.requester_nik, booking.pickup_location, booking.destination, booking.trip_type, booking.driver_name, booking.status]
+      const text = [booking.request_id, booking.requester_name, booking.requester_dept_job_position, booking.requester_phone, booking.requester_email, booking.requester_nik, booking.pickup_location, booking.destination, booking.driver_name, booking.status]
         .filter((value) => value != null).join(' ').toLowerCase()
       return terms.every((term) => text.includes(term))
     })
@@ -481,15 +473,6 @@ function OfficeDriverHistory() {
       : '-'
   }
 
-  // Convert trip type values into user-facing labels.
-  const formatTripType = (value) => {
-    if (!value) return '-'
-    if (value === 'antar') return 'Drop-off'
-    if (value === 'jemput') return 'Pick-up'
-    if (value === 'fulltrip') return 'Full Trip'
-    return value
-  }
-
   // Normalize booking status for UI (approved + started => in_progress).
   const getBookingStatus = (booking) => {
     const raw = String(booking?.status || 'pending').toLowerCase()
@@ -626,7 +609,6 @@ function OfficeDriverHistory() {
       driver_id: booking.driver_id || '',
       pickup_location: booking.pickup_location || '',
       destination: booking.destination || '',
-      trip_type: booking.trip_type || 'antar',
       departure_time: toLocalDateTimeInput(booking.departure_time),
       estimated_arrival_time: toLocalDateTimeInput(booking.estimated_arrival_time),
       passenger_count: booking.passenger_count ?? 1,
@@ -952,7 +934,6 @@ function OfficeDriverHistory() {
       'Total Duration',
       'OT hour',
       'OT minutes',
-      'Type of Trip',
       'Driver',
       'Starting Kilometer',
       'Ending Kilometer',
@@ -982,7 +963,6 @@ function OfficeDriverHistory() {
       formatDuration(booking),
       formatOvertimeHours(booking),
       formatOvertimeMinutes(booking),
-      formatTripType(booking.trip_type),
       booking.driver_name || booking.driver_id || '',
       booking.starting_mileage ?? '',
       booking.ending_mileage ?? '',
@@ -1198,11 +1178,6 @@ function OfficeDriverHistory() {
                     </button>
                   </th>
                   <th>
-                    <button type="button" className="table-sort" onClick={() => toggleSort('trip_type')}>
-                      Type of Trip {renderSortIcon('trip_type')}
-                    </button>
-                  </th>
-                  <th>
                     <button type="button" className="table-sort" onClick={() => toggleSort('driver')}>
                       Driver {renderSortIcon('driver')}
                     </button>
@@ -1238,25 +1213,25 @@ function OfficeDriverHistory() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="28" className="muted">
+                    <td colSpan="27" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="28" className="error-text">
+                    <td colSpan="27" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : !hasLoaded ? (
                   <tr>
-                    <td colSpan="28" className="muted">
+                    <td colSpan="27" className="muted">
                       Select a date range to load driver history.
                     </td>
                   </tr>
                 ) : sortedBookings.length === 0 ? (
                   <tr>
-                    <td colSpan="28" className="muted">
+                    <td colSpan="27" className="muted">
                       No driver history found.
                     </td>
                   </tr>
@@ -1283,7 +1258,6 @@ function OfficeDriverHistory() {
                       <td>{formatDuration(booking)}</td>
                       <td>{formatOvertimeHours(booking)}</td>
                       <td>{formatOvertimeMinutes(booking)}</td>
-                      <td>{formatTripType(booking.trip_type)}</td>
                       <td>{booking.driver_name || booking.driver_id || '-'}</td>
                       <td>{booking.starting_mileage ?? '-'}</td>
                       <td>{booking.ending_mileage ?? '-'}</td>
@@ -1536,17 +1510,6 @@ function OfficeDriverHistory() {
                       required
                     />
                   </label>
-                  <div className="inline-label">
-                    <span>Trip Type</span>
-                    <BookingFormSelect
-                      value={editForm.trip_type}
-                      options={tripTypeOptions}
-                      placeholder="Select trip type..."
-                      disabled={Boolean(actionLoadingId)}
-                      ariaLabel="Select trip type"
-                      onChange={(value) => setEditForm((current) => ({ ...current, trip_type: value }))}
-                    />
-                  </div>
                   <label className="inline-label">
                     <span>Total Passenger</span>
                     <input

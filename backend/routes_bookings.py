@@ -19,7 +19,6 @@ class BookingCreate(BaseModel):
     driver_id: str = Field(..., min_length=1)
     pickup_location: str = Field(..., min_length=1)
     destination: str = Field(..., min_length=1)
-    trip_type: Literal["antar", "jemput", "fulltrip"]
     departure_time: datetime
     estimated_arrival_time: datetime
     passenger_count: int = Field(..., ge=1)
@@ -34,7 +33,6 @@ class BookingAssignCreate(BaseModel):
     driver_email: str = Field(..., min_length=1)
     pickup_location: str = Field(..., min_length=1)
     destination: str = Field(..., min_length=1)
-    trip_type: Literal["antar", "jemput", "fulltrip"]
     departure_time: datetime
     estimated_arrival_time: datetime
     passenger_count: int = Field(..., ge=1)
@@ -54,7 +52,6 @@ class BookingResponse(BaseModel):
     requester_email: Optional[str] = None
     pickup_location: str
     destination: str
-    trip_type: Literal["antar", "jemput", "fulltrip"]
     departure_time: datetime
     estimated_arrival_time: Optional[datetime] = None
     passenger_count: int
@@ -81,7 +78,6 @@ class DriverCalendarBookingResponse(BaseModel):
     driver_id: str
     status: str
     requester_name: Optional[str] = None
-    trip_type: Optional[str] = None
     pickup_location: Optional[str] = None
     destination: Optional[str] = None
     departure_time: datetime
@@ -138,7 +134,6 @@ def serialize_booking(doc_snapshot) -> BookingResponse:
         requester_email=data.get("requester_email"),
         pickup_location=data.get("pickup_location"),
         destination=data.get("destination"),
-        trip_type=data.get("trip_type"),
         departure_time=data.get("departure_time"),
         estimated_arrival_time=data.get("estimated_arrival_time"),
         passenger_count=data.get("passenger_count"),
@@ -326,7 +321,6 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
         "requester_email": current_user.get("email"),
         "pickup_location": payload.pickup_location,
         "destination": payload.destination,
-        "trip_type": payload.trip_type,
         "departure_time": payload.departure_time,
         "estimated_arrival_time": payload.estimated_arrival_time,
         "passenger_count": payload.passenger_count,
@@ -437,7 +431,6 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
         "requester_email": payload.requester_email,
         "pickup_location": payload.pickup_location,
         "destination": payload.destination,
-        "trip_type": payload.trip_type,
         "departure_time": payload.departure_time,
         "estimated_arrival_time": payload.estimated_arrival_time,
         "passenger_count": payload.passenger_count,
@@ -584,7 +577,6 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
                     driver_id=driver_id,
                     requester_name=data.get("requester_name") if role in ("office_coordinator", "superadmin") else None,
                     status=data.get("status", "approved"),
-                    trip_type=data.get("trip_type"),
                     pickup_location=data.get("pickup_location"),
                     destination=data.get("destination"),
                     departure_time=departure_time,
@@ -755,7 +747,6 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
                 "$set": {
                     "pickup_location": payload.pickup_location,
                     "destination": payload.destination,
-                    "trip_type": payload.trip_type,
                     "driver_id": payload.driver_id,
                     "driver_name": driver_name,
                     "departure_time": payload.departure_time,
@@ -808,7 +799,6 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
             "$set": {
                 "pickup_location": payload.pickup_location,
                 "destination": payload.destination,
-                "trip_type": payload.trip_type,
                 "driver_id": payload.driver_id,
                 "driver_name": driver_name,
                 "departure_time": payload.departure_time,

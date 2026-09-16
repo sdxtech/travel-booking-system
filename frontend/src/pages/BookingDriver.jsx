@@ -6,17 +6,10 @@ import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import { formatDriverPlate } from '../components/driverPlate'
 import { API_BASE_URL } from '../config'
 
-const tripTypeOptions = [
-  { value: 'antar', label: 'Drop-off', icon: 'bi-box-arrow-right' },
-  { value: 'jemput', label: 'Pick-up', icon: 'bi-box-arrow-in-left' },
-  { value: 'fulltrip', label: 'Full Trip', icon: 'bi-arrow-left-right' },
-]
-
 const initialForm = {
   driver_id: '',
   pickup_location: '',
   destination: '',
-  trip_type: '',
   departure_date: '',
   departure_time: '',
   arrival_date: '',
@@ -171,7 +164,6 @@ function BookingDriver() {
       driver_id: booking.driver_id || '',
       pickup_location: booking.pickup_location || '',
       destination: booking.destination || '',
-      trip_type: booking.trip_type || '',
       departure_date: departure ? formatDateInput(departure) : '',
       departure_time: departure ? formatTimeInput(departure) : '',
       arrival_date: arrival ? formatDateInput(arrival) : '',
@@ -194,8 +186,8 @@ function BookingDriver() {
     setErrorMessage('')
     setSubmissionStatus('')
 
-    if (!form.trip_type || !form.driver_id) {
-      setErrorMessage('Trip type and driver are required.')
+    if (!form.driver_id) {
+      setErrorMessage('Driver is required.')
       setLoading(false)
       return
     }
@@ -226,7 +218,6 @@ function BookingDriver() {
       driver_id: form.driver_id,
       pickup_location: form.pickup_location,
       destination: form.destination,
-      trip_type: form.trip_type,
       departure_time: departureDateTime.toISOString(),
       estimated_arrival_time: estimatedArrivalDateTime.toISOString(),
       passenger_count: Number(form.passenger_count) || 1,
@@ -360,16 +351,6 @@ function BookingDriver() {
                   required
                 />
               </label>
-              <div className="form-field">
-                <span>Trip Type</span>
-                <BookingFormSelect
-                  value={form.trip_type}
-                  options={tripTypeOptions}
-                  placeholder="Select type..."
-                  ariaLabel="Select trip type"
-                  onChange={(value) => setForm((prev) => ({ ...prev, trip_type: value }))}
-                />
-              </div>
               <label className="form-field">
                 <span>Total Passenger</span>
                 <input
