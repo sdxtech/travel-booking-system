@@ -3086,21 +3086,26 @@ user-dropdown-toogle {
   border-left: 1px solid #545454;
 }
 
-button.quick-scheduler-lane__day {
-  appearance: none;
-  padding: 0;
-  background: transparent;
-  border-top: 0;
-  border-right: 0;
-  border-bottom: 0;
+.quick-scheduler-lane__slots {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(48, minmax(0, 1fr));
 }
 
-button.quick-scheduler-lane__day.is-bookable {
+.quick-scheduler-lane__slot {
+  appearance: none;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
 }
 
-button.quick-scheduler-lane__day.is-bookable:hover,
-button.quick-scheduler-lane__day.is-bookable:focus-visible {
+.quick-scheduler-lane__slot:hover,
+.quick-scheduler-lane__slot:focus-visible {
   background-color: rgba(37, 99, 235, 0.08);
   outline: 2px solid #2563eb;
   outline-offset: -2px;

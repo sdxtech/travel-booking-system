@@ -142,6 +142,10 @@ function QuickViewScheduler({
     () => Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => START_HOUR + index),
     []
   )
+  const halfHourSlots = useMemo(
+    () => Array.from({ length: (END_HOUR - START_HOUR) * 2 }, (_, index) => index),
+    []
+  )
 
   const visibleCalendars = useMemo(
     () => calendars.filter((calendar) => activeCalendarIds.has(String(calendar.id))),
@@ -218,13 +222,11 @@ function QuickViewScheduler({
     setHasCustomizedCalendarSelection(true)
   }
 
-  const selectEmptySlot = (event, date, calendar) => {
+  const selectEmptySlot = (date, calendar, slotIndex) => {
     if (!onEmptySlotClick) return
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const clickedMinutes = Math.max(0, Math.min(1439, ((event.clientY - bounds.top) / HOUR_HEIGHT) * 60))
-    const roundedMinutes = Math.floor(clickedMinutes / 30) * 30
     const start = new Date(date)
-    start.setHours(Math.floor(roundedMinutes / 60), roundedMinutes % 60, 0, 0)
+    const minutes = (START_HOUR * 60) + (slotIndex * 30)
+    start.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
     onEmptySlotClick({ calendar, start })
   }
 
@@ -335,19 +337,25 @@ function QuickViewScheduler({
                       ))}
                     </div>
                     <div className="quick-scheduler-lane__body">
-                      {weekDays.map((date) => (
-                        onEmptySlotClick ? (
-                          <button
-                            key={toDateKey(date)}
-                            type="button"
-                            className="quick-scheduler-lane__day is-bookable"
-                            onClick={(event) => selectEmptySlot(event, date, calendar)}
-                            aria-label={`Create booking for ${calendar.name} on ${date.toLocaleDateString('en-GB')}`}
-                          />
-                        ) : (
-                          <div key={toDateKey(date)} className="quick-scheduler-lane__day" />
-                        )
-                      ))}
+                      {weekDays.map((date) => <div key={toDateKey(date)} className="quick-scheduler-lane__day" />)}
+                      {onEmptySlotClick ? (
+                        <div className="quick-scheduler-lane__slots">
+                          {halfHourSlots.flatMap((slotIndex) => weekDays.map((date) => {
+                            const minutes = slotIndex * 30
+                            const hour = String(Math.floor(minutes / 60)).padStart(2, '0')
+                            const minute = String(minutes % 60).padStart(2, '0')
+                            return (
+                              <button
+                                key={`${toDateKey(date)}-${slotIndex}`}
+                                type="button"
+                                className="quick-scheduler-lane__slot"
+                                onClick={() => selectEmptySlot(date, calendar, slotIndex)}
+                                aria-label={`Create booking for ${calendar.name} on ${date.toLocaleDateString('en-GB')} at ${hour}:${minute}`}
+                              />
+                            )
+                          }))}
+                        </div>
+                      ) : null}
 
                       {currentTimePlacement ? (
                         <div
