@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { addMinutes, parseApiDate, toDateKey } from './quickViewSchedulerUtils'
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DAYS_IN_WEEK = WEEKDAYS.length
 const START_HOUR = 0
 const END_HOUR = 24
@@ -14,7 +14,7 @@ function formatEventDateTime(value) {
 function startOfWorkWeek(date) {
   const base = parseApiDate(date) || new Date()
   const day = base.getDay()
-  const diff = day === 0 ? -6 : 1 - day
+  const diff = -day
   return new Date(base.getFullYear(), base.getMonth(), base.getDate() + diff)
 }
 
