@@ -213,13 +213,14 @@ function App() {
             }
           />
           <Route
-            path="/admin/distribute-login"
+            path="/admin/distribute-account"
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminDistributeLogin />
               </ProtectedRoute>
             }
           />
+          <Route path="/admin/distribute-login" element={<Navigate to="/admin/distribute-account" replace />} />
           <Route
             path="/admin/audit-log"
             element={

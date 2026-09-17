@@ -30,7 +30,7 @@ function formatDetailValue(value) {
 }
 
 function describeActivity(action, path) {
-  if (action === 'Employee login invitation') return 'Distribute Login Invitation'
+  if (action === 'Account invitation') return 'Distribute Account Invitation'
   const key = action || path || ''
   const activities = [
     [/POST \/auth\/login/, 'Login'],
@@ -52,7 +52,7 @@ function describeActivity(action, path) {
     [/PATCH \/tickets\/[^/]+\/status/, 'Update Travel Request Status'],
     [/PATCH \/tickets\/[^/]+\/cancel$/, 'Cancel Travel Request'],
     [/PATCH \/tickets\/[^/]+$/, 'Edit Travel Request'],
-    [/POST \/users\/distribute-login/, 'Distribute Login Batch'],
+    [/POST \/users\/distribute-account/, 'Distribute Account Batch'],
     [/POST \/users\/import/, 'Import Users'],
     [/POST \/users$/, 'Create User'],
     [/PATCH \/users\/[^/]+\/password/, 'Reset User Password'],

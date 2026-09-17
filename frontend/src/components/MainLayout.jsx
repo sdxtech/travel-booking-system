@@ -248,8 +248,8 @@ function MainLayout({ title, children }) {
     !isEmployee && !isDriver
       ? [
           ...(isSuperadmin ? [{
-            label: 'Distribute Login',
-            path: '/admin/distribute-login',
+            label: 'Distribute Account',
+            path: '/admin/distribute-account',
             icon: 'bi-envelope-plus',
           }, {
             label: 'Audit Log',
