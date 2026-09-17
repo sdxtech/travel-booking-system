@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -24,6 +26,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from auth_utils import decode_access_token, get_jwt_secret
+from audit_service import audit_changes, record_audit_event, safe_request_details
 from mongo_client import db, init_mongo
 
 app = FastAPI()
@@ -37,6 +40,72 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def audit_mutating_api_requests(request: Request, call_next):
+    """Audit every data-changing API request, regardless of the user's role."""
+    is_mutation = request.method in {"POST", "PUT", "PATCH", "DELETE"}
+    before_snapshot, target = audit_snapshot(request.url.path)
+    request_details = {}
+    if is_mutation:
+        try:
+            raw_body = await request.body()
+            request_details = safe_request_details(json.loads(raw_body.decode("utf-8"))) if raw_body else {}
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            request_details = {}
+    response = await call_next(request)
+    if not is_mutation or request.url.path.startswith("/audit-logs"):
+        return response
+
+    actor = None
+    token = request.cookies.get("access_token")
+    if token:
+        try:
+            decoded = decode_access_token(token)
+            user = db["users"].find_one({"_id": decoded.get("sub")}) or {}
+            actor = {"uid": decoded.get("sub"), "email": user.get("email") or decoded.get("email"), "role": user.get("role")}
+        except Exception:
+            actor = None
+
+    after_snapshot, after_target = audit_snapshot(request.url.path)
+    changes = audit_changes(before_snapshot, after_snapshot)
+    if not changes and response.status_code < 400 and request_details:
+        changes = audit_changes({}, request_details)
+    details = {"http_status": response.status_code}
+    if changes:
+        details["changes"] = changes
+
+    record_audit_event(
+        action=f"{request.method} {request.url.path}",
+        status="success" if response.status_code < 400 else "failed",
+        actor=actor,
+        path=request.url.path,
+        target=target or after_target,
+        details=details,
+        ip_address=request.client.host if request.client else None,
+    )
+    return response
+
+
+def audit_snapshot(path: str):
+    """Read the affected document before/after a mutation for field-level audit diffs."""
+    patterns = (
+        (r"^/users/([^/]+)(?:/(?:password|deactivate))?$", "users"),
+        (r"^/bookings/([^/]+)(?:/(?:status|cancel|cancellation-review|start|complete|validate-completion))?$", "bookings"),
+        (r"^/tickets/([^/]+)(?:/(?:status|cancel))?$", "tickets"),
+        (r"^/locations/([^/]+)$", "booking_locations"),
+        (r"^/settings/drivers/([^/]+)$", "users"),
+    )
+    for pattern, collection in patterns:
+        match = re.fullmatch(pattern, path)
+        if match:
+            target = match.group(1)
+            return db[collection].find_one({"_id": target}), target
+    if path == "/settings/booking-cancellation":
+        target = "booking_cancellation_policy"
+        return db["app_settings"].find_one({"_id": target}), target
+    return None, None
 
 security = HTTPBearer(auto_error=False)
 
@@ -117,6 +186,7 @@ from routes_users_admin import router as users_router
 from routes_page_permissions import router as pages_router
 from routes_telegram import router as telegram_router
 from routes_locations import router as locations_router
+from routes_audit_logs import router as audit_logs_router
 
 
 @app.get("/health")
@@ -158,3 +228,4 @@ app.include_router(users_router)
 app.include_router(pages_router)
 app.include_router(telegram_router)
 app.include_router(locations_router)
+app.include_router(audit_logs_router)

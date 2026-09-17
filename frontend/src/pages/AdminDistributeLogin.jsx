@@ -8,6 +8,7 @@ function parseEmails(value) {
 
 function AdminDistributeLogin() {
   const [emailText, setEmailText] = useState('')
+  const [role, setRole] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
@@ -15,8 +16,12 @@ function AdminDistributeLogin() {
 
   const submit = async (event) => {
     event.preventDefault()
+    if (!role) {
+      setError('Select a role before entering email addresses.')
+      return
+    }
     if (!emails.length) {
-      setError('Enter at least one Employee email address.')
+      setError('Enter at least one email address.')
       return
     }
     if (emails.length > 100) {
@@ -28,14 +33,14 @@ function AdminDistributeLogin() {
     setError('')
     setResult(null)
     try {
-      const response = await fetch(`${API_BASE_URL}/users/distribute-login`, {
+      const response = await fetch(`${API_BASE_URL}/users/distribute-account`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails }),
+        body: JSON.stringify({ emails, role }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data?.detail || 'Failed to distribute login invitations.')
+      if (!response.ok) throw new Error(data?.detail || 'Failed to distribute account invitations.')
       setResult(data)
       if (data.failed === 0) setEmailText('')
     } catch (requestError) {
@@ -46,22 +51,32 @@ function AdminDistributeLogin() {
   }
 
   return (
-    <MainLayout title="Distribute Login">
+    <MainLayout title="Distribute Account">
       <section className="office-content admin-settings distribute-login-settings">
-        <header className="office-header"><h1>Distribute Login</h1></header>
+        <header className="office-header"><h1>Distribute Account</h1></header>
         <form className="ticket-form distribute-login-form" onSubmit={submit}>
           <section className="field-group">
             <div className="field-heading">
               <span className="heading-icon" aria-hidden="true"><i className="bi bi-envelope-plus" /></span>
               <div>
-                <h2>Employee login invitation</h2>
-                <p className="muted">Create Employee accounts and send each recipient a one-time link to set their password. Department and job position can be completed later in Manage User. Each link expires in 1 hour.</p>
+                <h2>Account invitation</h2>
+                <p className="muted">Choose the role first, then create accounts and send each recipient a one-time link to set their password. Department and job position can be completed later in Manage User. Each link expires in 1 hour.</p>
               </div>
             </div>
             <label className="form-field">
-              <span>Employee email addresses</span>
+              <span>Role</span>
+              <select value={role} onChange={(event) => setRole(event.target.value)} disabled={sending} required>
+                <option value="" disabled>Select role</option>
+                <option value="user">Employee</option>
+                <option value="driver">Driver</option>
+                <option value="office_coordinator">Office Coordinator</option>
+                <option value="superadmin">Super Admin</option>
+              </select>
+            </label>
+            <label className="form-field">
+              <span>Email addresses</span>
               <textarea value={emailText} onChange={(event) => setEmailText(event.target.value)} placeholder={'employee.one@example.com\nemployee.two@example.com'} rows="8" disabled={sending} required />
-              <small className="muted">One email per line. You can also separate email addresses with commas. Role: Employee.</small>
+              <small className="muted">One email per line. You can also separate email addresses with commas. The selected role will be assigned to every account.</small>
             </label>
             <div className="admin-settings__preview">
               <i className="bi bi-info-circle" aria-hidden="true" />

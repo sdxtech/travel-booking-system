@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator, field_v
 from pymongo.errors import DuplicateKeyError
 
 from auth_utils import hash_password
+from audit_service import record_audit_event
 from email_service import EmailDeliveryError, send_password_reset_email
 from main import get_current_user
 from mongo_client import db
@@ -110,20 +111,21 @@ class UserImportResponse(BaseModel):
     errors: list[UserImportError]
 
 
-class DistributeLoginRequest(BaseModel):
+class DistributeAccountRequest(BaseModel):
     emails: list[str] = Field(..., min_length=1, max_length=100)
+    role: Role
 
 
-class DistributeLoginResult(BaseModel):
+class DistributeAccountResult(BaseModel):
     email: str
     status: Literal["invited", "failed"]
     message: Optional[str] = None
 
 
-class DistributeLoginResponse(BaseModel):
+class DistributeAccountResponse(BaseModel):
     created: int
     failed: int
-    results: list[DistributeLoginResult]
+    results: list[DistributeAccountResult]
 
 
 def ensure_role(uid: str, allowed: tuple[str, ...]):
@@ -756,29 +758,32 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
     return UserImportResponse(created=created, updated=updated, failed=len(errors), errors=errors)
 
 
-@router.post("/distribute-login", response_model=DistributeLoginResponse, status_code=status.HTTP_201_CREATED)
-def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Depends(get_current_user)):
-    """Create Employee accounts in bulk and send one-hour set-password links."""
+@router.post("/distribute-account", response_model=DistributeAccountResponse, status_code=status.HTTP_201_CREATED)
+def distribute_accounts(payload: DistributeAccountRequest, current_user=Depends(get_current_user)):
+    """Create role-selected accounts in bulk and send one-hour set-password links."""
     uid = current_user["uid"]
     ensure_role(uid, ("superadmin",))
 
     normalized_emails: list[str] = []
     seen: set[str] = set()
-    results: list[DistributeLoginResult] = []
+    results: list[DistributeAccountResult] = []
     for raw_email in payload.emails:
         email = normalize_email(raw_email)
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
-            results.append(DistributeLoginResult(email=str(raw_email).strip(), status="failed", message="Invalid email address"))
+            results.append(DistributeAccountResult(email=str(raw_email).strip(), status="failed", message="Invalid email address"))
+            record_audit_event(action="Account invitation", status="failed", actor=current_user, target=str(raw_email).strip(), details={"email": str(raw_email).strip(), "role": payload.role, "reason": "Invalid email address"})
             continue
         if email in seen:
-            results.append(DistributeLoginResult(email=email, status="failed", message="Duplicate email in this list"))
+            results.append(DistributeAccountResult(email=email, status="failed", message="Duplicate email in this list"))
+            record_audit_event(action="Account invitation", status="failed", actor=current_user, target=email, details={"email": email, "role": payload.role, "reason": "Duplicate email in this list"})
             continue
         seen.add(email)
         normalized_emails.append(email)
 
     for email in normalized_emails:
         if db["users"].find_one({"email": email}):
-            results.append(DistributeLoginResult(email=email, status="failed", message="Email already exists"))
+            results.append(DistributeAccountResult(email=email, status="failed", message="Email already exists"))
+            record_audit_event(action="Account invitation", status="failed", actor=current_user, target=email, details={"email": email, "role": payload.role, "reason": "Email already exists"})
             continue
 
         now = utc_now()
@@ -790,7 +795,7 @@ def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Dep
                 "_id": user_id,
                 "name": invitation_name(email),
                 "dept_job_position": "",
-                "role": "user",
+                "role": payload.role,
                 "plate_number": None,
                 "nik": "",
                 "phone": "",
@@ -821,7 +826,8 @@ def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Dep
             )
             if email_id is None:
                 raise EmailDeliveryError("Invitation email service is not configured")
-            results.append(DistributeLoginResult(email=email, status="invited"))
+            results.append(DistributeAccountResult(email=email, status="invited"))
+            record_audit_event(action="Account invitation", status="sent", actor=current_user, target=email, details={"email": email, "role": payload.role, "delivery": "sent", "expires_in_minutes": 60})
         except Exception as exc:
             # Do not leave an unusable account when its only login invitation
             # could not be delivered. The administrator can correct the issue
@@ -829,10 +835,11 @@ def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Dep
             if inserted_profile:
                 db["password_reset_tokens"].delete_many({"user_id": user_id})
                 db["users"].delete_one({"_id": user_id})
-            results.append(DistributeLoginResult(email=email, status="failed", message=str(exc) or "Failed to send invitation email"))
+            results.append(DistributeAccountResult(email=email, status="failed", message=str(exc) or "Failed to send invitation email"))
+            record_audit_event(action="Account invitation", status="failed", actor=current_user, target=email, details={"email": email, "role": payload.role, "delivery": "failed", "reason": str(exc) or "Failed to send invitation email"})
 
     created = sum(item.status == "invited" for item in results)
-    return DistributeLoginResponse(created=created, failed=len(results) - created, results=results)
+    return DistributeAccountResponse(created=created, failed=len(results) - created, results=results)
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

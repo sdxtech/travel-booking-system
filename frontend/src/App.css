@@ -857,6 +857,35 @@ user-dropdown-toogle {
   font-size: 13px;
 }
 
+.audit-log-toolbar {
+  margin-bottom: 0;
+}
+
+.audit-log-table td {
+  vertical-align: top;
+}
+
+.audit-status {
+  display: inline-block;
+  text-transform: capitalize;
+  font-weight: 600;
+}
+
+.audit-status--success,
+.audit-status--sent {
+  color: #15803d;
+}
+
+.audit-status--failed {
+  color: #b91c1c;
+}
+
+.audit-log-pagination {
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+}
+
 .field-heading:has(.cancellation-deadline-heading) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

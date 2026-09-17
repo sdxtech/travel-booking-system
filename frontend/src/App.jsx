@@ -22,6 +22,7 @@ import Unauthorized from './pages/Unauthorized'
 import AdminPagePermissions from './pages/AdminPagePermissions'
 import AdminLocationPoints from './pages/AdminLocationPoints'
 import AdminDistributeLogin from './pages/AdminDistributeLogin'
+import AdminAuditLog from './pages/AdminAuditLog'
 import ForgotPassword from './pages/ForgotPassword'
 import ChangePassword from './pages/ChangePassword'
 import ResetPassword from './pages/ResetPassword'
@@ -212,10 +213,19 @@ function App() {
             }
           />
           <Route
-            path="/admin/distribute-login"
+            path="/admin/distribute-account"
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminDistributeLogin />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/distribute-login" element={<Navigate to="/admin/distribute-account" replace />} />
+          <Route
+            path="/admin/audit-log"
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <AdminAuditLog />
               </ProtectedRoute>
             }
           />
