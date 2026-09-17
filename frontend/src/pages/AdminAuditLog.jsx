@@ -4,12 +4,29 @@ import { API_BASE_URL } from '../config'
 
 function formatTime(value) {
   const date = value ? new Date(value) : null
-  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '-'
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'medium' }) : '-'
 }
 
 function formatDetails(details) {
+  const changes = Array.isArray(details?.changes) ? details.changes : []
+  const changeLabels = changes.map((change) => {
+    const field = String(change.field || '').replace(/_/g, ' ')
+    const before = formatDetailValue(change.before)
+    const after = formatDetailValue(change.after)
+    return `${field}: ${before} → ${after}`
+  })
   const entries = Object.entries(details || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
-  return entries.length ? entries.map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`).join(' • ') : '-'
+  const otherDetails = entries
+    .filter(([key]) => key !== 'changes')
+    .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${formatDetailValue(value)}`)
+  return [...changeLabels, ...otherDetails].join(' • ') || '-'
+}
+
+function formatDetailValue(value) {
+  if (value === undefined || value === null || value === '') return '(empty)'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
 
 function describeActivity(action, path) {
