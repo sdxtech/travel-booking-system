@@ -24,6 +24,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from auth_utils import decode_access_token, get_jwt_secret
+from audit_service import record_audit_event
 from mongo_client import db, init_mongo
 
 app = FastAPI()
@@ -37,6 +38,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def audit_mutating_api_requests(request: Request, call_next):
+    """Audit every data-changing API request, regardless of the user's role."""
+    response = await call_next(request)
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"} or request.url.path.startswith("/audit-logs"):
+        return response
+
+    actor = None
+    token = request.cookies.get("access_token")
+    if token:
+        try:
+            decoded = decode_access_token(token)
+            user = db["users"].find_one({"_id": decoded.get("sub")}) or {}
+            actor = {"uid": decoded.get("sub"), "email": user.get("email") or decoded.get("email"), "role": user.get("role")}
+        except Exception:
+            actor = None
+
+    record_audit_event(
+        action=f"{request.method} {request.url.path}",
+        status="success" if response.status_code < 400 else "failed",
+        actor=actor,
+        path=request.url.path,
+        target=request.path_params.get("booking_id") or request.path_params.get("ticket_id") or request.path_params.get("user_id"),
+        details={"http_status": response.status_code},
+        ip_address=request.client.host if request.client else None,
+    )
+    return response
 
 security = HTTPBearer(auto_error=False)
 
@@ -117,6 +147,7 @@ from routes_users_admin import router as users_router
 from routes_page_permissions import router as pages_router
 from routes_telegram import router as telegram_router
 from routes_locations import router as locations_router
+from routes_audit_logs import router as audit_logs_router
 
 
 @app.get("/health")
@@ -158,3 +189,4 @@ app.include_router(users_router)
 app.include_router(pages_router)
 app.include_router(telegram_router)
 app.include_router(locations_router)
+app.include_router(audit_logs_router)

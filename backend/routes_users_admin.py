@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator, field_v
 from pymongo.errors import DuplicateKeyError
 
 from auth_utils import hash_password
+from audit_service import record_audit_event
 from email_service import EmailDeliveryError, send_password_reset_email
 from main import get_current_user
 from mongo_client import db
@@ -769,9 +770,11 @@ def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Dep
         email = normalize_email(raw_email)
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
             results.append(DistributeLoginResult(email=str(raw_email).strip(), status="failed", message="Invalid email address"))
+            record_audit_event(action="Employee login invitation", status="failed", actor=current_user, target=str(raw_email).strip(), details={"email": str(raw_email).strip(), "reason": "Invalid email address"})
             continue
         if email in seen:
             results.append(DistributeLoginResult(email=email, status="failed", message="Duplicate email in this list"))
+            record_audit_event(action="Employee login invitation", status="failed", actor=current_user, target=email, details={"email": email, "reason": "Duplicate email in this list"})
             continue
         seen.add(email)
         normalized_emails.append(email)
@@ -779,6 +782,7 @@ def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Dep
     for email in normalized_emails:
         if db["users"].find_one({"email": email}):
             results.append(DistributeLoginResult(email=email, status="failed", message="Email already exists"))
+            record_audit_event(action="Employee login invitation", status="failed", actor=current_user, target=email, details={"email": email, "reason": "Email already exists"})
             continue
 
         now = utc_now()
@@ -822,6 +826,7 @@ def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Dep
             if email_id is None:
                 raise EmailDeliveryError("Invitation email service is not configured")
             results.append(DistributeLoginResult(email=email, status="invited"))
+            record_audit_event(action="Employee login invitation", status="sent", actor=current_user, target=email, details={"email": email, "delivery": "sent", "expires_in_minutes": 60})
         except Exception as exc:
             # Do not leave an unusable account when its only login invitation
             # could not be delivered. The administrator can correct the issue
@@ -830,6 +835,7 @@ def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Dep
                 db["password_reset_tokens"].delete_many({"user_id": user_id})
                 db["users"].delete_one({"_id": user_id})
             results.append(DistributeLoginResult(email=email, status="failed", message=str(exc) or "Failed to send invitation email"))
+            record_audit_event(action="Employee login invitation", status="failed", actor=current_user, target=email, details={"email": email, "delivery": "failed", "reason": str(exc) or "Failed to send invitation email"})
 
     created = sum(item.status == "invited" for item in results)
     return DistributeLoginResponse(created=created, failed=len(results) - created, results=results)

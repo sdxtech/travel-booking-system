@@ -251,6 +251,10 @@ function MainLayout({ title, children }) {
             label: 'Distribute Login',
             path: '/admin/distribute-login',
             icon: 'bi-envelope-plus',
+          }, {
+            label: 'Audit Log',
+            path: '/admin/audit-log',
+            icon: 'bi-journal-text',
           }] : []),
           {
             label: 'Manage User',
