@@ -12,6 +12,50 @@ function formatDetails(details) {
   return entries.length ? entries.map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value}`).join(' • ') : '-'
 }
 
+function describeActivity(action, path) {
+  if (action === 'Employee login invitation') return 'Distribute Login Invitation'
+  const key = action || path || ''
+  const activities = [
+    [/POST \/auth\/login/, 'Login'],
+    [/POST \/auth\/logout/, 'Logout'],
+    [/POST \/auth\/forgot-password/, 'Request Password Reset'],
+    [/POST \/auth\/reset-password/, 'Set / Reset Password'],
+    [/PATCH \/auth\/change-password/, 'Change Password'],
+    [/POST \/bookings\/assign/, 'Create & Approve Booking Driver'],
+    [/POST \/bookings$/, 'Submit Booking Driver Request'],
+    [/PATCH \/bookings\/[^/]+\/status/, 'Update Booking Driver Status'],
+    [/PATCH \/bookings\/[^/]+\/cancel$/, 'Cancel Booking Driver Request'],
+    [/PATCH \/bookings\/[^/]+\/cancellation-review/, 'Review Booking Cancellation'],
+    [/PATCH \/bookings\/[^/]+\/start/, 'Start Booking Driver Trip'],
+    [/PATCH \/bookings\/[^/]+\/complete/, 'Finish Booking Driver Trip'],
+    [/PATCH \/bookings\/[^/]+\/validate-completion/, 'Validate Booking Driver Completion'],
+    [/PATCH \/bookings\/[^/]+$/, 'Edit Booking Driver Request'],
+    [/POST \/tickets\/accommodation/, 'Create Travel Request'],
+    [/POST \/tickets$/, 'Submit Travel Request'],
+    [/PATCH \/tickets\/[^/]+\/status/, 'Update Travel Request Status'],
+    [/PATCH \/tickets\/[^/]+\/cancel$/, 'Cancel Travel Request'],
+    [/PATCH \/tickets\/[^/]+$/, 'Edit Travel Request'],
+    [/POST \/users\/distribute-login/, 'Distribute Login Batch'],
+    [/POST \/users\/import/, 'Import Users'],
+    [/POST \/users$/, 'Create User'],
+    [/PATCH \/users\/[^/]+\/password/, 'Reset User Password'],
+    [/PATCH \/users\/[^/]+\/deactivate/, 'Deactivate User'],
+    [/PATCH \/users\/[^/]+$/, 'Update User'],
+    [/DELETE \/users\//, 'Delete User'],
+    [/PATCH \/settings\/booking-cancellation/, 'Update Cancellation Settings'],
+    [/PATCH \/settings\/drivers\//, 'Update Driver Availability'],
+    [/PUT \/pages\/permissions/, 'Update Page Permissions'],
+    [/POST \/locations$/, 'Add Location Point'],
+    [/PATCH \/locations\//, 'Update Location Point'],
+    [/DELETE \/locations\//, 'Delete Location Point'],
+    [/POST \/telegram\/connect/, 'Connect Telegram'],
+    [/DELETE \/telegram\/connection/, 'Disconnect Telegram'],
+    [/PATCH \/notifications\//, 'Update Notification'],
+  ]
+  const match = activities.find(([pattern]) => pattern.test(key))
+  return match ? match[1] : action || 'Unknown activity'
+}
+
 function AdminAuditLog() {
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
@@ -70,7 +114,7 @@ function AdminAuditLog() {
               {!loading && !data.items.length ? <tr><td colSpan="7" className="muted">No audit activity found.</td></tr> : null}
               {!loading && data.items.map((item) => <tr key={item.id}>
                 <td>{formatTime(item.created_at)}</td><td>{item.actor_email || 'System / unauthenticated'}</td><td>{item.actor_role || '-'}</td>
-                <td>{item.action}</td><td>{item.target || item.path || '-'}</td><td><span className={`audit-status audit-status--${item.status}`}>{item.status}</span></td><td>{formatDetails(item.details)}</td>
+                <td>{describeActivity(item.action, item.path)}</td><td>{item.target || item.path || '-'}</td><td><span className={`audit-status audit-status--${item.status}`}>{item.status}</span></td><td>{formatDetails(item.details)}</td>
               </tr>)}
             </tbody>
           </table>
