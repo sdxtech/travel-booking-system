@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
+import useOfficeSidebar from '../hooks/useOfficeSidebar'
+
+const menuItems = [
+  { label: 'Quick View', icon: 'bi-speedometer2' },
+  { label: 'Travel Status & History', icon: 'bi-clock-history' },
+  { label: 'Travel Assign', icon: 'bi-building' },
+  { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
+  { label: 'Booking Driver Assign', icon: 'bi-person-check' },
+  { label: 'Manage User', icon: 'bi-people' },
+]
 
 function parseEmails(value) {
   return value.split(/[\n,;]+/).map((email) => email.trim()).filter(Boolean)
@@ -8,6 +18,7 @@ function parseEmails(value) {
 
 function AdminDistributeLogin() {
   const [emailText, setEmailText] = useState('')
+  const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const [role, setRole] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -52,7 +63,38 @@ function AdminDistributeLogin() {
 
   return (
     <MainLayout title="Distribute Account">
-      <section className="office-content admin-settings distribute-login-settings">
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+         <aside className="office-sidebar visible">
+          <div className="sidebar-header">
+            <span className="sidebar-role">Super Admin</span>
+            <button
+              type="button"
+              className="sidebar-toggle"
+              onClick={toggleSidebar}
+              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <i className={`bi ${isSidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} aria-hidden="true" />
+            </button>
+          </div>
+          <nav className="sidebar-menu">
+            {menuItems.map((menuItem) => (
+              <button
+                key={menuItem.label}
+                type="button"
+                className={`sidebar-item ${menuItem.label === 'Manage User' ? 'active' : ''}`}
+                
+                aria-label={menuItem.label}
+                title={menuItem.label}
+              >
+                <i className={`bi ${menuItem.icon} sidebar-item__icon`} aria-hidden="true" />
+                <span className="sidebar-item__label">{menuItem.label}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+      <section className="office-content  distribute-login-settings">
         <header className="office-header"><h1>Distribute Account</h1></header>
         <form className="ticket-form distribute-login-form" onSubmit={submit}>
           <section className="field-group">
@@ -103,6 +145,7 @@ function AdminDistributeLogin() {
           </section>
         </form>
       </section>
+      </div>
     </MainLayout>
   )
 }
