@@ -843,6 +843,14 @@ user-dropdown-toogle {
   grid-column: 1 / -1;
 }
 
+.field-heading:has(.cancellation-deadline-heading) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  gap: 16px;
+}
+
 .admin-settings__preview {
   display: flex;
   align-items: flex-start;

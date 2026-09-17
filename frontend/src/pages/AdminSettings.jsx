@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config'
 
 const initialPolicy = {
   auto_approve: true,
+  deadline_enabled: true,
   value: '1',
   unit: 'days',
   cutoff_time: '17:00',
@@ -42,6 +43,7 @@ function AdminSettings() {
         const data = await response.json()
         setPolicy({
           auto_approve: data.auto_approve !== false,
+          deadline_enabled: data.deadline_enabled !== false,
           value: String(data.value || 1),
           unit: data.unit === 'hours' ? 'hours' : 'days',
           cutoff_time: data.cutoff_time || '17:00',
@@ -80,7 +82,7 @@ function AdminSettings() {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ value, unit: policy.unit, cutoff_time: policy.cutoff_time, auto_approve: policy.auto_approve }),
+        body: JSON.stringify({ value, unit: policy.unit, cutoff_time: policy.cutoff_time, auto_approve: policy.auto_approve, deadline_enabled: policy.deadline_enabled }),
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
@@ -91,6 +93,7 @@ function AdminSettings() {
       const updated = await response.json()
       const nextPolicy = {
         auto_approve: updated.auto_approve !== false,
+        deadline_enabled: updated.deadline_enabled !== false,
         value: String(updated.value),
         unit: updated.unit,
         cutoff_time: updated.cutoff_time || '17:00',
@@ -139,10 +142,22 @@ function AdminSettings() {
               <span className="heading-icon" aria-hidden="true">
                 <i className="bi bi-calendar-x" />
               </span>
-              <div>
+              <div className="cancellation-deadline-heading">
                 <h2>Cancellation deadline</h2>
-                <p className="muted">Use a rolling duration in hours, or a specific Jakarta cutoff time on a prior day.</p>
+                <p className="muted">{policy.deadline_enabled ? 'Use a rolling duration in hours, or a specific Jakarta cutoff time on a prior day.' : 'Eligible Employee cancellations are not restricted by a time cutoff.'}</p>
               </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Cancellation deadline"
+                aria-checked={policy.deadline_enabled}
+                className={`driver-availability-toggle ${policy.deadline_enabled ? 'is-on' : 'is-off'}`}
+                disabled={loading || saving}
+                onClick={() => setPolicy((prev) => ({ ...prev, deadline_enabled: !prev.deadline_enabled }))}
+              >
+                <i className={`bi ${policy.deadline_enabled ? 'bi-toggle-on' : 'bi-toggle-off'}`} aria-hidden="true" />
+                <span>{policy.deadline_enabled ? 'On' : 'Off'}</span>
+              </button>
             </div>
 
             <div className="field-grid">
@@ -155,7 +170,7 @@ function AdminSettings() {
                   step="1"
                   value={policy.value}
                   onChange={(event) => setPolicy((prev) => ({ ...prev, value: event.target.value }))}
-                  disabled={loading || saving}
+                  disabled={loading || saving || !policy.deadline_enabled}
                   required
                 />
               </label>
@@ -165,7 +180,7 @@ function AdminSettings() {
                 <select
                   value={policy.unit}
                   onChange={(event) => setPolicy((prev) => ({ ...prev, unit: event.target.value }))}
-                  disabled={loading || saving}
+                  disabled={loading || saving || !policy.deadline_enabled}
                 >
                   <option value="hours">Hour(s)</option>
                   <option value="days">Day(s)</option>
@@ -179,7 +194,7 @@ function AdminSettings() {
                     type="time"
                     value={policy.cutoff_time}
                     onChange={(event) => setPolicy((prev) => ({ ...prev, cutoff_time: event.target.value }))}
-                    disabled={loading || saving}
+                    disabled={loading || saving || !policy.deadline_enabled}
                     required
                   />
                 </label>
@@ -188,9 +203,9 @@ function AdminSettings() {
 
             <div className="admin-settings__preview">
               <i className="bi bi-info-circle" aria-hidden="true" />
-              <span>
-                Employees can cancel a pending or approved booking until {getPolicyLabel(policy)}.
-              </span>
+              <span>{policy.deadline_enabled
+                ? `Employees can cancel a pending or approved booking until ${getPolicyLabel(policy)}.`
+                : 'Cancellation deadline is off. Employees can cancel eligible pending or approved bookings without a time cutoff.'}</span>
             </div>
 
             {error ? <p className="error-text">{error}</p> : null}

@@ -880,7 +880,7 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
 
         departure_time = normalize_datetime(data.get("departure_time"))
         policy = get_booking_cancellation_policy()
-        if departure_time:
+        if departure_time and policy.get("deadline_enabled", True):
             cancellation_deadline = get_booking_cancellation_deadline(departure_time, policy)
             if utc_now() > cancellation_deadline:
                 if policy["unit"] == "days":

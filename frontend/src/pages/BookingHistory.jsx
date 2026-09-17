@@ -61,6 +61,7 @@ function BookingHistory() {
 
   const getCancellationPolicyLabel = () => {
     if (!cancellationPolicy) return ''
+    if (cancellationPolicy.deadline_enabled === false) return 'without a time cutoff'
     const value = Number(cancellationPolicy.value) || 1
     if (cancellationPolicy.unit === 'hours') {
       return `${value} ${value === 1 ? 'hour' : 'hours'} before departure`
@@ -73,6 +74,7 @@ function BookingHistory() {
     if (booking.cancellation_status === 'pending') return false
     if (!['pending', 'approved'].includes(getBookingStatus(booking))) return false
     if (!cancellationPolicy) return true
+    if (cancellationPolicy.deadline_enabled === false) return true
 
     const departureTime = toDate(booking?.departure_time)
     if (!departureTime) return true
@@ -388,7 +390,9 @@ function BookingHistory() {
         {actionMessage ? <p className="success-text">{actionMessage}</p> : null}
         {cancellationPolicy ? (
           <p className="muted booking-cancellation-policy">
-            Pending and approved bookings can be cancelled until {getCancellationPolicyLabel()}.
+            {cancellationPolicy.deadline_enabled === false
+              ? 'Cancellation deadline is off. Pending and approved bookings can be cancelled without a time cutoff.'
+              : `Pending and approved bookings can be cancelled until ${getCancellationPolicyLabel()}.`}
             {cancellationPolicy.auto_approve === false ? ' Cancellation requires Office Coordinator approval.' : ''}
           </p>
         ) : null}

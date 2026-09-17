@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import BookingFormSelect from './BookingFormSelect'
 import { API_BASE_URL } from '../config'
 import useBookingLocations from '../hooks/useBookingLocations'
@@ -21,6 +22,7 @@ function formatDriverHeader(calendar) {
 }
 
 function QuickBookingModal({ slot, onClose, onBooked }) {
+  const navigate = useNavigate()
   const defaultEnd = new Date(slot.start)
   defaultEnd.setMinutes(defaultEnd.getMinutes() + 30)
   const [form, setForm] = useState({
@@ -88,24 +90,43 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="quick-booking-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="modal quick-booking-modal">
-        <div className="modal-header">
-          <h2 id="quick-booking-title">{submissionStatus ? (submissionStatus === 'approved' ? 'Booking Approved' : 'Request Sent') : 'Create Booking Driver'}</h2>
-          <button type="button" className="modal-close" aria-label="Close booking form" onClick={onClose}>
-            <i className="bi bi-x-lg" aria-hidden="true" />
-          </button>
-        </div>
-        {submissionStatus ? (
-          <div className="quick-booking-modal__success">
-            <div className="success-modal-icon" aria-hidden="true"><i className="bi bi-check-lg" /></div>
-            <p>
-              {submissionStatus === 'approved'
-                ? 'The selected driver is available, so your booking was approved automatically by the system.'
-                : 'Your booking request has been sent for review.'}
-            </p>
-            <button type="button" className="btn btn-brand" onClick={onClose}>Done</button>
+      {submissionStatus ? (
+        <div className="modal success-modal">
+          <div className="success-modal-icon" aria-hidden="true">
+            <i className="bi bi-check-lg" />
           </div>
-        ) : (
+          <h2 id="quick-booking-title" className="success-modal-title">
+            {submissionStatus === 'approved' ? 'Booking Approved' : 'Request Sent'}
+          </h2>
+          <p className="success-modal-message">
+            {submissionStatus === 'approved'
+              ? 'The selected driver is available, so your booking was approved automatically by the system.'
+              : 'Your booking request has been sent for review.'}
+          </p>
+          <div className="success-modal-actions">
+            <button
+              type="button"
+              className="btn btn-brand"
+              onClick={() => {
+                onClose()
+                navigate('/user/booking-history')
+              }}
+            >
+              View History
+            </button>
+            <button type="button" className="btn btn-outline-brand" onClick={() => setSubmissionStatus('')}>
+              Back to Form
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="modal quick-booking-modal">
+          <div className="modal-header">
+            <h2 id="quick-booking-title">Create Booking Driver</h2>
+            <button type="button" className="modal-close" aria-label="Close booking form" onClick={onClose}>
+              <i className="bi bi-x-lg" aria-hidden="true" />
+            </button>
+          </div>
           <form className="ticket-form quick-booking-modal__form" onSubmit={submit}>
             <p className="quick-booking-modal__driver"><i className="bi bi-car-front" aria-hidden="true" /> {formatDriverHeader(slot.calendar)}</p>
             <div className="booking-grid">
@@ -124,8 +145,8 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
               <button type="button" className="btn btn-outline-danger" onClick={onClose} disabled={submitting}>Cancel</button>
             </div>
           </form>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

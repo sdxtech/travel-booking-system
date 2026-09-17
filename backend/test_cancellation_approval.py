@@ -103,6 +103,12 @@ class CancellationApprovalTests(unittest.TestCase):
         self.policy["auto_approve"] = True
         self.assertEqual(self.cancel().status, "cancelled")
 
+    def test_employee_can_cancel_after_cutoff_when_deadline_is_off(self):
+        self.document["departure_time"] = self.now
+        self.policy["deadline_enabled"] = False
+        self.policy["auto_approve"] = True
+        self.assertEqual(self.cancel().status, "cancelled")
+
     def test_employee_cannot_cancel_active_or_review_requests(self):
         self.document["status"] = "in_progress"
         with self.assertRaises(HTTPException):
@@ -165,11 +171,14 @@ class CancellationApprovalTests(unittest.TestCase):
             return_value={**self.policy, "cutoff_minutes": 1440},
         ):
             result = settings.update_booking_cancellation_policy(
-                settings.BookingCancellationPolicyUpdate(value=1, unit="days", auto_approve=False),
+                settings.BookingCancellationPolicyUpdate(
+                    value=1, unit="days", auto_approve=False, deadline_enabled=False,
+                ),
                 {"uid": "admin", "role": "superadmin"},
             )
             self.assertFalse(result.auto_approve)
             self.assertFalse(collection.update_one.call_args.args[1]["$set"]["auto_approve"])
+            self.assertFalse(collection.update_one.call_args.args[1]["$set"]["deadline_enabled"])
 
 
 if __name__ == "__main__":

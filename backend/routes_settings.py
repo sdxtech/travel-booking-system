@@ -15,6 +15,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 class BookingCancellationPolicyUpdate(BaseModel):
     auto_approve: bool = True
+    deadline_enabled: bool = True
     value: int = Field(..., ge=1, le=8760)
     unit: Literal["hours", "days"]
     cutoff_time: str = Field(default="17:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
@@ -22,6 +23,7 @@ class BookingCancellationPolicyUpdate(BaseModel):
 
 class BookingCancellationPolicyResponse(BaseModel):
     auto_approve: bool = True
+    deadline_enabled: bool = True
     value: int
     unit: Literal["hours", "days"]
     cutoff_minutes: int
@@ -98,6 +100,7 @@ def update_booking_cancellation_policy(
             "$set": {
                 "value": payload.value,
                 "auto_approve": payload.auto_approve,
+                "deadline_enabled": payload.deadline_enabled,
                 "unit": payload.unit,
                 "cutoff_time": payload.cutoff_time,
                 "updated_at": now,
