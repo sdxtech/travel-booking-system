@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from main import get_current_user
 from bson import ObjectId
+from pymongo import ReturnDocument
 
 
 from auth_utils import create_access_token, verify_password, hash_password, get_jwt_expires_hours
@@ -216,11 +217,8 @@ def get_current_user_profile(current_user=Depends(get_current_user)):
     }
 
 @router.post("/forgot-password")
-def forgot_password(
-    payload: ForgotPasswordRequest,
-):
+def forgot_password(payload: ForgotPasswordRequest,):
     email = payload.email.strip().lower()
-
     user = db["users"].find_one({
         "email": email
     })
@@ -232,6 +230,46 @@ def forgot_password(
                 "a password reset link has been sent."
             )
         }
+    
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=1)
+    
+    last_reset_request = user.get(
+        "password_reset_requested_at"
+    )
+    
+    if last_reset_request:
+        if last_reset_request.tzinfo is None:
+            last_reset_request = last_reset_request.replace(
+                tzinfo=timezone.utc
+            )
+        next_allowed = (
+            last_reset_request + timedelta(days=1)
+        )
+        if now < next_allowed:
+            remaining = next_allowed - now
+            hours = remaining.seconds // 3600
+            minutes = (remaining.seconds % 3600) // 60
+            
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    "Password reset has already been requested "
+                    "for this account today. "
+                    f"Please try again in approximately "
+                    f"{hours} hours and {minutes} minutes."
+                )
+            )
+    db["users"].update_one(
+        {
+            "_id": user["_id"]
+        },
+        {
+            "$set": {
+                "password_reset_requested_at": now
+            }
+        }
+    )
 
     # Generate raw token
     token = secrets.token_urlsafe(32)
