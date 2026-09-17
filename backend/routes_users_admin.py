@@ -1,9 +1,12 @@
 import base64
 import csv
+import hashlib
 import io
+import os
 import re
+import secrets
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Literal, Optional
 from uuid import uuid4
@@ -14,6 +17,7 @@ from pydantic import BaseModel, Field, ValidationError, model_validator, field_v
 from pymongo.errors import DuplicateKeyError
 
 from auth_utils import hash_password
+from email_service import EmailDeliveryError, send_password_reset_email
 from main import get_current_user
 from mongo_client import db
 
@@ -104,6 +108,22 @@ class UserImportResponse(BaseModel):
     updated: int = 0
     failed: int
     errors: list[UserImportError]
+
+
+class DistributeLoginRequest(BaseModel):
+    emails: list[str] = Field(..., min_length=1, max_length=100)
+
+
+class DistributeLoginResult(BaseModel):
+    email: str
+    status: Literal["invited", "failed"]
+    message: Optional[str] = None
+
+
+class DistributeLoginResponse(BaseModel):
+    created: int
+    failed: int
+    results: list[DistributeLoginResult]
 
 
 def ensure_role(uid: str, allowed: tuple[str, ...]):
@@ -231,6 +251,13 @@ def normalize_email(value: str) -> str:
     """Normalize an email value from imports (trim, lowercase, remove spaces)."""
     text = str(value or "").strip().lower()
     return re.sub(r"\s+", "", text)
+
+
+def invitation_name(email: str) -> str:
+    """Create a temporary display name when the invitation only supplies an email."""
+    local_part = email.split("@", 1)[0]
+    name = re.sub(r"[._-]+", " ", local_part).strip()
+    return name.title() or "Employee"
 
 
 def format_validation_error(exc: ValidationError) -> str:
@@ -727,6 +754,85 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
             continue
 
     return UserImportResponse(created=created, updated=updated, failed=len(errors), errors=errors)
+
+
+@router.post("/distribute-login", response_model=DistributeLoginResponse, status_code=status.HTTP_201_CREATED)
+def distribute_employee_logins(payload: DistributeLoginRequest, current_user=Depends(get_current_user)):
+    """Create Employee accounts in bulk and send one-hour set-password links."""
+    uid = current_user["uid"]
+    ensure_role(uid, ("superadmin",))
+
+    normalized_emails: list[str] = []
+    seen: set[str] = set()
+    results: list[DistributeLoginResult] = []
+    for raw_email in payload.emails:
+        email = normalize_email(raw_email)
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            results.append(DistributeLoginResult(email=str(raw_email).strip(), status="failed", message="Invalid email address"))
+            continue
+        if email in seen:
+            results.append(DistributeLoginResult(email=email, status="failed", message="Duplicate email in this list"))
+            continue
+        seen.add(email)
+        normalized_emails.append(email)
+
+    for email in normalized_emails:
+        if db["users"].find_one({"email": email}):
+            results.append(DistributeLoginResult(email=email, status="failed", message="Email already exists"))
+            continue
+
+        now = utc_now()
+        user_id = uuid4().hex
+        token = secrets.token_urlsafe(32)
+        inserted_profile = False
+        try:
+            insert_user_profile({
+                "_id": user_id,
+                "name": invitation_name(email),
+                "dept_job_position": "",
+                "role": "user",
+                "plate_number": None,
+                "nik": "",
+                "phone": "",
+                "email": email,
+                "disabled": False,
+                "created_at": now,
+                "updated_at": now,
+                "created_by": uid,
+                "invited_at": now,
+                "invited_by": uid,
+            })
+            inserted_profile = True
+            db["password_reset_tokens"].insert_one({
+                "user_id": user_id,
+                "token_hash": hashlib.sha256(token.encode()).hexdigest(),
+                "expires_at": now + timedelta(hours=1),
+                "used": False,
+                "purpose": "account_invitation",
+                "created_at": now,
+            })
+            reset_url = f"{os.getenv('APP_PUBLIC_URL', '').rstrip('/')}/reset-password?token={token}"
+            email_id = send_password_reset_email(
+                to_email=email,
+                recipient_name=invitation_name(email),
+                reset_url=reset_url,
+                invitation=True,
+                expires_in_minutes=60,
+            )
+            if email_id is None:
+                raise EmailDeliveryError("Invitation email service is not configured")
+            results.append(DistributeLoginResult(email=email, status="invited"))
+        except Exception as exc:
+            # Do not leave an unusable account when its only login invitation
+            # could not be delivered. The administrator can correct the issue
+            # and submit the email again.
+            if inserted_profile:
+                db["password_reset_tokens"].delete_many({"user_id": user_id})
+                db["users"].delete_one({"_id": user_id})
+            results.append(DistributeLoginResult(email=email, status="failed", message=str(exc) or "Failed to send invitation email"))
+
+    created = sum(item.status == "invited" for item in results)
+    return DistributeLoginResponse(created=created, failed=len(results) - created, results=results)
 
 
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

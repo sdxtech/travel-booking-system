@@ -247,6 +247,11 @@ function MainLayout({ title, children }) {
   const directItems =
     !isEmployee && !isDriver
       ? [
+          ...(isSuperadmin ? [{
+            label: 'Distribute Login',
+            path: '/admin/distribute-login',
+            icon: 'bi-envelope-plus',
+          }] : []),
           {
             label: 'Manage User',
             path: isSuperadmin

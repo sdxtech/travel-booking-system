@@ -111,6 +111,8 @@ def send_password_reset_email(
     to_email: str,
     recipient_name: Optional[str],
     reset_url: str,
+    invitation: bool = False,
+    expires_in_minutes: int = 30,
 ) -> Optional[str]:
     config = get_email_config()
 
@@ -130,7 +132,16 @@ def send_password_reset_email(
         quote=True,
     )
 
-    subject = "Reset Your Booking App Password"
+    is_invitation = invitation is True
+    expiry_label = "1 hour" if expires_in_minutes == 60 else f"{expires_in_minutes} minutes"
+    subject = "Set Up Your Booking App Account" if is_invitation else "Reset Your Booking App Password"
+    heading = "Set Up Your Password" if is_invitation else "Reset Your Password"
+    intro = (
+        "A Super Admin created an Employee account for you. Set your password to activate your account."
+        if is_invitation
+        else "We received a request to reset your Booking App password."
+    )
+    action_label = "Set Password" if is_invitation else "Reset Password"
 
     html_content = (
         '<div style="margin:0;background:#f4f6f8;padding:24px;'
@@ -142,7 +153,7 @@ def send_password_reset_email(
 
         '<h1 style="margin:0 0 16px;color:#273896;'
         'font-size:22px;line-height:30px">'
-        'Reset Your Password'
+        f'{heading}'
         '</h1>'
 
         f'<p style="margin:0 0 12px;font-size:14px;'
@@ -152,7 +163,7 @@ def send_password_reset_email(
 
         '<p style="margin:0 0 16px;font-size:14px;'
         'line-height:22px">'
-        'We received a request to reset your Booking App password.'
+        f'{intro}'
         '</p>'
 
         '<p style="margin:24px 0">'
@@ -160,13 +171,13 @@ def send_password_reset_email(
         'style="display:inline-block;padding:10px 16px;'
         'border-radius:6px;background:#273896;'
         'color:#ffffff;text-decoration:none;font-weight:600">'
-        'Reset Password'
+        f'{action_label}'
         '</a>'
         '</p>'
 
         '<p style="margin:0;font-size:13px;'
         'line-height:20px;color:#64748b">'
-        'This link will expire in 30 minutes and can only be used once.'
+        f'This link will expire in {expiry_label} and can only be used once.'
         '</p>'
 
         '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;'
@@ -182,9 +193,9 @@ def send_password_reset_email(
 
     text_content = (
         f"Hello {recipient_name or 'User'},\n\n"
-        "We received a request to reset your Booking App password.\n\n"
-        f"Reset your password here:\n{reset_url}\n\n"
-        "This link will expire in 30 minutes and can only be used once.\n\n"
+        f"{intro}\n\n"
+        f"{action_label} here:\n{reset_url}\n\n"
+        f"This link will expire in {expiry_label} and can only be used once.\n\n"
         "If you did not request a password reset, you can safely ignore "
         "this email."
     )

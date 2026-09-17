@@ -804,7 +804,8 @@ user-dropdown-toogle {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
   padding: 12px;
   border-radius: 8px;
   border: 1px solid var(--brand-bold);
@@ -813,7 +814,8 @@ user-dropdown-toogle {
 }
 
 .form-field input:focus,
-.form-field select:focus {
+.form-field select:focus,
+.form-field textarea:focus {
   outline: 2px solid var(--brand-bold);
   border-color: var(--brand-bold);
 }
@@ -841,6 +843,18 @@ user-dropdown-toogle {
 
 .cancellation-auto-approve p {
   grid-column: 1 / -1;
+}
+
+.form-field textarea {
+  min-height: 150px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.distribute-login-result ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
 }
 
 .field-heading:has(.cancellation-deadline-heading) {

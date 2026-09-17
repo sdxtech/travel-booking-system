@@ -21,6 +21,7 @@ import './App.css'
 import Unauthorized from './pages/Unauthorized'
 import AdminPagePermissions from './pages/AdminPagePermissions'
 import AdminLocationPoints from './pages/AdminLocationPoints'
+import AdminDistributeLogin from './pages/AdminDistributeLogin'
 import ForgotPassword from './pages/ForgotPassword'
 import ChangePassword from './pages/ChangePassword'
 import ResetPassword from './pages/ResetPassword'
@@ -207,6 +208,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["superadmin"]}>
                 <AdminDriverAvailability />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/distribute-login"
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <AdminDistributeLogin />
               </ProtectedRoute>
             }
           />
