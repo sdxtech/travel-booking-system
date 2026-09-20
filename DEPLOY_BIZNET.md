@@ -2,6 +2,12 @@
 
 Target: `https://booking.plvpilot.space`, Docker Compose untuk aplikasi dan MongoDB, Nginx + Certbot di host. Jalankan perintah di VPS sebagai user yang punya `sudo`. DNS A record `booking.plvpilot.space` harus menunjuk ke IP publik VPS sebelum langkah HTTPS.
 
+## Akses awal lewat Biznet Gio
+
+Di portal Biznet Gio, buka **Compute → NEO Lite / NEO Lite Pro → instance → Open Console**. Tab noVNC yang muncul adalah terminal Ubuntu VPS; login sebagai user dan password OS yang dibuat saat order. Semua perintah di bawah dijalankan di terminal itu. Untuk menempel perintah panjang, gunakan kontrol **Clipboard** noVNC bila tersedia; SSH dari Windows Terminal biasanya lebih mudah untuk copy/paste. Jika ingin SSH, lihat IP publik di detail instance dan gunakan keypair yang dipasang saat order, misalnya `ssh -i <path-private-key> trbookadmin@<IP-PUBLIK>` dari komputer lokal.
+
+Pada menu **Security Group** NEO Lite, pastikan inbound TCP 80 dan 443 tersedia untuk publik. Jika security group baru di-attach, tambahkan aturan SSH 22 untuk IP komputer Anda sebelum menutup noVNC. MongoDB 27017 dan port aplikasi 8080 tidak perlu dibuka ke publik.
+
 ## 1. Sistem dan Docker
 
 ```bash
@@ -33,7 +39,7 @@ sudo docker compose version
 
 ## 2. Source dan rahasia server
 
-Pakai commit yang sudah berisi `compose.production.yml`, `frontend/nginx.conf` terbaru, dan `ops/backup-mongo.sh`. Jika repo private, autentikasi Git di VPS atau salin source dengan SSH/SCP dari komputer lokal. Jangan salin file `.env.production` lokal yang mungkin berisi kunci berbeda. Simpan rahasia hanya dalam `.env.production` pada VPS dan jangan commit.
+Pakai commit yang sudah berisi `compose.production.yml`, `frontend/nginx.conf` terbaru, dan `ops/backup-mongo.sh`. Jika repo private, autentikasi Git di VPS atau salin source dengan SSH/SCP dari komputer lokal. File `.env.production` memang tidak ada dalam Git; buat langsung di VPS. Simpan rahasia hanya dalam file tersebut dan jangan commit.
 
 ```bash
 sudo mkdir -p /opt/booking-app
@@ -42,7 +48,21 @@ git clone https://github.com/sdxtech/travel-booking-system.git /opt/booking-app
 cd /opt/booking-app
 ```
 
-Edit `.env.production` di VPS. Isi `JWT_SECRET` dengan nilai acak minimal 32 byte. `DOCKER_MONGODB_URI` tidak dipakai Compose production; database berada di volume MongoDB pada VPS dan dimulai kosong. Jangan masukkan password atau token ke perintah shell yang tersimpan di history.
+Edit `.env.production` di VPS. Isi `JWT_SECRET` dengan nilai acak minimal 32 byte. `DOCKER_MONGODB_URI` tidak dipakai Compose production; database berada di volume MongoDB pada VPS dan dimulai kosong. Jangan masukkan password atau token ke perintah shell yang tersimpan di history. Jalankan `openssl rand -hex 32`, lalu salin hasilnya ke `JWT_SECRET` lewat editor. Contoh isi awal:
+
+```env
+JWT_SECRET=<hasil openssl rand -hex 32>
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_SECURITY=ssl
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+```
+
+Hapus tanda `<` dan `>` saat mengisi nilai nyata. Jika password SMTP mengandung karakter `$` atau `#`, bungkus nilainya dengan tanda petik tunggal di file env agar Docker Compose membacanya secara harfiah.
 
 ```bash
 umask 077
@@ -51,7 +71,7 @@ chmod 600 .env.production
 sudo docker compose --env-file .env.production -f compose.production.yml config --quiet
 ```
 
-Jika `JWT_SECRET` belum tersedia, buat nilai baru dengan `openssl rand -hex 32`, lalu masukkan lewat editor. Untuk email Hostinger, buat mailbox pengirim di hPanel, lalu isi variabel berikut saat siap:
+Untuk email Hostinger, buat mailbox pengirim di hPanel, lalu isi variabel berikut saat siap:
 
 ```env
 SMTP_HOST=smtp.hostinger.com
@@ -154,4 +174,4 @@ sudo docker compose --env-file .env.production -f compose.production.yml logs --
 sudo docker compose --env-file .env.production -f compose.production.yml ps
 ```
 
-Untuk update aplikasi, tarik commit yang sudah diverifikasi lalu jalankan `sudo docker compose --env-file .env.production -f compose.production.yml up -d --build`. Simpan salinan `.env.production` server sebelum `git pull` bila file tersebut berubah lokal, dan jangan jalankan `down -v` karena itu menghapus volume database.
+Untuk update aplikasi, tarik commit yang sudah diverifikasi lalu jalankan `sudo docker compose --env-file .env.production -f compose.production.yml up -d --build`. File `.env.production` tidak dilacak Git sehingga tetap ada saat `git pull`. Jangan jalankan `down -v` karena itu menghapus volume database.

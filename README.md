@@ -22,7 +22,7 @@ Pastikan Docker Desktop sudah berjalan, lalu masuk ke folder project:
 cd "C:\xampp81\htdocs\SODEXO\00-INTERNAL\101-TRAVEL BOOKING SYSTEM\booking-driver-ticket-request - mongo"
 ```
 
-Project menggunakan `.env.development` untuk konfigurasi local.
+Project menggunakan `.env.development` untuk konfigurasi local. File ini tidak dilacak Git. Saat clone baru, buat file tersebut di root project, misalnya berisi `APP_ENV=development`, `JWT_SECRET=<nilai acak>`, dan `VITE_API_BASE_URL=http://localhost:8000`. Pengaturan MongoDB lokal sudah punya nilai default di Compose.
 
 ### Menjalankan pertama kali
 
