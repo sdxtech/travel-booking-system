@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
+import useOfficeSidebar from '../hooks/useOfficeSidebar'
+
+const menuItems = [
+  { label: 'Quick View', icon: 'bi-speedometer2' },
+  { label: 'Travel Status & History', icon: 'bi-clock-history' },
+  { label: 'Travel Assign', icon: 'bi-building' },
+  { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
+  { label: 'Booking Driver Assign', icon: 'bi-person-check' },
+  { label: 'Manage User', icon: 'bi-people' },
+]
 
 const initialPolicy = {
   auto_approve: true,
@@ -21,6 +31,7 @@ function getPolicyLabel(policy) {
 // Super Admin configuration for the Employee booking cancellation cutoff.
 function AdminSettings() {
   const [policy, setPolicy] = useState(initialPolicy)
+   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -109,7 +120,38 @@ function AdminSettings() {
 
   return (
     <MainLayout title="Cancel Booking Driver Settings">
-      <section className="office-content admin-settings">
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+         <aside className="office-sidebar visible">
+          <div className="sidebar-header">
+            <span className="sidebar-role"></span>
+            <button
+              type="button"
+              className="sidebar-toggle"
+              onClick={toggleSidebar}
+              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <i className={`bi ${isSidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} aria-hidden="true" />
+            </button>
+          </div>
+          <nav className="sidebar-menu">
+            {menuItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className={`sidebar-item ${item.label === 'Booking Driver Assign' ? 'active' : ''}`}
+               
+                aria-label={item.label}
+                title={item.label}
+              >
+                <i className={`bi ${item.icon} sidebar-item__icon`} aria-hidden="true" />
+                <span className="sidebar-item__label">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+      <section className="office-content ">
         <header className="office-header">
         
           <h1>Cancel Booking Driver</h1>
@@ -139,12 +181,15 @@ function AdminSettings() {
           </section>
           <section className="field-group">
             <div className="field-heading">
-              <span className="heading-icon" aria-hidden="true">
+              <div className='field-heading-2'>
+
+              <div className="heading-icon" aria-hidden="true">
                 <i className="bi bi-calendar-x" />
-              </span>
+              </div>
               <div className="cancellation-deadline-heading">
                 <h2>Cancellation deadline</h2>
                 <p className="muted">{policy.deadline_enabled ? 'Use a rolling duration in hours, or a specific Jakarta cutoff time on a prior day.' : 'Eligible Employee cancellations are not restricted by a time cutoff.'}</p>
+              </div>
               </div>
               <button
                 type="button"
@@ -220,6 +265,7 @@ function AdminSettings() {
           </section>
         </form>
       </section>
+      </div>
     </MainLayout>
   )
 }

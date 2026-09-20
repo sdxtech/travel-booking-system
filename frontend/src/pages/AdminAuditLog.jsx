@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
+import useOfficeSidebar from '../hooks/useOfficeSidebar'
 
+const menuItems = [
+  { label: 'Quick View', icon: 'bi-speedometer2' },
+  { label: 'Travel Status & History', icon: 'bi-clock-history' },
+  { label: 'Travel Assign', icon: 'bi-building' },
+  { label: 'Booking Driver Status & History', icon: 'bi-card-list' },
+  { label: 'Booking Driver Assign', icon: 'bi-person-check' },
+  { label: 'Manage User', icon: 'bi-people' },
+]
 function formatTime(value) {
   const date = value ? new Date(value) : null
   return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'medium' }) : '-'
@@ -75,6 +84,7 @@ function describeActivity(action, path) {
 
 function AdminAuditLog() {
   const [search, setSearch] = useState('')
+  const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useState(1)
   const [data, setData] = useState({ items: [], total: 0 })
@@ -113,6 +123,37 @@ function AdminAuditLog() {
 
   return (
     <MainLayout title="Audit Log">
+      <div className={`office-quick-view fixed-sidebar ${isSidebarCollapsed ? 'is-collapsed' : ''}`}>
+        <aside className="office-sidebar visible">
+          <div className="sidebar-header">
+            <span className="sidebar-role"></span>
+            <button
+              type="button"
+              className="sidebar-toggle"
+              onClick={toggleSidebar}
+              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <i className={`bi ${isSidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`} aria-hidden="true" />
+            </button>
+          </div>
+          <nav className="sidebar-menu">
+            {menuItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className={`sidebar-item ${item.label === 'Booking Driver Assign' ? 'active' : ''}`}
+               
+                aria-label={item.label}
+                title={item.label}
+              >
+                <i className={`bi ${item.icon} sidebar-item__icon`} aria-hidden="true" />
+                <span className="sidebar-item__label">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
       <section className="office-content admin-settings audit-log-settings">
         <header className="office-header"><h1>Audit Log</h1></header>
         <form className="form-actions audit-log-toolbar" onSubmit={applySearch}>
@@ -142,6 +183,7 @@ function AdminAuditLog() {
           <button type="button" className="btn btn-secondary" disabled={page >= totalPages || loading} onClick={() => setPage((current) => current + 1)}>Next</button>
         </div>
       </section>
+      </div>
     </MainLayout>
   )
 }
