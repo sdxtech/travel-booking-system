@@ -1,5 +1,7 @@
 # Deployment Guide
 
+Untuk deploy awal di VPS Biznet Ubuntu 24.04, ikuti [DEPLOY_BIZNET.md](DEPLOY_BIZNET.md).
+
 Project ini sudah disiapkan untuk dua mode:
 - local tanpa Docker
 - container-based deploy dengan `Dockerfile`
