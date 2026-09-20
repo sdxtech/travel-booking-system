@@ -18,14 +18,14 @@ docker compose --env-file .env.development up -d --build backend
 
 Jalankan script lagi untuk mengganti token; gunakan `-Clear` untuk menghapus secret lokal. Script ini tidak mendaftarkan webhook.
 
-Untuk production, pasang environment berikut di pengelola service backend dan di terminal saat menjalankan registrasi webhook:
+Untuk production di Biznet Gio, isi environment berikut di `.env.production` pada VPS:
 
 - `TELEGRAM_BOT_TOKEN`: token rahasia dari BotFather.
 - `TELEGRAM_WEBHOOK_SECRET`: string acak 32–256 karakter, hanya huruf, angka, `_`, atau `-`. Bisa dibuat dengan `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 - `TELEGRAM_BOT_USERNAME`: `BookingDriverBot` (default).
-- `APP_PUBLIC_URL`: URL aplikasi, misalnya `https://booking.plvpilot.space`.
+- `APP_PUBLIC_URL`: URL aplikasi, misalnya `https://booking.pesan.biz`.
 
-Nilai secret jangan dimasukkan ke file environment yang dilacak Git. Tetap gunakan `.env.development` / `.env.production` untuk konfigurasi non-secret. Restart backend setelah mengatur environment. Tidak ada dependency Python tambahan.
+Kedua file `.env.development` dan `.env.production` diabaikan Git, sehingga secret tetap berada pada mesin masing-masing. Jangan kirim token lewat chat atau commit. Restart backend setelah mengatur environment. Tidak ada dependency Python tambahan.
 
 ## 2. Aktifkan webhook sekali
 
@@ -34,13 +34,13 @@ Deploy backend terlebih dahulu. Webhook harus bisa dijangkau Telegram melalui HT
 Dari folder `backend`, dengan venv dan environment secret yang sama dengan backend:
 
 ```bash
-python setup_telegram_webhook.py https://booking.plvpilot.space/api/telegram/webhook
+python setup_telegram_webhook.py https://booking.pesan.biz/api/telegram/webhook
 ```
 
 Contoh menggunakan prefix reverse proxy `/api`; sesuaikan dengan konfigurasi Nginx aktual. Jika backend dipublikasikan tanpa prefix, gunakan `/telegram/webhook` langsung. Untuk Docker, jalankan script di container yang sudah menerima secrets:
 
 ```bash
-docker compose exec backend python setup_telegram_webhook.py https://booking.plvpilot.space/api/telegram/webhook
+docker compose --env-file .env.production -f compose.production.yml exec backend python setup_telegram_webhook.py https://booking.pesan.biz/api/telegram/webhook
 ```
 
 Script memeriksa identitas bot, lalu mendaftarkan webhook dengan secret header. Script menolak mengganti webhook lain yang sudah terpasang kecuali diberi `--replace-existing`. Gunakan opsi itu saat sengaja memindahkan bot dari URL pengujian lokal ke production atau sebaliknya. Jika bot sudah punya program yang membaca `getUpdates` (polling), integrasikan handler `/start` ini dengan program tersebut atau hentikan polling sebelum memakai webhook. Satu bot tidak bisa menerima update melalui polling dan webhook sekaligus. Jangan gunakan bot yang sama untuk webhook development dan production bersamaan.

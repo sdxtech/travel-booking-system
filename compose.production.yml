@@ -21,7 +21,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRES_HOURS: ${JWT_EXPIRES_HOURS:-8}
-      CORS_ORIGINS: https://booking.plvpilot.space
+      CORS_ORIGINS: https://booking.pesan.biz
       APP_ENV: production
       SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}
       SMTP_PORT: ${SMTP_PORT:-465}
@@ -29,7 +29,7 @@ services:
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
-      APP_PUBLIC_URL: https://booking.plvpilot.space
+      APP_PUBLIC_URL: https://booking.pesan.biz
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-BookingDriverBot}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}

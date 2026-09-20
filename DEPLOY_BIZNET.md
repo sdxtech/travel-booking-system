@@ -1,6 +1,12 @@
 # Deploy awal di Biznet VPS (Ubuntu 24.04)
 
-Target: `https://booking.plvpilot.space`, Docker Compose untuk aplikasi dan MongoDB, Nginx + Certbot di host. Jalankan perintah di VPS sebagai user yang punya `sudo`. DNS A record `booking.plvpilot.space` harus menunjuk ke IP publik VPS sebelum langkah HTTPS.
+Target: `https://booking.pesan.biz`, Docker Compose untuk aplikasi dan MongoDB, Nginx + Certbot di host. Jalankan perintah di VPS sebagai user yang punya `sudo`.
+
+## DNS subdomain di Hostinger
+
+Di hPanel Hostinger, buka **Domains → Domain portfolio → Manage** untuk `pesan.biz`, lalu **DNS / Nameservers → DNS records**. Tambahkan satu record **A** dengan **Name/Host `booking`**, **Points to/Content = IP publik Biznet Gio**, dan TTL default. Periksa apakah sudah ada record A, AAAA, atau CNAME untuk `booking`; hapus atau edit record yang bentrok. Jangan ubah record MX/TXT email untuk langkah ini. Jika nameserver `pesan.biz` dikelola di luar Hostinger, buat record A yang sama pada penyedia DNS yang aktif. Karena aplikasi di-host pada Biznet Gio, yang dibutuhkan di Hostinger adalah DNS record, bukan website/subdomain hosting baru.
+
+Setelah DNS menyebar, cek `getent ahostsv4 booking.pesan.biz` di VPS. Hasil IPv4 harus sama dengan IP publik Biznet Gio sebelum menjalankan Certbot.
 
 ## Akses awal lewat Biznet Gio
 
@@ -99,10 +105,10 @@ MongoDB dan backend hanya berada di jaringan internal Docker. Frontend hanya dib
 ## 4. Nginx dan HTTPS
 
 ```bash
-sudo tee /etc/nginx/sites-available/booking.plvpilot.space >/dev/null <<'EOF'
+sudo tee /etc/nginx/sites-available/booking.pesan.biz >/dev/null <<'EOF'
 server {
     listen 80;
-    server_name booking.plvpilot.space;
+    server_name booking.pesan.biz;
     client_max_body_size 20m;
 
     location / {
@@ -114,7 +120,7 @@ server {
     }
 }
 EOF
-sudo ln -s /etc/nginx/sites-available/booking.plvpilot.space /etc/nginx/sites-enabled/booking.plvpilot.space
+sudo ln -s /etc/nginx/sites-available/booking.pesan.biz /etc/nginx/sites-enabled/booking.pesan.biz
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -132,11 +138,11 @@ Sesudah DNS sudah mengarah ke VPS dan halaman HTTP merespons:
 ```bash
 sudo snap install --classic certbot
 sudo ln -s /snap/bin/certbot /usr/local/bin/certbot
-sudo certbot --nginx -d booking.plvpilot.space
+sudo certbot --nginx -d booking.pesan.biz
 sudo nginx -t
 sudo systemctl reload nginx
 sudo certbot renew --dry-run
-curl -f https://booking.plvpilot.space/api/healthz
+curl -f https://booking.pesan.biz/api/healthz
 ```
 
 ## 5. Akun awal dan backup harian
