@@ -12,6 +12,19 @@ Setelah DNS menyebar, cek `getent ahostsv4 booking.pesan.biz` di VPS. Hasil IPv4
 
 Di portal Biznet Gio, buka **Compute → NEO Lite / NEO Lite Pro → instance → Open Console**. Tab noVNC yang muncul adalah terminal Ubuntu VPS; login sebagai user dan password OS yang dibuat saat order. Semua perintah di bawah dijalankan di terminal itu. Untuk menempel perintah panjang, gunakan kontrol **Clipboard** noVNC bila tersedia; SSH dari Windows Terminal biasanya lebih mudah untuk copy/paste. Jika ingin SSH, lihat IP publik di detail instance dan gunakan keypair yang dipasang saat order, misalnya `ssh -i <path-private-key> trbookadmin@<IP-PUBLIK>` dari komputer lokal.
 
+Jika SSH belum aktif, jalankan lebih dulu di noVNC:
+
+```bash
+sudo apt update
+sudo apt install -y openssh-server
+sudo systemctl enable --now ssh
+sudo systemctl status ssh --no-pager
+sudo ss -ltnp | grep ':22'
+if command -v ufw >/dev/null; then sudo ufw allow OpenSSH; fi
+```
+
+Untuk memakai key lokal `travel-booking-ssh`, tampilkan isi `travel-booking-ssh.pub` di terminal PowerShell komputer Anda dengan `Get-Content .\travel-booking-ssh.pub`. Salin satu baris public key itu. Di noVNC sebagai `trbookadmin`, jalankan `mkdir -p ~/.ssh`, `chmod 700 ~/.ssh`, buka `nano ~/.ssh/authorized_keys`, tambahkan public key pada baris baru, simpan, lalu jalankan `chmod 600 ~/.ssh/authorized_keys`. Jangan pindahkan private key ke VPS. Dari terminal VS Code di folder project lokal, sambungkan dengan `ssh -i ".\travel-booking-ssh" trbookadmin@<IP-PUBLIK>`.
+
 Pada menu **Security Group** NEO Lite, pastikan inbound TCP 80 dan 443 tersedia untuk publik. Jika security group baru di-attach, tambahkan aturan SSH 22 untuk IP komputer Anda sebelum menutup noVNC. MongoDB 27017 dan port aplikasi 8080 tidak perlu dibuka ke publik.
 
 ## 1. Sistem dan Docker
