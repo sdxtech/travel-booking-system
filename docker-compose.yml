@@ -13,11 +13,15 @@ services:
       JWT_EXPIRES_HOURS: ${JWT_EXPIRES_HOURS:-8}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
       APP_ENV: ${APP_ENV:-development}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURITY: ${SMTP_SECURITY:-ssl}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-BookingDriverBot}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
-      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Booking App <notifications@booking.plvpilot.space>}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8080}
       PORT: 8000
     ports:

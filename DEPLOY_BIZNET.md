@@ -42,7 +42,7 @@ git clone https://github.com/sdxtech/travel-booking-system.git /opt/booking-app
 cd /opt/booking-app
 ```
 
-Edit `.env.production` di VPS. Isi `JWT_SECRET` dengan nilai acak minimal 32 byte dan API key yang memang sudah siap digunakan. `DOCKER_MONGODB_URI` tidak dipakai Compose production; database berada di volume MongoDB pada VPS dan dimulai kosong. Jangan masukkan password atau token ke perintah shell yang tersimpan di history.
+Edit `.env.production` di VPS. Isi `JWT_SECRET` dengan nilai acak minimal 32 byte. `DOCKER_MONGODB_URI` tidak dipakai Compose production; database berada di volume MongoDB pada VPS dan dimulai kosong. Jangan masukkan password atau token ke perintah shell yang tersimpan di history.
 
 ```bash
 umask 077
@@ -51,7 +51,18 @@ chmod 600 .env.production
 sudo docker compose --env-file .env.production -f compose.production.yml config --quiet
 ```
 
-Jika `JWT_SECRET` belum tersedia, buat nilai baru dengan `openssl rand -hex 32`, lalu masukkan lewat editor. Pastikan `RESEND_FROM_EMAIL=BDTR <info@notif.plvpilot.space>`. `RESEND_API_KEY` dan token Telegram boleh kosong selama belum siap.
+Jika `JWT_SECRET` belum tersedia, buat nilai baru dengan `openssl rand -hex 32`, lalu masukkan lewat editor. Untuk email Hostinger, buat mailbox pengirim di hPanel, lalu isi variabel berikut saat siap:
+
+```env
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_SECURITY=ssl
+SMTP_USERNAME=<alamat mailbox lengkap>
+SMTP_PASSWORD=<password mailbox>
+SMTP_FROM_EMAIL=Booking App <alamat mailbox lengkap>
+```
+
+Ambil pengaturan SMTP yang tepat dari hPanel **Emails → Manage → Connect Apps & Devices → Manual Configuration**. Jika hPanel mengarahkan ke port 587, gunakan `SMTP_PORT=587` dan `SMTP_SECURITY=starttls`. Password mailbox berbeda dari password login hPanel. Email otomatis dilewati sampai semua variabel SMTP wajib terisi; notifikasi aplikasi dan alur booking tetap berjalan. Token Telegram juga boleh dikosongkan selama belum siap.
 
 ## 3. Jalankan aplikasi
 

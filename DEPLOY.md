@@ -20,8 +20,12 @@ Rekomendasi production:
 - `JWT_ALGORITHM` (default `HS256`)
 - `JWT_EXPIRES_HOURS` (default `8`)
 - `CORS_ORIGINS`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
+- `SMTP_HOST` (Hostinger Email: `smtp.hostinger.com`)
+- `SMTP_PORT` (default `465`)
+- `SMTP_SECURITY` (`ssl` atau `starttls`)
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
 - `APP_PUBLIC_URL`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_BOT_USERNAME` (default `BookingDriverBot`)

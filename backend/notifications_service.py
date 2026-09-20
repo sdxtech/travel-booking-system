@@ -58,7 +58,7 @@ def create_user_notification(
 
     if should_send_email:
         try:
-            resend_email_id = send_notification_email(
+            smtp_message_id = send_notification_email(
                 to_email=recipient_email,
                 recipient_name=user_snapshot.get("name"),
                 message=message,
@@ -71,8 +71,8 @@ def create_user_notification(
                 {
                     "$set": {
                         "email_status": "sent",
-                        "email_provider": "resend",
-                        "email_provider_id": resend_email_id,
+                        "email_provider": "hostinger_smtp",
+                        "email_provider_id": smtp_message_id,
                         "email_sent_at": utc_now(),
                     }
                 },
@@ -83,7 +83,7 @@ def create_user_notification(
                 {
                     "$set": {
                         "email_status": "failed",
-                        "email_provider": "resend",
+                        "email_provider": "hostinger_smtp",
                         "email_error": str(exc)[:500],
                         "email_failed_at": utc_now(),
                     }

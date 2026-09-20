@@ -2,30 +2,70 @@ from __future__ import annotations
 
 import html
 import os
+import smtplib
+import ssl
+from email.message import EmailMessage
+from email.utils import formataddr, make_msgid, parseaddr
 from typing import Optional
-
-import requests
-
-
-RESEND_EMAILS_URL = "https://api.resend.com/emails"
 
 
 class EmailDeliveryError(RuntimeError):
-    """Raised when Resend rejects or cannot process an email request."""
+    """Raised when the configured SMTP server cannot accept an email."""
 
 
 def get_email_config() -> dict[str, str]:
     """Read email settings at call time so local reloads pick up env changes."""
     return {
-        "api_key": os.getenv("RESEND_API_KEY", "").strip(),
-        "from_email": os.getenv("RESEND_FROM_EMAIL", "").strip(),
+        "host": os.getenv("SMTP_HOST", "").strip(),
+        "port": os.getenv("SMTP_PORT", "465").strip(),
+        "security": os.getenv("SMTP_SECURITY", "ssl").strip().lower(),
+        "username": os.getenv("SMTP_USERNAME", "").strip(),
+        "password": os.getenv("SMTP_PASSWORD", ""),
+        "from_email": os.getenv("SMTP_FROM_EMAIL", "").strip(),
         "app_url": os.getenv("APP_PUBLIC_URL", "").strip(),
     }
 
 
 def email_delivery_enabled() -> bool:
     config = get_email_config()
-    return bool(config["api_key"] and config["from_email"])
+    return bool(config["host"] and config["username"] and config["password"] and config["from_email"])
+
+
+def send_email(*, to_email: str, subject: str, html_content: str, text_content: str) -> Optional[str]:
+    config = get_email_config()
+    if not (email_delivery_enabled() and to_email):
+        return None
+
+    try:
+        port = int(config["port"])
+        if not 1 <= port <= 65535 or config["security"] not in {"ssl", "starttls"}:
+            raise ValueError("Invalid SMTP port or security mode")
+        sender_name, sender_address = parseaddr(config["from_email"])
+        if not sender_address or sender_address.lower() != config["username"].lower():
+            raise ValueError("SMTP_FROM_EMAIL must use the SMTP_USERNAME mailbox")
+
+        message = EmailMessage()
+        message["From"] = formataddr((sender_name, sender_address))
+        message["To"] = to_email
+        message["Subject"] = subject
+        message_id = make_msgid(domain=sender_address.rsplit("@", 1)[-1])
+        message["Message-ID"] = message_id
+        message.set_content(text_content)
+        message.add_alternative(html_content, subtype="html")
+
+        tls_context = ssl.create_default_context()
+        if config["security"] == "ssl":
+            with smtplib.SMTP_SSL(config["host"], port, timeout=10, context=tls_context) as smtp:
+                smtp.login(config["username"], config["password"])
+                smtp.send_message(message)
+        else:
+            with smtplib.SMTP(config["host"], port, timeout=10) as smtp:
+                smtp.starttls(context=tls_context)
+                smtp.login(config["username"], config["password"])
+                smtp.send_message(message)
+        return message_id
+    except (OSError, smtplib.SMTPException, ValueError) as exc:
+        raise EmailDeliveryError("SMTP email delivery failed") from exc
 
 
 def build_notification_subject(event: str, entity_type: str) -> str:
@@ -69,42 +109,14 @@ def send_notification_email(
     entity_type: str,
     notification_id: str,
 ) -> Optional[str]:
-    """Send one notification email and return the Resend email id when configured."""
+    """Send one notification email and return its Message-ID when configured."""
     config = get_email_config()
-    if not (config["api_key"] and config["from_email"] and to_email):
-        return None
-
-    response = requests.post(
-        RESEND_EMAILS_URL,
-        headers={
-            "Authorization": f"Bearer {config['api_key']}",
-            "Content-Type": "application/json",
-            "Idempotency-Key": f"booking-app-notification-{notification_id}",
-            "User-Agent": "booking-app/1.0",
-        },
-        json={
-            "from": config["from_email"],
-            "to": [to_email],
-            "subject": build_notification_subject(event, entity_type),
-            "html": build_notification_html(recipient_name, message, config["app_url"]),
-            "text": f"Hello {recipient_name or 'User'},\n\n{message}\n\nOpen Booking App: {config['app_url']}".strip(),
-        },
-        timeout=10,
+    return send_email(
+        to_email=to_email,
+        subject=build_notification_subject(event, entity_type),
+        html_content=build_notification_html(recipient_name, message, config["app_url"]),
+        text_content=f"Hello {recipient_name or 'User'},\n\n{message}\n\nOpen Booking App: {config['app_url']}".strip(),
     )
-
-    if not response.ok:
-        detail = response.text.strip()[:500] or f"HTTP {response.status_code}"
-        raise EmailDeliveryError(f"Resend email delivery failed: {detail}")
-
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise EmailDeliveryError("Resend returned an invalid JSON response") from exc
-
-    email_id = payload.get("id")
-    if not email_id:
-        raise EmailDeliveryError("Resend response did not include an email id")
-    return str(email_id)
 
 def send_password_reset_email(
     *,
@@ -114,13 +126,7 @@ def send_password_reset_email(
     invitation: bool = False,
     expires_in_minutes: int = 30,
 ) -> Optional[str]:
-    config = get_email_config()
-
-    if not (
-        config["api_key"]
-        and config["from_email"]
-        and to_email
-    ):
+    if not (email_delivery_enabled() and to_email):
         return None
 
     safe_name = html.escape(
@@ -200,45 +206,9 @@ def send_password_reset_email(
         "this email."
     )
 
-    response = requests.post(
-        RESEND_EMAILS_URL,
-        headers={
-            "Authorization": f"Bearer {config['api_key']}",
-            "Content-Type": "application/json",
-            "User-Agent": "booking-app/1.0",
-        },
-        json={
-            "from": config["from_email"],
-            "to": [to_email],
-            "subject": subject,
-            "html": html_content,
-            "text": text_content,
-        },
-        timeout=10,
+    return send_email(
+        to_email=to_email,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content,
     )
-
-    if not response.ok:
-        detail = (
-            response.text.strip()[:500]
-            or f"HTTP {response.status_code}"
-        )
-
-        raise EmailDeliveryError(
-            f"Resend email delivery failed: {detail}"
-        )
-
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise EmailDeliveryError(
-            "Resend returned an invalid JSON response"
-        ) from exc
-
-    email_id = payload.get("id")
-
-    if not email_id:
-        raise EmailDeliveryError(
-            "Resend response did not include an email id"
-        )
-
-    return str(email_id)

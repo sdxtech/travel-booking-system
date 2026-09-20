@@ -12,7 +12,7 @@ from bson import ObjectId
 from auth_utils import create_access_token, verify_password, hash_password, get_jwt_expires_hours
 from mongo_client import db
 from notifications_service import create_user_notification
-from email_service import send_password_reset_email, send_notification_email
+from email_service import send_password_reset_email
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -272,25 +272,6 @@ def forgot_password(
             "a password reset link has been sent."
         )
     }
-
-@router.post("/test-email")
-def test_email():
-    email_id = send_notification_email(
-        to_email="raihanlail07@gmail.com",
-        recipient_name="Test User",
-        message="This is a test email from BDTR.",
-        event="test",
-        entity_type="booking",
-        notification_id="test-email-001",
-    )
-
-    print("RESEND EMAIL ID:", email_id)
-
-    return {
-        "success": email_id is not None,
-        "email_id": email_id,
-    }
-    
 
 @router.post("/reset-password")
 def reset_password(

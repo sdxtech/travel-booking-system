@@ -1,51 +1,68 @@
 import os
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-from email_service import build_notification_html, send_notification_email
+from email_service import build_notification_html, send_notification_email, send_password_reset_email
+
+
+SMTP_ENV = {
+    "SMTP_HOST": "smtp.hostinger.com",
+    "SMTP_PORT": "465",
+    "SMTP_SECURITY": "ssl",
+    "SMTP_USERNAME": "info@example.com",
+    "SMTP_PASSWORD": "mailbox-password",
+    "SMTP_FROM_EMAIL": "Booking App <info@example.com>",
+    "APP_PUBLIC_URL": "https://booking.example.com",
+}
 
 
 class EmailServiceTests(unittest.TestCase):
-    def test_skips_delivery_without_api_key(self):
-        with patch.dict(os.environ, {"RESEND_API_KEY": "", "RESEND_FROM_EMAIL": "Booking App <test@example.com>"}):
-            with patch("email_service.requests.post") as post:
+    def test_skips_delivery_without_mailbox_password(self):
+        with patch.dict(os.environ, {**SMTP_ENV, "SMTP_PASSWORD": ""}):
+            with patch("email_service.smtplib.SMTP_SSL") as smtp:
                 result = send_notification_email(
-                    to_email="user@example.com",
-                    recipient_name="User",
-                    message="Updated",
-                    event="updated",
-                    entity_type="booking",
-                    notification_id="notification-1",
+                    to_email="user@example.com", recipient_name="User", message="Updated",
+                    event="updated", entity_type="booking", notification_id="notification-1",
                 )
 
         self.assertIsNone(result)
-        post.assert_not_called()
+        smtp.assert_not_called()
 
-    def test_sends_email_with_idempotency_key(self):
-        response = Mock(ok=True)
-        response.json.return_value = {"id": "resend-email-1"}
-        env = {
-            "RESEND_API_KEY": "re_test",
-            "RESEND_FROM_EMAIL": "Booking App <test@example.com>",
-            "APP_PUBLIC_URL": "https://booking.example.com",
-        }
-
-        with patch.dict(os.environ, env):
-            with patch("email_service.requests.post", return_value=response) as post:
-                result = send_notification_email(
-                    to_email="user@example.com",
-                    recipient_name="User",
-                    message="Your booking was approved.",
-                    event="approved",
-                    entity_type="booking",
-                    notification_id="notification-1",
+    def test_notification_uses_authenticated_tls_and_html(self):
+        with patch.dict(os.environ, SMTP_ENV):
+            with patch("email_service.smtplib.SMTP_SSL") as smtp:
+                message_id = send_notification_email(
+                    to_email="user@example.com", recipient_name="User",
+                    message="Your booking was approved.", event="approved",
+                    entity_type="booking", notification_id="notification-1",
                 )
 
-        self.assertEqual(result, "resend-email-1")
-        request = post.call_args
-        self.assertEqual(request.kwargs["headers"]["Idempotency-Key"], "booking-app-notification-notification-1")
-        self.assertEqual(request.kwargs["json"]["to"], ["user@example.com"])
-        self.assertEqual(request.kwargs["json"]["subject"], "Driver Booking: Approved")
+        self.assertTrue(message_id.startswith("<"))
+        smtp.assert_called_once()
+        connection = smtp.return_value.__enter__.return_value
+        connection.login.assert_called_once_with("info@example.com", "mailbox-password")
+        sent_message = connection.send_message.call_args.args[0]
+        self.assertEqual(sent_message["Subject"], "Driver Booking: Approved")
+        self.assertEqual(sent_message["To"], "user@example.com")
+        self.assertEqual(sent_message["Message-ID"], message_id)
+        self.assertIn("Open Booking App", sent_message.get_body(preferencelist=("html",)).get_content())
+
+    def test_invitation_uses_starttls_and_one_hour_link(self):
+        with patch.dict(os.environ, {**SMTP_ENV, "SMTP_PORT": "587", "SMTP_SECURITY": "starttls"}):
+            with patch("email_service.smtplib.SMTP") as smtp:
+                message_id = send_password_reset_email(
+                    to_email="user@example.com", recipient_name="User",
+                    reset_url="https://booking.example.com/reset-password?token=abc",
+                    invitation=True, expires_in_minutes=60,
+                )
+
+        self.assertIsNotNone(message_id)
+        connection = smtp.return_value.__enter__.return_value
+        connection.starttls.assert_called_once()
+        connection.login.assert_called_once()
+        sent_message = connection.send_message.call_args.args[0]
+        self.assertEqual(sent_message["Subject"], "Set Up Your Booking App Account")
+        self.assertIn("1 hour", sent_message.get_body(preferencelist=("plain",)).get_content())
 
     def test_html_escapes_user_content(self):
         rendered = build_notification_html("<Admin>", "<script>alert(1)</script>", "")

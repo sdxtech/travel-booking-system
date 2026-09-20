@@ -151,41 +151,13 @@ Frontend otomatis membaca konfigurasi melalui Vite. Mode ini biasanya tersedia d
 
 ## Staging Deploy
 
-## Email Notification dengan Resend
+## Email Notification dengan Hostinger SMTP
 
 Telegram tambahan khusus Driver tersedia melalui @BookingDriverBot. Email tetap aktif. Panduan token, webhook, dan penghubungan akun ada di [TELEGRAM.md](TELEGRAM.md).
 
-Email dikirim otomatis bersama notifikasi aplikasi jika `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` terisi. Jika salah satunya kosong atau Resend gagal, notifikasi aplikasi tetap tersimpan dan proses bisnis tidak dibatalkan.
+Email dikirim melalui mailbox Hostinger. Buat mailbox di hPanel **Emails → Manage**, lalu lihat **Connect Apps & Devices → Manual Configuration** untuk pengaturan SMTP. Isi `SMTP_USERNAME`, `SMTP_PASSWORD`, dan `SMTP_FROM_EMAIL` pada `.env.development` atau `.env.production` sesuai lingkungan; jangan commit password mailbox. Default Hostinger Email adalah `smtp.hostinger.com` port `465` dengan `SMTP_SECURITY=ssl`. Alternatif port `587` memakai `SMTP_SECURITY=starttls` jika hPanel mengharuskannya.
 
-1. Tambahkan dan verifikasi domain pengirim di Resend. Untuk production, alamat default proyek adalah `info@notif.plvpilot.space`.
-2. Buat API key development baru dengan izin mengirim email.
-3. Di Windows, jalankan script setup berikut dari root project. Key diminta secara tersembunyi dan disimpan pada environment user Windows, bukan di file Git:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup-resend-development.ps1
-```
-
-Setelah setup, terminal baru akan membaca key secara otomatis. Nilai `RESEND_API_KEY` di `.env.development` dan `.env.production` harus tetap kosong agar secret tidak pernah ikut commit:
-
-```env
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=BDTR <info@notif.plvpilot.space>
-APP_PUBLIC_URL=http://localhost:5173
-```
-
-Untuk Docker Compose, jalankan perintah ini dari terminal baru setelah setup:
-
-```powershell
-docker compose --env-file .env.development up -d --build backend
-```
-
-Untuk mengganti key, jalankan kembali script setup. Untuk menghapus key development dari Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup-resend-development.ps1 -Clear
-```
-
-Status pengiriman tersimpan pada koleksi `notifications` melalui field `email_status` (`skipped`, `pending`, `sent`, atau `failed`) dan `email_provider_id` jika berhasil.
+Jika konfigurasi SMTP belum lengkap atau pengiriman gagal, notifikasi aplikasi tetap tersimpan dan proses booking/travel tidak dibatalkan. Status tersimpan pada koleksi `notifications` lewat `email_status` (`skipped`, `pending`, `sent`, atau `failed`) dan `email_provider_id` berisi Message-ID saat server SMTP menerima pesan.
 
 ### Backend (Render)
 
@@ -199,8 +171,10 @@ Status pengiriman tersimpan pada koleksi `notifications` melalui field `email_st
   - `JWT_EXPIRES_HOURS`: default `8`
   - `CORS_ORIGINS`: daftar origin frontend, dipisah koma
   - `APP_ENV`: gunakan `production` untuk konfigurasi production
-  - `RESEND_API_KEY`: API key rahasia dari Resend
-  - `RESEND_FROM_EMAIL`: nama dan alamat pengirim dari domain yang sudah diverifikasi
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`: pengaturan SMTP mailbox Hostinger
+  - `SMTP_USERNAME`: alamat mailbox lengkap
+  - `SMTP_PASSWORD`: password mailbox (rahasia)
+  - `SMTP_FROM_EMAIL`: nama dan alamat mailbox pengirim
   - `APP_PUBLIC_URL`: URL aplikasi untuk tombol pada email
 - Catatan: `MONGODB_URI` juga bisa berisi nama env var lain yang menyimpan URI MongoDB.
 
