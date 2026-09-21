@@ -67,10 +67,18 @@ git clone https://github.com/sdxtech/travel-booking-system.git /opt/booking-app
 cd /opt/booking-app
 ```
 
-Edit `.env.production` di VPS. Isi `JWT_SECRET` dengan nilai acak minimal 32 byte. `DOCKER_MONGODB_URI` tidak dipakai Compose production; database berada di volume MongoDB pada VPS dan dimulai kosong. Jangan masukkan password atau token ke perintah shell yang tersimpan di history. Jalankan `openssl rand -hex 32`, lalu salin hasilnya ke `JWT_SECRET` lewat editor. Contoh isi awal:
+File `.env.production` belum ada setelah clone. Jalankan skrip sekali untuk membuat JWT secret acak langsung di VPS tanpa menampilkannya di terminal. Skrip tidak akan mengubah file yang sudah ada. `DOCKER_MONGODB_URI` tidak dipakai Compose production; database berada di volume MongoDB pada VPS dan dimulai kosong.
+
+```bash
+cd /opt/booking-app
+bash ops/init-production-env.sh
+sudo docker compose --env-file .env.production -f compose.production.yml config --quiet
+```
+
+Isi awal `.env.production` setelah skrip dijalankan:
 
 ```env
-JWT_SECRET=<hasil openssl rand -hex 32>
+JWT_SECRET=<dibuat otomatis oleh skrip>
 SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=465
 SMTP_SECURITY=ssl
@@ -83,12 +91,7 @@ TELEGRAM_WEBHOOK_SECRET=
 
 Hapus tanda `<` dan `>` saat mengisi nilai nyata. Jika password SMTP mengandung karakter `$` atau `#`, bungkus nilainya dengan tanda petik tunggal di file env agar Docker Compose membacanya secara harfiah.
 
-```bash
-umask 077
-nano .env.production
-chmod 600 .env.production
-sudo docker compose --env-file .env.production -f compose.production.yml config --quiet
-```
+Untuk menambahkan kredensial SMTP/Telegram nanti, buka `nano .env.production`. Jangan masukkan password atau token ke perintah shell yang tersimpan di history.
 
 Untuk email Hostinger, buat mailbox pengirim di hPanel, lalu isi variabel berikut saat siap:
 
