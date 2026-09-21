@@ -197,6 +197,15 @@ function OfficeDriverHistory() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings, sortConfig, searchQuery])
 
+  const statusSummary = useMemo(() => {
+    const counts = { total: sortedBookings.length, approved: 0, cancelled: 0, rejected: 0, completed: 0 }
+    sortedBookings.forEach((booking) => {
+      const status = String(booking.status || '').toLowerCase()
+      if (Object.prototype.hasOwnProperty.call(counts, status)) counts[status] += 1
+    })
+    return counts
+  }, [sortedBookings])
+
   const totalPages = Math.max(1, Math.ceil(sortedBookings.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pagedBookings = sortedBookings.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -1074,6 +1083,26 @@ function OfficeDriverHistory() {
           {hasLoaded ? <p className="muted">Date Range: {getActiveRangeLabel()}</p> : <p className="muted">Date Range: Not loaded</p>}
           {!loading && actionMessage ? <p className="success-text">{actionMessage}</p> : null}
           {!loading && actionError ? <p className="error-text">{actionError}</p> : null}
+
+          <section className="booking-status-summary" aria-label="Booking driver status summary" aria-busy={loading}>
+            {[
+              { label: 'Total Bookings', key: 'total', icon: 'bi-collection' },
+              { label: 'Approved', key: 'approved', icon: 'bi-check-circle' },
+              { label: 'Cancelled', key: 'cancelled', icon: 'bi-x-circle' },
+              { label: 'Rejected', key: 'rejected', icon: 'bi-slash-circle' },
+              { label: 'Completed', key: 'completed', icon: 'bi-check2-all' },
+            ].map(({ label, key, icon }) => (
+              <div className="booking-status-summary__card" key={key}>
+                <span className="booking-status-summary__label">
+                  <i className={`bi ${icon}`} aria-hidden="true" />
+                  {label}
+                </span>
+                <strong className="booking-status-summary__value">
+                  {hasLoaded && !loading ? statusSummary[key].toLocaleString('en-US') : '–'}
+                </strong>
+              </div>
+            ))}
+          </section>
 
           <div className="office-table-wrapper">
             <table ref={historyTableRef} className="office-table history-frozen-columns">
