@@ -121,21 +121,7 @@ MongoDB dan backend hanya berada di jaringan internal Docker. Frontend hanya dib
 ## 4. Nginx dan HTTPS
 
 ```bash
-sudo tee /etc/nginx/sites-available/booking.pesan.biz >/dev/null <<'EOF'
-server {
-    listen 80;
-    server_name booking.pesan.biz;
-    client_max_body_size 20m;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
+sudo install -m 644 /opt/booking-app/ops/nginx-booking.pesan.biz.conf /etc/nginx/sites-available/booking.pesan.biz
 sudo ln -s /etc/nginx/sites-available/booking.pesan.biz /etc/nginx/sites-enabled/booking.pesan.biz
 sudo nginx -t
 sudo systemctl reload nginx
