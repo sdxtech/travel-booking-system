@@ -165,14 +165,10 @@ Pasang backup harian pukul 02:00 waktu server. Script menyimpan arsip MongoDB di
 ```bash
 sudo chmod 755 /opt/booking-app/ops/backup-mongo.sh
 sudo /opt/booking-app/ops/backup-mongo.sh
-sudo crontab -e
+sudo install -m 644 /opt/booking-app/ops/booking-app-backup.cron /etc/cron.d/booking-app-backup
 ```
 
-Tambahkan baris berikut ke crontab root:
-
-```cron
-0 2 * * * /opt/booking-app/ops/backup-mongo.sh >> /var/log/booking-app-backup.log 2>&1
-```
+File cron tersebut menjalankan backup sebagai root setiap hari pukul 02:00 waktu VPS.
 
 ## Operasional
 
