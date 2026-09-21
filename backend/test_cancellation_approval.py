@@ -63,7 +63,9 @@ class CancellationApprovalTests(unittest.TestCase):
     def test_auto_mode_cancels_immediately(self):
         self.policy["auto_approve"] = True
         self.assertEqual(self.cancel().status, "cancelled")
-        bookings.notify_roles.assert_not_called()
+        bookings.notify_roles.assert_called_once()
+        self.assertEqual(bookings.notify_roles.call_args.args[0], ("office_coordinator",))
+        self.assertEqual(bookings.notify_roles.call_args.kwargs["email_details"]["Departure Point"], "Office")
 
     def test_approve_cancellation_cancels_and_notifies_employee(self):
         self.cancel()

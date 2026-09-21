@@ -6,7 +6,7 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid, parseaddr
-from typing import Optional
+from typing import Mapping, Optional
 
 
 class EmailDeliveryError(RuntimeError):
@@ -74,9 +74,26 @@ def build_notification_subject(event: str, entity_type: str) -> str:
     return f"{entity_label}: {event_label}"
 
 
-def build_notification_html(recipient_name: Optional[str], message: str, app_url: str) -> str:
+def build_notification_html(
+    recipient_name: Optional[str],
+    message: str,
+    app_url: str,
+    details: Optional[Mapping[str, object]] = None,
+) -> str:
     safe_name = html.escape((recipient_name or "User").strip() or "User")
     safe_message = html.escape(message)
+    detail_rows = ""
+    if details:
+        detail_rows = '<div style="margin:18px 0 0;border-top:1px solid #e5e7eb;padding-top:14px">'
+        for label, value in details.items():
+            safe_label = html.escape(str(label))
+            safe_value = html.escape(str(value or "-"))
+            detail_rows += (
+                '<div style="display:flex;gap:12px;margin:0 0 8px;font-size:14px;line-height:21px">'
+                f'<strong style="min-width:190px;color:#374151">{safe_label} :</strong>'
+                f'<span style="color:#1f2937">{safe_value}</span></div>'
+            )
+        detail_rows += "</div>"
     action = ""
     if app_url:
         safe_url = html.escape(app_url, quote=True)
@@ -93,6 +110,7 @@ def build_notification_html(recipient_name: Optional[str], message: str, app_url
         '<h1 style="margin:0 0 16px;color:#273896;font-size:22px;line-height:30px">Booking App</h1>'
         f'<p style="margin:0 0 12px;font-size:14px;line-height:22px">Hello {safe_name},</p>'
         f'<p style="margin:0;font-size:14px;line-height:22px">{safe_message}</p>'
+        f"{detail_rows}"
         f"{action}"
         '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;padding-top:16px;color:#64748b;font-size:12px;line-height:18px">'
         "This is an automated notification from Booking App.</p>"
@@ -108,14 +126,19 @@ def send_notification_email(
     event: str,
     entity_type: str,
     notification_id: str,
+    details: Optional[Mapping[str, object]] = None,
 ) -> Optional[str]:
     """Send one notification email and return its Message-ID when configured."""
     config = get_email_config()
     return send_email(
         to_email=to_email,
         subject=build_notification_subject(event, entity_type),
-        html_content=build_notification_html(recipient_name, message, config["app_url"]),
-        text_content=f"Hello {recipient_name or 'User'},\n\n{message}\n\nOpen Booking App: {config['app_url']}".strip(),
+        html_content=build_notification_html(recipient_name, message, config["app_url"], details),
+        text_content=(
+            f"Hello {recipient_name or 'User'},\n\n{message}"
+            + ("\n\n" + "\n".join(f"{label} : {value or '-'}" for label, value in details.items()) if details else "")
+            + f"\n\nOpen Booking App: {config['app_url']}"
+        ).strip(),
     )
 
 def send_password_reset_email(

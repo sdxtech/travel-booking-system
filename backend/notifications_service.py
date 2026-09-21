@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Mapping, Optional
 from uuid import uuid4
 
 from email_service import email_delivery_enabled, send_notification_email
@@ -22,6 +22,7 @@ def create_user_notification(
     entity_id: str,
     status: Optional[str] = None,
     actor_id: Optional[str] = None,
+    email_details: Optional[Mapping[str, object]] = None,
 ) -> Optional[str]:
     """Create a notification entry under a user document and return the new notification id."""
     if not user_id:
@@ -65,6 +66,7 @@ def create_user_notification(
                 event=event,
                 entity_type=entity_type,
                 notification_id=notification_id,
+                details=email_details,
             )
             db["notifications"].update_one(
                 {"_id": notification_id},
@@ -121,6 +123,7 @@ def notify_roles(
     entity_id: str,
     status: Optional[str] = None,
     actor_id: Optional[str] = None,
+    email_details: Optional[Mapping[str, object]] = None,
 ) -> int:
     """Broadcast a notification to every user whose role is in the given list."""
     delivered = 0
@@ -135,6 +138,7 @@ def notify_roles(
                 entity_id=entity_id,
                 status=status,
                 actor_id=actor_id,
+                email_details=email_details,
             )
             if created_id:
                 delivered += 1

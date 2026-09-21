@@ -163,6 +163,39 @@ def normalize_email(value: Optional[str]) -> Optional[str]:
     return value.strip().lower()
 
 
+def format_booking_email_datetime(value: Optional[datetime]) -> str:
+    """Format booking schedule values in Jakarta time for notification emails."""
+    if not isinstance(value, datetime):
+        return "-"
+    aware_value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return aware_value.astimezone(timezone(timedelta(hours=7))).strftime("%d %B %Y, %H:%M WIB")
+
+
+def requester_email_details(booking: dict) -> dict[str, str]:
+    """Build the booking fields shown to drivers and office recipients."""
+    return {
+        "Requestor": booking.get("requester_name") or booking.get("requester_email") or "-",
+        "Phone/WA": booking.get("requester_phone") or "-",
+        "Departure Date & Time": format_booking_email_datetime(booking.get("departure_time")),
+        "Departure Point": booking.get("pickup_location") or "-",
+        "Destination Point": booking.get("destination") or "-",
+        "Estimated Arrival Date & Time": format_booking_email_datetime(booking.get("estimated_arrival_time")),
+    }
+
+
+def driver_email_details(booking: dict, driver: Optional[dict] = None) -> dict[str, str]:
+    """Build the driver and schedule fields shown in successful booking emails."""
+    driver_data = driver or {}
+    return {
+        "Driver": booking.get("driver_name") or driver_data.get("name") or driver_data.get("email") or "-",
+        "Phone/WA": driver_data.get("phone_number") or driver_data.get("phone") or "-",
+        "Departure Date & Time": format_booking_email_datetime(booking.get("departure_time")),
+        "Departure Point": booking.get("pickup_location") or "-",
+        "Destination Point": booking.get("destination") or "-",
+        "Estimated Arrival Date & Time": format_booking_email_datetime(booking.get("estimated_arrival_time")),
+    }
+
+
 def ensure_role(uid: str, allowed: tuple[str, ...]):
     """Ensure the user has one of the allowed roles and return the resolved role."""
     doc = db["users"].find_one({"_id": uid})
@@ -352,6 +385,7 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
         entity_id=booking_id,
         status=booking_status,
         actor_id="system" if booking_status == "approved" else uid,
+        email_details=driver_email_details(data, driver_data) if booking_status == "approved" else None,
     )
 
     if booking_status == "approved":
@@ -363,6 +397,7 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
             entity_id=booking_id,
             status="approved",
             actor_id="system",
+            email_details=requester_email_details(data),
         )
     else:
         notify_roles(
@@ -373,6 +408,7 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
             entity_id=booking_id,
             status="pending",
             actor_id=uid,
+            email_details=requester_email_details(data),
         )
 
     snapshot = db["bookings"].find_one({"_id": booking_id})
@@ -447,12 +483,13 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
         create_user_notification(
             linked_user_id,
             "A driver booking has been created for you and has been approved.",
-        event="created_by_office",
-        entity_type="booking",
-        entity_id=booking_id,
-        status="approved",
-        actor_id=uid,
-    )
+            event="created_by_office",
+            entity_type="booking",
+            entity_id=booking_id,
+            status="approved",
+            actor_id=uid,
+            email_details=driver_email_details(data, driver_data),
+        )
 
     create_user_notification(
         driver_uid,
@@ -462,6 +499,7 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
         entity_id=booking_id,
         status="approved",
         actor_id=uid,
+        email_details=requester_email_details(data),
     )
 
     return BookingOfficeHistoryResponse(**booking.model_dump())
@@ -698,6 +736,7 @@ def update_booking_status(
             entity_id=booking_id,
             status=payload.status,
             actor_id=uid,
+            email_details=driver_email_details({**booking_data, **updates}, driver_data) if payload.status == "approved" else None,
         )
 
     if payload.status == "approved" and payload.driver_id:
@@ -709,6 +748,7 @@ def update_booking_status(
             entity_id=booking_id,
             status="approved",
             actor_id=uid,
+            email_details=requester_email_details({**booking_data, **updates}),
         )
 
     updated_snapshot = db["bookings"].find_one({"_id": booking_id})
@@ -815,6 +855,16 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
     if not result.modified_count:
         raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
 
+    updated_booking_data = {
+        **data,
+        "pickup_location": payload.pickup_location,
+        "destination": payload.destination,
+        "driver_id": payload.driver_id,
+        "driver_name": driver_name,
+        "departure_time": payload.departure_time,
+        "estimated_arrival_time": payload.estimated_arrival_time,
+    }
+
     create_user_notification(
         uid,
         (
@@ -827,6 +877,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
         entity_id=booking_id,
         status=booking_status,
         actor_id="system" if booking_status == "approved" else uid,
+        email_details=driver_email_details(updated_booking_data, driver_data) if booking_status == "approved" else None,
     )
 
     if booking_status == "approved":
@@ -838,6 +889,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
             entity_id=booking_id,
             status="approved",
             actor_id="system",
+            email_details=requester_email_details(updated_booking_data),
         )
     else:
         notify_roles(
@@ -848,6 +900,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
             entity_id=booking_id,
             status="pending",
             actor_id=uid,
+            email_details=requester_email_details(updated_booking_data),
         )
 
     updated_snapshot = db["bookings"].find_one({"_id": booking_id})
@@ -914,6 +967,7 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
                 f"Cancellation requested for booking {data.get('request_id') or booking_id}. Please review.",
                 event="cancellation_requested", entity_type="booking", entity_id=booking_id,
                 status=booking_status, actor_id=uid,
+                email_details=requester_email_details(data),
             )
             return serialize_booking(db["bookings"].find_one({"_id": booking_id}))
     elif role == "office_coordinator":
@@ -974,6 +1028,30 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
             status="cancelled",
             actor_id=uid,
         )
+
+    if role == "user":
+        cancellation_details = requester_email_details(data)
+        notify_roles(
+            ("office_coordinator",),
+            f"Booking {data.get('request_id') or booking_id} was cancelled by the Employee.",
+            event="cancelled_by_employee",
+            entity_type="booking",
+            entity_id=booking_id,
+            status="cancelled",
+            actor_id=uid,
+            email_details=cancellation_details,
+        )
+        if data.get("driver_id"):
+            create_user_notification(
+                data["driver_id"],
+                f"Booking {data.get('request_id') or booking_id} was cancelled by the Employee.",
+                event="cancelled_by_employee",
+                entity_type="booking",
+                entity_id=booking_id,
+                status="cancelled",
+                actor_id=uid,
+                email_details=cancellation_details,
+            )
 
     updated_snapshot = db["bookings"].find_one({"_id": booking_id})
     return serialize_booking(updated_snapshot)

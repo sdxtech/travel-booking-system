@@ -70,6 +70,31 @@ class EmailServiceTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;", rendered)
         self.assertIn("&lt;Admin&gt;", rendered)
 
+    def test_notification_includes_booking_details_in_html_and_text(self):
+        details = {
+            "Requestor": "Budi & Team",
+            "Phone/WA": "08123456789",
+            "Departure Point": "Main Office",
+        }
+        with patch.dict(os.environ, SMTP_ENV):
+            with patch("email_service.smtplib.SMTP_SSL") as smtp:
+                send_notification_email(
+                    to_email="driver@example.com",
+                    recipient_name="Driver",
+                    message="You have a new assignment.",
+                    event="assigned",
+                    entity_type="booking",
+                    notification_id="notification-details",
+                    details=details,
+                )
+
+        sent_message = smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
+        html_body = sent_message.get_body(preferencelist=("html",)).get_content()
+        text_body = sent_message.get_body(preferencelist=("plain",)).get_content()
+        self.assertIn("Requestor", html_body)
+        self.assertIn("Budi &amp; Team", html_body)
+        self.assertIn("Phone/WA : 08123456789", text_body)
+
 
 if __name__ == "__main__":
     unittest.main()
