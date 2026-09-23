@@ -54,10 +54,14 @@ def send_telegram_message(chat_id, text):
     return str(result["message_id"])
 
 
-def send_notification_telegram(*, chat_id, recipient_name, message, event, entity_type):
+def send_notification_telegram(*, chat_id, recipient_name, message, event, entity_type, details=None):
     app_url = os.getenv("APP_PUBLIC_URL", "").strip()
     title = build_notification_subject(event, entity_type)
     text = f"{title}\n\nHello {recipient_name or 'Driver'},\n\n{message}"
+    if details:
+        text += "\n\nBooking details:"
+        for label, value in details.items():
+            text += f"\n{label}: {value or '-'}"
     if app_url:
         text += f"\n\nOpen Booking App: {app_url}"
     return send_telegram_message(chat_id, text)

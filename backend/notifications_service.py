@@ -96,7 +96,7 @@ def create_user_notification(
         try:
             message_id = send_notification_telegram(
                 chat_id=chat_id, recipient_name=user_snapshot.get("name"), message=message,
-                event=event, entity_type=entity_type,
+                event=event, entity_type=entity_type, details=email_details,
             )
             db["notifications"].update_one({"_id": notification_id}, {"$set": {
                 "telegram_status": "sent", "telegram_provider_id": message_id, "telegram_sent_at": utc_now(),
