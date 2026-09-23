@@ -136,6 +136,8 @@ def build_notification_html(
         f'<p style="margin:0 0 12px;font-size:14px;line-height:22px">Hello {safe_name},</p>'
         f'<p style="margin:0;font-size:14px;line-height:22px;overflow-wrap:anywhere">{safe_message}</p>'
         f"{detail_rows}{action}"
+        '<p style="margin:8px 0 0;color:#64748b;font-size:12px;line-height:18px">'
+        'This is an automated notification from Booking App.</p>'
     )
     return build_email_layout(content)
 
