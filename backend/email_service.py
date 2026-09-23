@@ -74,6 +74,26 @@ def build_notification_subject(event: str, entity_type: str) -> str:
     return f"{entity_label}: {event_label}"
 
 
+def build_email_layout(content: str) -> str:
+    """Wrap email content in a narrow, mobile-friendly centered card."""
+    return (
+        '<!doctype html><html><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+        '<meta name="x-apple-disable-message-reformatting"></head>'
+        '<body style="margin:0;padding:0;background:#f4f6f8;'
+        'font-family:Segoe UI,Arial,sans-serif;color:#1f2937;'
+        '-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%">'
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="width:100%;border-collapse:collapse;background:#f4f6f8">'
+        '<tr><td align="center" style="padding:16px 10px">'
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+        'style="width:100%;max-width:560px;border:1px solid #dbe1ea;'
+        'border-radius:10px;background:#ffffff;border-collapse:separate">'
+        f'<tr><td style="padding:24px 22px">{content}</td></tr>'
+        '</table></td></tr></table></body></html>'
+    )
+
+
 def build_notification_html(
     recipient_name: Optional[str],
     message: str,
@@ -84,16 +104,23 @@ def build_notification_html(
     safe_message = html.escape(message)
     detail_rows = ""
     if details:
-        detail_rows = '<div style="margin:18px 0 0;border-top:1px solid #e5e7eb;padding-top:14px">'
+        detail_rows = (
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
+            'style="width:100%;margin:18px 0 0;border-top:1px solid #e5e7eb;'
+            'border-collapse:collapse">'
+        )
         for label, value in details.items():
             safe_label = html.escape(str(label))
             safe_value = html.escape(str(value or "-"))
             detail_rows += (
-                '<div style="display:flex;gap:12px;margin:0 0 8px;font-size:14px;line-height:21px">'
-                f'<strong style="min-width:190px;color:#374151">{safe_label} :</strong>'
-                f'<span style="color:#1f2937">{safe_value}</span></div>'
+                '<tr><td style="padding:12px 0 2px;font-size:13px;line-height:18px;'
+                'font-weight:600;color:#475569;overflow-wrap:anywhere;word-break:break-word">'
+                f'{safe_label}</td></tr>'
+                '<tr><td style="padding:0 0 12px;font-size:14px;line-height:21px;'
+                'color:#1f2937;border-bottom:1px solid #eef1f5;overflow-wrap:anywhere;'
+                f'word-break:break-word">{safe_value}</td></tr>'
             )
-        detail_rows += "</div>"
+        detail_rows += "</table>"
     action = ""
     if app_url:
         safe_url = html.escape(app_url, quote=True)
@@ -104,18 +131,16 @@ def build_notification_html(
             "</p>"
         )
 
-    return (
-        '<div style="margin:0;background:#f4f6f8;padding:24px;font-family:Segoe UI,Arial,sans-serif;color:#1f2937">'
-        '<div style="max-width:560px;margin:0 auto;border:1px solid #dbe1ea;border-radius:10px;background:#ffffff;padding:24px">'
+    content = (
         '<h1 style="margin:0 0 16px;color:#273896;font-size:22px;line-height:30px">Booking App</h1>'
         f'<p style="margin:0 0 12px;font-size:14px;line-height:22px">Hello {safe_name},</p>'
-        f'<p style="margin:0;font-size:14px;line-height:22px">{safe_message}</p>'
-        f"{detail_rows}"
-        f"{action}"
-        '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;padding-top:16px;color:#64748b;font-size:12px;line-height:18px">'
-        "This is an automated notification from Booking App.</p>"
-        "</div></div>"
+        f'<p style="margin:0;font-size:14px;line-height:22px;overflow-wrap:anywhere">{safe_message}</p>'
+        f"{detail_rows}{action}"
+        '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;padding-top:16px;'
+        'color:#64748b;font-size:12px;line-height:18px">'
+        'This is an automated notification from Booking App.</p>'
     )
+    return build_email_layout(content)
 
 
 def send_notification_email(
@@ -172,14 +197,7 @@ def send_password_reset_email(
     )
     action_label = "Set Password" if is_invitation else "Reset Password"
 
-    html_content = (
-        '<div style="margin:0;background:#f4f6f8;padding:24px;'
-        'font-family:Segoe UI,Arial,sans-serif;color:#1f2937">'
-        
-        '<div style="max-width:560px;margin:0 auto;'
-        'border:1px solid #dbe1ea;border-radius:10px;'
-        'background:#ffffff;padding:24px">'
-
+    content = (
         '<h1 style="margin:0 0 16px;color:#273896;'
         'font-size:22px;line-height:30px">'
         f'{heading}'
@@ -215,10 +233,8 @@ def send_password_reset_email(
         'If you did not request a password reset, you can safely ignore '
         'this email.'
         '</p>'
-
-        '</div>'
-        '</div>'
     )
+    html_content = build_email_layout(content)
 
     text_content = (
         f"Hello {recipient_name or 'User'},\n\n"
