@@ -54,6 +54,7 @@ const isSuperadmin =
   const [importLoading, setImportLoading] = useState(false)
   const [importError, setImportError] = useState('')
   const [importResult, setImportResult] = useState(null)
+  const [updateExisting, setUpdateExisting] = useState(false)
 
   const [selectedUser, setSelectedUser] = useState(null)
   const [editForm, setEditForm] = useState(null)
@@ -237,6 +238,7 @@ const isSuperadmin =
         body: JSON.stringify({
           filename: importFile.name,
           file_base64: fileBase64,
+          update_existing: updateExisting,
         }),
       })
 
@@ -1019,9 +1021,12 @@ const isSuperadmin =
                   </button>
                 </div>
 
+                <label className="inline-label" style={{ margin: '8px 0' }}>
+                  <input type="checkbox" checked={updateExisting} onChange={(event) => setUpdateExisting(event.target.checked)} disabled={importLoading} />
+                  <span>Update existing user profiles by email</span>
+                </label>
                 <p className="muted" style={{ marginTop: 0 }}>
-                  Upload an Excel (.xlsx) or CSV (.csv) file to create multiple users. Allowed roles: <code>user</code>, <code>driver</code> (role is optional;
-                  default is <code>user</code>).
+                  {updateExisting ? <>Update mode: <code>email</code> is required. Fill only profile columns to change; blank cells are ignored. Passwords are never changed.</> : <>Upload an Excel (.xlsx) or CSV (.csv) file to create multiple users. Allowed roles: <code>user</code>, <code>driver</code> (role is optional; default is <code>user</code>).</>}
                 </p>
 
                 <label className="inline-label">
@@ -1029,10 +1034,10 @@ const isSuperadmin =
                   <input type="file" accept=".xlsx,.csv" onChange={handleImportFileChange} disabled={importLoading} />
                 </label>
 
-                <p className="muted" style={{ marginTop: 0 }}>
+                {!updateExisting ? <p className="muted" style={{ marginTop: 0 }}>
                   Required columns: <code>name</code>, <code>dept_job_position</code>, <code>nik</code>, <code>phone</code>
                   , <code>email</code>, <code>password</code>. Optional: <code>role</code>, <code>telegram_id</code>. <code>plate_number</code> is required for Driver (example: B 1234 ABC).
-                </p>
+                </p> : null}
 
                 {importError ? <p className="error-text">{importError}</p> : null}
 

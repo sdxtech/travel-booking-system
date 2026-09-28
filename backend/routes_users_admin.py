@@ -362,7 +362,7 @@ def xlsx_cell_text(cell: ET.Element, shared_strings: list[str], ns: dict[str, st
     return normalize_cell_value(raw)
 
 
-def parse_user_rows_from_xlsx(content: bytes) -> list[tuple[int, dict[str, str]]]:
+def parse_user_rows_from_xlsx(content: bytes, update_existing: bool = False) -> list[tuple[int, dict[str, str]]]:
     """Parse user import rows from an .xlsx file into (row_number, payload) tuples."""
     zf = zipfile.ZipFile(io.BytesIO(content))
     shared = xlsx_shared_strings(zf)
@@ -410,7 +410,8 @@ def parse_user_rows_from_xlsx(content: bytes) -> list[tuple[int, dict[str, str]]
         if field_name:
             col_to_field[col_idx] = field_name
 
-    missing = [field for field in REQUIRED_IMPORT_FIELDS if field not in col_to_field.values()]
+    required_fields = ("email",) if update_existing else REQUIRED_IMPORT_FIELDS
+    missing = [field for field in required_fields if field not in col_to_field.values()]
     if missing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -429,7 +430,7 @@ def parse_user_rows_from_xlsx(content: bytes) -> list[tuple[int, dict[str, str]]
     return results
 
 
-def parse_user_rows_from_csv(content: bytes) -> list[tuple[int, dict[str, str]]]:
+def parse_user_rows_from_csv(content: bytes, update_existing: bool = False) -> list[tuple[int, dict[str, str]]]:
     """Parse user import rows from a CSV file into (row_number, payload) tuples."""
     text = content.decode("utf-8-sig", errors="replace")
     reader = csv.reader(io.StringIO(text))
@@ -445,7 +446,8 @@ def parse_user_rows_from_csv(content: bytes) -> list[tuple[int, dict[str, str]]]
         if field_name:
             col_to_field[idx] = field_name
 
-    missing = [field for field in REQUIRED_IMPORT_FIELDS if field not in col_to_field.values()]
+    required_fields = ("email",) if update_existing else REQUIRED_IMPORT_FIELDS
+    missing = [field for field in required_fields if field not in col_to_field.values()]
     if missing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -478,13 +480,13 @@ def decode_import_file(payload: UserImportRequest) -> tuple[str, bytes]:
     return filename, raw
 
 
-def parse_import_rows(filename: str, content: bytes) -> list[tuple[int, dict[str, str]]]:
+def parse_import_rows(filename: str, content: bytes, update_existing: bool = False) -> list[tuple[int, dict[str, str]]]:
     """Parse import rows based on the filename extension (.xlsx or .csv)."""
     lower = filename.lower()
     if lower.endswith(".xlsx"):
-        return parse_user_rows_from_xlsx(content)
+        return parse_user_rows_from_xlsx(content, update_existing)
     if lower.endswith(".csv"):
-        return parse_user_rows_from_csv(content)
+        return parse_user_rows_from_csv(content, update_existing)
 
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type. Use .xlsx or .csv")
 
@@ -635,7 +637,7 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
     current_role = ensure_role(uid, ("office_coordinator", "superadmin"))
 
     filename, content = decode_import_file(payload)
-    rows = parse_import_rows(filename, content)
+    rows = parse_import_rows(filename, content, payload.update_existing)
 
     created = 0
     updated = 0
@@ -643,8 +645,9 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
 
     for row_number, row_data in rows:
         normalized = {key: normalize_cell_value(value) for key, value in row_data.items()}
-        normalized.setdefault("role", "user")
-        normalized["role"] = (normalized.get("role") or "user").strip().lower()
+        if not payload.update_existing:
+            normalized.setdefault("role", "user")
+            normalized["role"] = (normalized.get("role") or "user").strip().lower()
         if "email" in normalized:
             normalized["email"] = normalize_email(normalized.get("email"))
 
@@ -790,6 +793,58 @@ def distribute_accounts(payload: DistributeAccountRequest, current_user=Depends(
         user_id = uuid4().hex
         token = secrets.token_urlsafe(32)
         inserted_profile = False
+        if payload.update_existing:
+            if not email:
+                errors.append(UserImportError(row=row_number, email=None, message="Email is required"))
+                continue
+            existing = db["users"].find_one({"email": email})
+            if not existing:
+                errors.append(UserImportError(row=row_number, email=email, message="No user found with this email"))
+                continue
+            if current_role == "office_coordinator" and existing.get("role") not in ("user", "driver"):
+                errors.append(UserImportError(row=row_number, email=email, message="Office coordinator can only update roles: user, driver"))
+                continue
+            changes = {}
+            for field in ("name", "dept_job_position", "nik", "phone"):
+                if normalized.get(field):
+                    changes[field] = normalized[field]
+            if normalized.get("role"):
+                role_value = normalized["role"].strip().lower()
+                if role_value not in ("user", "driver", "office_coordinator", "superadmin"):
+                    errors.append(UserImportError(row=row_number, email=email, message="Invalid role"))
+                    continue
+                if current_role == "office_coordinator" and role_value not in ("user", "driver"):
+                    errors.append(UserImportError(row=row_number, email=email, message="Office coordinator can only assign roles: user, driver"))
+                    continue
+                changes["role"] = role_value
+            target_role = changes.get("role", existing.get("role"))
+            if target_role == "driver":
+                plate = normalized.get("plate_number") or existing.get("plate_number")
+                try:
+                    changes["plate_number"] = normalize_plate(plate)
+                except ValueError as exc:
+                    errors.append(UserImportError(row=row_number, email=email, message=str(exc)))
+                    continue
+            elif "role" in changes:
+                changes["plate_number"] = None
+            if normalized.get("telegram_chat_id"):
+                try:
+                    telegram = TelegramUserFields(telegram_chat_id=normalized["telegram_chat_id"])
+                    changes.update(telegram_profile_changes(telegram, existing))
+                except ValidationError as exc:
+                    errors.append(UserImportError(row=row_number, email=email, message=format_validation_error(exc)))
+                    continue
+            if not changes:
+                errors.append(UserImportError(row=row_number, email=email, message="No profile fields supplied to update"))
+                continue
+            try:
+                changes.update(updated_at=utc_now(), updated_by=uid)
+                update_user_profile(existing.get("_id"), changes)
+                updated += 1
+            except HTTPException as exc:
+                errors.append(UserImportError(row=row_number, email=email, message=str(exc.detail)))
+            continue
+
         try:
             insert_user_profile({
                 "_id": user_id,
