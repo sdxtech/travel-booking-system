@@ -8,6 +8,7 @@ from main import get_current_user
 from mongo_client import db
 from notifications_service import create_user_notification
 from settings_service import BOOKING_CANCELLATION_POLICY_ID, get_booking_cancellation_policy
+from cache_service import get_cached_json, set_cached_json
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -116,9 +117,15 @@ def update_booking_cancellation_policy(
 def list_driver_availability(current_user=Depends(get_current_user)):
     """List driver booking availability for Coordinator and Super Admin Settings."""
     require_driver_availability_manager(current_user)
+    cache_identity = f"{current_user['uid']}:{current_user['role']}"
+    cached = get_cached_json("driver-availability", cache_identity)
+    if cached is not None:
+        return [DriverAvailabilityResponse.model_validate(item) for item in cached]
     drivers = list(db["users"].find({"role": "driver"}))
     drivers.sort(key=lambda item: str((item or {}).get("name") or (item or {}).get("email") or "").lower())
-    return [serialize_driver_availability(driver) for driver in drivers]
+    results = [serialize_driver_availability(driver) for driver in drivers]
+    set_cached_json("driver-availability", cache_identity, [item.model_dump(mode="json") for item in results])
+    return results
 
 
 @router.patch("/drivers/{driver_id}", response_model=DriverAvailabilityResponse)

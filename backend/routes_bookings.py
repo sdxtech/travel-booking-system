@@ -11,6 +11,7 @@ from notifications_service import create_user_notification, notify_roles
 from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
 from settings_service import get_booking_cancellation_deadline, get_booking_cancellation_policy
+from cache_service import get_cached_json, set_cached_json
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -581,6 +582,10 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
     """Return driver busy schedules for employee quick-view calendars."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
+    cache_identity = f"{uid}:{role}"
+    cached = get_cached_json("driver-calendars", cache_identity)
+    if cached is not None:
+        return [DriverCalendarResponse.model_validate(item) for item in cached]
 
     drivers = list(db["users"].find({"role": "driver", "disabled": {"$ne": True}}))
 
@@ -642,6 +647,7 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
             )
         )
 
+    set_cached_json("driver-calendars", cache_identity, [item.model_dump(mode="json") for item in results])
     return results
 
 

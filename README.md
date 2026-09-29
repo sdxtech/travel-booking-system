@@ -24,9 +24,11 @@ cd "C:\xampp81\htdocs\SODEXO\00-INTERNAL\101-TRAVEL BOOKING SYSTEM\booking-drive
 
 Project menggunakan `.env.development` untuk konfigurasi local. File ini tidak dilacak Git. Saat clone baru, buat file tersebut di root project, misalnya berisi `APP_ENV=development`, `JWT_SECRET=<nilai acak>`, dan `VITE_API_BASE_URL=http://localhost:8000`. Pengaturan MongoDB lokal sudah punya nilai default di Compose.
 
+Redis dipakai sebagai cache singkat (default 15 detik) untuk kalender dan status ketersediaan driver. Cache dibersihkan setelah perubahan data berhasil. Jika Redis tidak tersedia, backend tetap membaca langsung dari MongoDB. Untuk backend yang dijalankan langsung di komputer, Redis harus aktif di `localhost:6379`; Docker Compose sudah menyediakan Redis.
+
 ### Menjalankan pertama kali
 
-Build dan jalankan MongoDB, backend, serta frontend:
+Build dan jalankan MongoDB, Redis, backend, serta frontend:
 
 ```bash
 docker compose --env-file .env.development up -d --build

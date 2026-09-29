@@ -27,6 +27,7 @@ from jwt import ExpiredSignatureError, InvalidTokenError
 
 from auth_utils import decode_access_token, get_jwt_secret
 from audit_service import audit_changes, record_audit_event, safe_request_details
+from cache_service import invalidate_response_cache
 from mongo_client import db, init_mongo
 
 is_production = os.getenv("APP_ENV", "development").strip().lower() == "production"
@@ -60,6 +61,8 @@ async def audit_mutating_api_requests(request: Request, call_next):
         except (UnicodeDecodeError, json.JSONDecodeError):
             request_details = {}
     response = await call_next(request)
+    if is_mutation and response.status_code < 400:
+        invalidate_response_cache()
     if not is_mutation or request.url.path.startswith("/audit-logs"):
         return response
 

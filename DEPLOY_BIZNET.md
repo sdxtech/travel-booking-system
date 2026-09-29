@@ -82,6 +82,7 @@ JWT_SECRET=<dibuat otomatis oleh skrip>
 MONGO_ROOT_USERNAME=booking_root
 MONGO_ROOT_PASSWORD=<dibuat otomatis oleh skrip>
 MONGO_APP_PASSWORD=<dibuat otomatis oleh skrip>
+REDIS_PASSWORD=<dibuat otomatis oleh skrip>
 SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=465
 SMTP_SECURITY=ssl

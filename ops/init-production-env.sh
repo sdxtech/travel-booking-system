@@ -13,11 +13,13 @@ umask 077
 jwt_secret=$(openssl rand -hex 32)
 mongo_root_password=$(openssl rand -hex 32)
 mongo_app_password=$(openssl rand -hex 32)
+redis_password=$(openssl rand -hex 32)
 cat > "$env_file" <<EOF
 JWT_SECRET=$jwt_secret
 MONGO_ROOT_USERNAME=booking_root
 MONGO_ROOT_PASSWORD=$mongo_root_password
 MONGO_APP_PASSWORD=$mongo_app_password
+REDIS_PASSWORD=$redis_password
 SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=465
 SMTP_SECURITY=ssl
