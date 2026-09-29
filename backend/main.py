@@ -29,7 +29,12 @@ from auth_utils import decode_access_token, get_jwt_secret
 from audit_service import audit_changes, record_audit_event, safe_request_details
 from mongo_client import db, init_mongo
 
-app = FastAPI()
+is_production = os.getenv("APP_ENV", "development").strip().lower() == "production"
+app = FastAPI(
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
+)
 
 origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
 

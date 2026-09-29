@@ -20,6 +20,11 @@ def get_jwt_secret() -> str:
     secret = os.getenv("JWT_SECRET")
     if not secret:
         raise RuntimeError("JWT_SECRET is not set.")
+    if os.getenv("APP_ENV", "development").strip().lower() == "production":
+        if len(secret.encode("utf-8")) < 32:
+            raise RuntimeError("JWT_SECRET must be at least 32 bytes in production.")
+        if secret.strip().lower() in {"change-me-before-production", "secret", "changeme"}:
+            raise RuntimeError("JWT_SECRET uses a known placeholder value in production.")
     return secret
 
 

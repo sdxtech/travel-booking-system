@@ -79,6 +79,9 @@ Isi awal `.env.production` setelah skrip dijalankan:
 
 ```env
 JWT_SECRET=<dibuat otomatis oleh skrip>
+MONGO_ROOT_USERNAME=booking_root
+MONGO_ROOT_PASSWORD=<dibuat otomatis oleh skrip>
+MONGO_APP_PASSWORD=<dibuat otomatis oleh skrip>
 SMTP_HOST=smtp.hostinger.com
 SMTP_PORT=465
 SMTP_SECURITY=ssl
@@ -92,6 +95,8 @@ TELEGRAM_WEBHOOK_SECRET=
 Hapus tanda `<` dan `>` saat mengisi nilai nyata. Jika password SMTP mengandung karakter `$` atau `#`, bungkus nilainya dengan tanda petik tunggal di file env agar Docker Compose membacanya secara harfiah.
 
 Untuk menambahkan kredensial SMTP/Telegram nanti, buka `nano .env.production`. Jangan masukkan password atau token ke perintah shell yang tersimpan di history.
+
+Production MongoDB menggunakan autentikasi. Akun `booking_root` hanya untuk administrasi dan health check; backend menggunakan akun `booking_app` dengan hak `readWrite` hanya pada `bdtr_prod`. Pada volume MongoDB baru, skrip init membuat akun aplikasi secara otomatis. Skrip tersebut hanya berjalan saat volume database masih kosong. Jika volume sudah pernah dipakai, jangan langsung recreate MongoDB setelah menambahkan variabel autentikasi; lakukan migrasi akun MongoDB dengan backup terverifikasi terlebih dahulu. Ini penting untuk volume yang sedang dipulihkan.
 
 Untuk email Hostinger, buat mailbox pengirim di hPanel, lalu isi variabel berikut saat siap:
 
@@ -171,6 +176,19 @@ sudo install -m 644 /opt/booking-app/ops/booking-app-backup.cron /etc/cron.d/boo
 File cron tersebut menjalankan backup sebagai root setiap hari pukul 02:00 waktu VPS.
 
 ## Operasional
+
+### Batas akses jaringan aplikasi
+
+Di VPS, gunakan hanya `compose.production.yml`; jangan jalankan `docker-compose.yml` karena file itu khusus pengembangan lokal. File development pun hanya menerbitkan port ke loopback. Production hanya menerbitkan frontend ke `127.0.0.1:8080` untuk Nginx. Backend dan MongoDB tetap berada di jaringan internal Docker dan tidak boleh memiliki pemetaan port host.
+
+Setelah deploy atau recreate container, periksa pemetaan port:
+
+```bash
+sudo docker ps --format 'table {{.Names}}\t{{.Ports}}'
+sudo ss -lntp | grep -E ':(27017|8000|8080)\b'
+```
+
+Hasil yang diharapkan: frontend hanya `127.0.0.1:8080->80/tcp`; MongoDB dan backend tidak memiliki port host. Di production, backend juga menolak startup bila `JWT_SECRET` kurang dari 32 byte. FastAPI docs/OpenAPI dinonaktifkan pada production.
 
 ```bash
 cd /opt/booking-app
