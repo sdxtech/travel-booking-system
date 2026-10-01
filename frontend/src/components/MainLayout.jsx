@@ -264,7 +264,11 @@ function MainLayout({ title, children }) {
             icon: 'bi-people',
           },
         ]
-      : []
+      : isDriver ? [{
+          label: 'Connect Telegram',
+          path: '/driver/telegram',
+          icon: 'bi-telegram',
+        }] : []
 
   useEffect(() => {
     const trimmedTitle =

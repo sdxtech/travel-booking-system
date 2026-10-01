@@ -34,7 +34,7 @@ textarea {
 a {
   color: inherit;
 }
-/* Optional Telegram connection above Driver tasks. */
+/* Telegram connection on the dedicated Driver page. */
 .driver-telegram {
   display: flex;
   align-items: center;

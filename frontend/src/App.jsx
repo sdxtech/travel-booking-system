@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-d
 import Login from './pages/Login'
 import UserHome from './pages/UserHome'
 import DriverHome from './pages/DriverHome'
+import DriverTelegramSettings from './pages/DriverTelegramSettings'
 import OfficeHome from './pages/OfficeHome'
 import TicketRequest from './pages/TicketRequest'
 import TicketHistory from './pages/TicketHistory'
@@ -81,6 +82,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["driver"]}>
                 <DriverHome />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/driver/telegram"
+            element={
+              <ProtectedRoute allowedRoles={["driver"]}>
+                <DriverTelegramSettings />
               </ProtectedRoute>
             }
           />
