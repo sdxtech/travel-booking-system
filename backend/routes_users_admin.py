@@ -793,58 +793,6 @@ def distribute_accounts(payload: DistributeAccountRequest, current_user=Depends(
         user_id = uuid4().hex
         token = secrets.token_urlsafe(32)
         inserted_profile = False
-        if payload.update_existing:
-            if not email:
-                errors.append(UserImportError(row=row_number, email=None, message="Email is required"))
-                continue
-            existing = db["users"].find_one({"email": email})
-            if not existing:
-                errors.append(UserImportError(row=row_number, email=email, message="No user found with this email"))
-                continue
-            if current_role == "office_coordinator" and existing.get("role") not in ("user", "driver"):
-                errors.append(UserImportError(row=row_number, email=email, message="Office coordinator can only update roles: user, driver"))
-                continue
-            changes = {}
-            for field in ("name", "dept_job_position", "nik", "phone"):
-                if normalized.get(field):
-                    changes[field] = normalized[field]
-            if normalized.get("role"):
-                role_value = normalized["role"].strip().lower()
-                if role_value not in ("user", "driver", "office_coordinator", "superadmin"):
-                    errors.append(UserImportError(row=row_number, email=email, message="Invalid role"))
-                    continue
-                if current_role == "office_coordinator" and role_value not in ("user", "driver"):
-                    errors.append(UserImportError(row=row_number, email=email, message="Office coordinator can only assign roles: user, driver"))
-                    continue
-                changes["role"] = role_value
-            target_role = changes.get("role", existing.get("role"))
-            if target_role == "driver":
-                plate = normalized.get("plate_number") or existing.get("plate_number")
-                try:
-                    changes["plate_number"] = normalize_plate(plate)
-                except ValueError as exc:
-                    errors.append(UserImportError(row=row_number, email=email, message=str(exc)))
-                    continue
-            elif "role" in changes:
-                changes["plate_number"] = None
-            if normalized.get("telegram_chat_id"):
-                try:
-                    telegram = TelegramUserFields(telegram_chat_id=normalized["telegram_chat_id"])
-                    changes.update(telegram_profile_changes(telegram, existing))
-                except ValidationError as exc:
-                    errors.append(UserImportError(row=row_number, email=email, message=format_validation_error(exc)))
-                    continue
-            if not changes:
-                errors.append(UserImportError(row=row_number, email=email, message="No profile fields supplied to update"))
-                continue
-            try:
-                changes.update(updated_at=utc_now(), updated_by=uid)
-                update_user_profile(existing.get("_id"), changes)
-                updated += 1
-            except HTTPException as exc:
-                errors.append(UserImportError(row=row_number, email=email, message=str(exc.detail)))
-            continue
-
         try:
             insert_user_profile({
                 "_id": user_id,
