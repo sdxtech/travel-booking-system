@@ -1,5 +1,8 @@
 import os
 import unittest
+from email import policy
+from email.parser import BytesParser
+from pathlib import Path
 from unittest.mock import patch
 
 from email_service import build_notification_html, send_notification_email, send_password_reset_email
@@ -17,6 +20,22 @@ SMTP_ENV = {
 
 
 class EmailServiceTests(unittest.TestCase):
+    def assert_inline_logo(self, message):
+        parsed = BytesParser(policy=policy.default).parsebytes(message.as_bytes())
+        images = [part for part in parsed.walk() if part.get_content_type() == "image/png"]
+        self.assertEqual(len(images), 1)
+        image = images[0]
+        self.assertEqual(image.get_content_disposition(), "inline")
+        self.assertEqual(
+            image.get_payload(decode=True),
+            (Path(__file__).resolve().parent / "assets" / "app-logo-blue.png").read_bytes(),
+        )
+        body = parsed.get_body(preferencelist=("html",)).get_content()
+        self.assertIn(f'src="cid:{image["Content-ID"][1:-1]}"', body)
+        self.assertNotIn("https://booking.example.com/app-logo-blue.png", body)
+        self.assertIn('align="center"', body)
+        self.assertTrue(any(part.get_content_type() == "multipart/related" for part in parsed.walk()))
+
     def test_skips_delivery_without_mailbox_password(self):
         with patch.dict(os.environ, {**SMTP_ENV, "SMTP_PASSWORD": ""}):
             with patch("email_service.smtplib.SMTP_SSL") as smtp:
@@ -45,6 +64,7 @@ class EmailServiceTests(unittest.TestCase):
         self.assertEqual(sent_message["Subject"], "Driver Booking: Approved")
         self.assertEqual(sent_message["To"], "user@example.com")
         self.assertEqual(sent_message["Message-ID"], message_id)
+        self.assert_inline_logo(sent_message)
         self.assertIn("Open Booking App", sent_message.get_body(preferencelist=("html",)).get_content())
 
     def test_invitation_uses_starttls_and_one_hour_link(self):
@@ -62,6 +82,7 @@ class EmailServiceTests(unittest.TestCase):
         connection.login.assert_called_once()
         sent_message = connection.send_message.call_args.args[0]
         self.assertEqual(sent_message["Subject"], "Set Up Your Booking App Account")
+        self.assert_inline_logo(sent_message)
         self.assertIn("1 hour", sent_message.get_body(preferencelist=("plain",)).get_content())
 
     def test_html_escapes_user_content(self):

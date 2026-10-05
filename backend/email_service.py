@@ -6,7 +6,12 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid, parseaddr
+from pathlib import Path
 from typing import Mapping, Optional
+
+
+EMAIL_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "app-logo-blue.png"
+EMAIL_LOGO_SRC = "cid:booking-app-logo"
 
 
 class EmailDeliveryError(RuntimeError):
@@ -51,7 +56,16 @@ def send_email(*, to_email: str, subject: str, html_content: str, text_content: 
         message_id = make_msgid(domain=sender_address.rsplit("@", 1)[-1])
         message["Message-ID"] = message_id
         message.set_content(text_content)
+        logo_cid = None
+        if EMAIL_LOGO_SRC in html_content:
+            logo_cid = make_msgid()
+            html_content = html_content.replace(EMAIL_LOGO_SRC, f"cid:{logo_cid[1:-1]}")
         message.add_alternative(html_content, subtype="html")
+        if logo_cid:
+            message.get_payload()[-1].add_related(
+                EMAIL_LOGO_PATH.read_bytes(), maintype="image", subtype="png",
+                cid=logo_cid, disposition="inline", filename="app-logo-blue.png",
+            )
 
         tls_context = ssl.create_default_context()
         if config["security"] == "ssl":
@@ -76,16 +90,12 @@ def build_notification_subject(event: str, entity_type: str) -> str:
 
 def build_email_layout(content: str) -> str:
     """Wrap email content in a narrow, mobile-friendly centered card."""
-    app_url = get_email_config()["app_url"].rstrip("/")
-    logo = ""
-    if app_url:
-        logo_url = html.escape(f"{app_url}/app-logo-blue.png", quote=True)
-        logo = (
-            '<tr><td style="padding:24px 22px 0">'
-            f'<img src="{logo_url}" alt="Booking App" width="80" height="80" '
-            'style="display:block;width:80px;height:80px;border:0">'
-            '</td></tr>'
-        )
+    logo = (
+        '<tr><td align="center" style="padding:24px 22px 0;text-align:center">'
+        f'<img src="{EMAIL_LOGO_SRC}" alt="Booking App" width="80" height="80" '
+        'style="display:block;width:80px;height:80px;margin:0 auto;border:0">'
+        '</td></tr>'
+    )
     return (
         '<!doctype html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
