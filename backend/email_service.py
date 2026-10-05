@@ -76,6 +76,16 @@ def build_notification_subject(event: str, entity_type: str) -> str:
 
 def build_email_layout(content: str) -> str:
     """Wrap email content in a narrow, mobile-friendly centered card."""
+    app_url = get_email_config()["app_url"].rstrip("/")
+    logo = ""
+    if app_url:
+        logo_url = html.escape(f"{app_url}/app-logo-blue.png", quote=True)
+        logo = (
+            '<tr><td style="padding:24px 22px 0">'
+            f'<img src="{logo_url}" alt="Booking App" width="80" height="80" '
+            'style="display:block;width:80px;height:80px;border:0">'
+            '</td></tr>'
+        )
     return (
         '<!doctype html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
@@ -89,7 +99,7 @@ def build_email_layout(content: str) -> str:
         '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" '
         'style="width:100%;max-width:560px;border:1px solid #dbe1ea;'
         'border-radius:10px;background:#ffffff;border-collapse:separate">'
-        f'<tr><td style="padding:24px 22px">{content}</td></tr>'
+        f'{logo}<tr><td style="padding:24px 22px">{content}</td></tr>'
         '</table></td></tr></table></body></html>'
     )
 
