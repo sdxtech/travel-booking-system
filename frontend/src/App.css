@@ -4241,6 +4241,17 @@ user-dropdown-toogle {
   line-height: 1;
 }
 
+.success-modal-icon.account-delete-icon {
+  background: #dc2626;
+}
+
+.account-delete-target {
+  margin: 0;
+  max-width: 100%;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .success-modal-title {
   margin: 0;
   font-size: 32px;

@@ -58,6 +58,8 @@ function AdminManageUser() {
   const [editError, setEditError] = useState('')
 
   const [successModal, setSuccessModal] = useState(null)
+  const [deleteModalUser, setDeleteModalUser] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
 
   const [passwordModalUser, setPasswordModalUser] = useState(null)
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' })
@@ -498,14 +500,10 @@ function AdminManageUser() {
 
   // Permanently delete a user account from the backend.
   const handleDelete = async (user) => {
-    if (!user?.uid) return
-
-    const confirmed = window.confirm(
-      `Delete this account permanently?\n\nThis will remove the user record from MongoDB.\n\n${user.email || user.name || user.uid}`
-    )
-    if (!confirmed) return
+    if (!user?.uid || actionLoadingId) return
 
     setActionLoadingId(user.uid)
+    setDeleteError('')
     setActionError('')
     setActionSuccess('')
     setSuccessModal(null)
@@ -524,10 +522,11 @@ function AdminManageUser() {
         } catch {
           // ignore parse error
         }
-        setActionError(detail)
+        setDeleteError(detail)
         return
       }
 
+      setDeleteModalUser(null)
       setSuccessModal({
         mode: 'delete',
         title: 'Account Deleted',
@@ -535,7 +534,7 @@ function AdminManageUser() {
       })
       await loadUsers()
     } catch {
-      setActionError('Network error. Please try again.')
+      setDeleteError('Network error. Please try again.')
     } finally {
       setActionLoadingId('')
     }
@@ -862,7 +861,10 @@ function AdminManageUser() {
                             type="button"
                             className="is-danger"
                             disabled={actionLoadingId === user.uid}
-                            onClick={() => handleDelete(user)}
+                            onClick={() => {
+                              setDeleteError('')
+                              setDeleteModalUser(user)
+                            }}
                             title="Super Admin override: delete user"
                           >
                             <i className="bi bi-trash" aria-hidden="true" /> Delete
@@ -897,6 +899,42 @@ function AdminManageUser() {
               Next
             </button>
           </div>
+
+          {deleteModalUser ? (
+            <div
+              className="modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-account-title"
+              aria-describedby="delete-account-description"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && !actionLoadingId) setDeleteModalUser(null)
+              }}
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !actionLoadingId) setDeleteModalUser(null)
+              }}
+            >
+              <div className="modal success-modal">
+                <div className="success-modal-icon account-delete-icon" aria-hidden="true">
+                  <i className="bi bi-trash" />
+                </div>
+                <h2 id="delete-account-title" className="success-modal-title">Delete Account?</h2>
+                <p id="delete-account-description" className="success-modal-message">
+                  This account will be permanently deleted. This action cannot be undone.
+                </p>
+                <p className="account-delete-target">{deleteModalUser.email || deleteModalUser.name || deleteModalUser.uid}</p>
+                {deleteError ? <p className="error-text" role="alert">{deleteError}</p> : null}
+                <div className="success-modal-actions">
+                  <button type="button" className="btn btn-outline-brand" autoFocus disabled={Boolean(actionLoadingId)} onClick={() => setDeleteModalUser(null)}>
+                    Cancel
+                  </button>
+                  <button type="button" className="btn btn-danger" disabled={Boolean(actionLoadingId)} onClick={() => handleDelete(deleteModalUser)}>
+                    {actionLoadingId ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {successModal ? (
             <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="user-success-title">

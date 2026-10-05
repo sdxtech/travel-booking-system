@@ -114,8 +114,8 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
             >
               View History
             </button>
-            <button type="button" className="btn btn-outline-brand" onClick={() => setSubmissionStatus('')}>
-              Back to Form
+            <button type="button" className="btn btn-outline-brand" onClick={onClose}>
+              Close
             </button>
           </div>
         </div>

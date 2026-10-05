@@ -571,7 +571,7 @@ const isSuperadmin =
                     View History
                   </button>
                   <button type="button" className="btn btn-outline-brand" onClick={() => setShowSuccessModal(false)}>
-                    Back to Form
+                    Close
                   </button>
                 </div>
               </div>
