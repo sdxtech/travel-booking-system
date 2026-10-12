@@ -28,7 +28,7 @@ class EmailServiceTests(unittest.TestCase):
         self.assertEqual(image.get_content_disposition(), "inline")
         self.assertEqual(
             image.get_payload(decode=True),
-            (Path(__file__).resolve().parent / "assets" / "app-logo-blue.png").read_bytes(),
+            (Path(__file__).resolve().parent / "assets" / "DR LOGO BLUE.png").read_bytes(),
         )
         body = parsed.get_body(preferencelist=("html",)).get_content()
         self.assertIn(f'src="cid:{image["Content-ID"][1:-1]}"', body)

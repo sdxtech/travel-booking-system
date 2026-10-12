@@ -12,10 +12,7 @@ const roleRouteMap = {
 };
 
 const LOGO_SOURCES = [
-  "/app-logo-blue.png",
-  "/app-logo-black.png",
-  "/app-logo-white.png",
-  "/app-logo.png",
+  "/DR%20LOGO%20BLUE.png",
 ];
 
 const getLoginErrorMessage = (message) => {

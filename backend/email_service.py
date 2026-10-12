@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Mapping, Optional
 
 
-EMAIL_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "app-logo-blue.png"
+EMAIL_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "DR LOGO BLUE.png"
 EMAIL_LOGO_SRC = "cid:booking-app-logo"
 
 
@@ -64,7 +64,7 @@ def send_email(*, to_email: str, subject: str, html_content: str, text_content: 
         if logo_cid:
             message.get_payload()[-1].add_related(
                 EMAIL_LOGO_PATH.read_bytes(), maintype="image", subtype="png",
-                cid=logo_cid, disposition="inline", filename="app-logo-blue.png",
+                cid=logo_cid, disposition="inline", filename=EMAIL_LOGO_PATH.name,
             )
 
         tls_context = ssl.create_default_context()

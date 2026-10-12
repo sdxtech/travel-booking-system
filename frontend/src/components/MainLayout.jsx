@@ -775,7 +775,7 @@ function MainLayout({ title, children }) {
 
     <img
       className="navbar__logo"
-      src="/app-logo-blue.png"
+      src="/DR%20LOGO%20BLUE.png"
       alt={APP_NAME}
     />
 
