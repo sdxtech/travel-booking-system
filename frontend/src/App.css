@@ -403,10 +403,10 @@
 }
 
 .navbar__logo {
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  padding: 5px;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  padding: 3px;
   background: #ffffff;
   border-radius: 10px;
   box-sizing: border-box;
@@ -727,7 +727,7 @@ user-dropdown-toogle {
   width: 100%;
   max-width: 1100px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 40px;
   align-items: center;
 }
@@ -766,6 +766,7 @@ user-dropdown-toogle {
 
 .login-card {
   width: 100%;
+  min-width: 0;
   max-width: 420px;
   background-color: #ffffff;
   border-radius: 12px;
@@ -1490,9 +1491,12 @@ user-dropdown-toogle {
     gap: 6px;
   }
 
-  /* Shrink brand logo */
+  /* Keep the logo visible in the compact mobile navbar. */
   .navbar__logo {
-    display: none;
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+    padding: 2px;
   }
 
   /* Hide user name and role text on mobile */
@@ -4380,7 +4384,7 @@ user-dropdown-toogle {
   }
 
   .login-wrapper {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     gap: 24px;
   }
