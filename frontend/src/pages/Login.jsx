@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { indonesianError } from "../utils/indonesian";
 import { APP_NAME } from "../config";
 import { useAuth } from "../hooks/useAuth";
 
@@ -17,20 +18,20 @@ const LOGO_SOURCES = [
 
 const getLoginErrorMessage = (message) => {
   if (!message) {
-    return "Login failed. Please check your email and password.";
+    return "Gagal masuk. Periksa kembali email dan kata sandi Anda.";
   }
 
   const normalized = message.toLowerCase();
 
   if (normalized.includes("disabled")) {
-    return "Your account has been disabled. Please contact an administrator.";
+    return "Akun Anda dinonaktifkan. Silakan hubungi administrator.";
   }
 
   if (normalized.includes("invalid email or password")) {
-    return "Invalid email or password. If this account was imported, please ask an administrator to reset the password.";
+    return "Email atau kata sandi salah. Jika akun Anda dibuat melalui impor, minta administrator mengatur ulang kata sandi.";
   }
 
-  return message;
+  return indonesianError(message, "Gagal masuk. Periksa kembali email dan kata sandi Anda.");
 };
 
 function Login() {
@@ -47,7 +48,7 @@ function Login() {
   const { login } = useAuth();
 
   useEffect(() => {
-    document.title = `Login | ${APP_NAME}`;
+    document.title = `Masuk | ${APP_NAME}`;
   }, []);
 
   const handleSubmit = async (event) => {
@@ -76,7 +77,7 @@ function Login() {
   };
 
   return (
-    <div className="login-page">
+    <div className="login-page" lang="id">
       <div className="login-wrapper">
         <div className="login-logo">
           <div className="login-logo__circle">
@@ -88,13 +89,13 @@ function Login() {
                 onError={() => setLogoIndex((prev) => prev + 1)}
               />
             ) : (
-              <span className="login-logo__fallback">APP LOGO</span>
+              <span className="login-logo__fallback">LOGO APLIKASI</span>
             )}
           </div>
         </div>
 
         <div className="login-card login-card-branded">
-          <h1 className="login-title">LOGIN</h1>
+          <h1 className="login-title">MASUK</h1>
 
           <form className="login-form" onSubmit={handleSubmit}>
             <label className="form-field">
@@ -105,12 +106,12 @@ function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="you@example.com"
+                placeholder="nama@contoh.com"
               />
             </label>
 
             <label className="form-field">
-              <span>Password</span>
+              <span>Kata Sandi</span>
 
               <div className="password-input-wrapper">
                 <input
@@ -125,7 +126,7 @@ function Login() {
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
                   aria-pressed={showPassword}
                 >
                   <i
@@ -148,17 +149,17 @@ function Login() {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <span>Remember me</span>
+              <span>Ingat saya</span>
             </label>
 
-            <a href="/forgot-password" className="forgot-password-link">Forgot Password?</a>
+            <a href="/forgot-password" className="forgot-password-link">Lupa Kata Sandi?</a>
             </div>
 
 
             {error && <p className="error-text">{error}</p>}
 
             <button type="submit" disabled={loading}>
-              {loading ? "Signing in..." : "Login"}
+              {loading ? "Memproses..." : "Masuk"}
             </button>
           </form>
         </div>

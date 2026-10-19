@@ -302,6 +302,7 @@ def forgot_password(payload: ForgotPasswordRequest,):
         to_email=user["email"],
         recipient_name=user.get("name"),
         reset_url=reset_url,
+        language="id" if user.get("role") == "driver" else "en",
     )
 
     return {

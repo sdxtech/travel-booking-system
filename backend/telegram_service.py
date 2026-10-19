@@ -5,6 +5,7 @@ import re
 import requests
 
 from email_service import build_notification_subject
+from driver_localization import driver_notification_details, driver_notification_message
 
 
 class TelegramDeliveryError(RuntimeError):
@@ -56,12 +57,14 @@ def send_telegram_message(chat_id, text):
 
 def send_notification_telegram(*, chat_id, recipient_name, message, event, entity_type, details=None):
     app_url = os.getenv("APP_PUBLIC_URL", "").strip()
-    title = build_notification_subject(event, entity_type)
-    text = f"{title}\n\nHello {recipient_name or 'Driver'},\n\n{message}"
+    title = build_notification_subject(event, entity_type, language="id")
+    message = driver_notification_message(message, event)
+    details = driver_notification_details(details)
+    text = f"{title}\n\nHalo {recipient_name or 'Pengemudi'},\n\n{message}"
     if details:
-        text += "\n\nBooking details:"
+        text += "\n\nRincian perjalanan:"
         for label, value in details.items():
             text += f"\n{label}: {value or '-'}"
     if app_url:
-        text += f"\n\nOpen Booking App: {app_url}"
+        text += f"\n\nBuka Booking App: {app_url}"
     return send_telegram_message(chat_id, text)

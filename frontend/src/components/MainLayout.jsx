@@ -1,8 +1,9 @@
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { API_BASE_URL, APP_NAME } from '../config'
 import { useAuth } from '../hooks/useAuth'
+import { indonesianError } from '../utils/indonesian'
 
 const userNavSections = [
   {
@@ -170,6 +171,7 @@ function MainLayout({ title, children }) {
 
   const isEmployee = role === 'user'
   const isDriver = role === 'driver'
+  const t = useCallback((english, indonesian) => isDriver ? indonesian : english, [isDriver])
   const isSuperadmin = role === 'superadmin'
 
 
@@ -207,7 +209,7 @@ function MainLayout({ title, children }) {
     ]
   } else if (isDriver) {
     navSections = [
-      accountSettingsSection,
+      { ...accountSettingsSection, label: 'Akun', items: accountSettingsSection.items.map((item) => ({ ...item, label: 'Ubah Kata Sandi' })) },
     ]
   } else if (isSuperadmin) {
     navSections = [
@@ -232,7 +234,7 @@ function MainLayout({ title, children }) {
       }
     : isDriver
       ? {
-          label: 'Driver Tasks',
+          label: 'Tugas Saya',
           path: '/driver/home',
           icon: 'bi-card-checklist',
         }
@@ -265,7 +267,7 @@ function MainLayout({ title, children }) {
           },
         ]
       : isDriver ? [{
-          label: 'Connect Telegram',
+          label: 'Hubungkan Telegram',
           path: '/driver/telegram',
           icon: 'bi-telegram',
         }] : []
@@ -294,7 +296,7 @@ function MainLayout({ title, children }) {
     [notifications]
   )
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     setNotificationsLoading(true)
     setNotificationsError('')
 
@@ -308,13 +310,13 @@ function MainLayout({ title, children }) {
 
       if (!res.ok) {
         let detail =
-          'Failed to load notifications.'
+          t('Failed to load notifications.', 'Notifikasi gagal dimuat. Silakan coba lagi.')
 
         try {
           const data = await res.json()
 
           if (data?.detail) {
-            detail = data.detail
+            detail = isDriver ? indonesianError(data.detail, detail) : data.detail
           }
         } catch {
           // Ignore parse error.
@@ -335,14 +337,14 @@ function MainLayout({ title, children }) {
       )
     } catch {
       setNotificationsError(
-        'Network error. Please try again.'
+        t('Network error. Please try again.', 'Koneksi bermasalah. Silakan coba lagi.')
       )
 
       setNotifications([])
     } finally {
       setNotificationsLoading(false)
     }
-  }
+  }, [isDriver, t])
 
   const markAllNotificationsRead = async () => {
     try {
@@ -393,7 +395,7 @@ function MainLayout({ title, children }) {
         handleRefresh
       )
     }
-  }, [])
+  }, [fetchNotifications])
 
   useEffect(() => {
     if (!notificationsOpen) return
@@ -519,13 +521,13 @@ function MainLayout({ title, children }) {
   const renderSideNav = () => (
     <aside
       className="app-sidebar"
-      aria-label="Main menu"
+      aria-label={t('Main menu', 'Menu utama')}
     >
       <div className="app-sidebar__header">
         <div className="app-sidebar__identity">
           <div className="app-sidebar__brand">
             <span className="app-sidebar__brand-title">
-              Navigation Menu
+              {t('Navigation Menu', 'Menu Navigasi')}
             </span>
           </div>
         </div>
@@ -536,13 +538,13 @@ function MainLayout({ title, children }) {
           onClick={toggleSidebar}
           aria-label={
             isSidebarCollapsed
-              ? 'Open side navigation'
-              : 'Close side navigation'
+              ? t('Open side navigation', 'Buka menu navigasi')
+              : t('Close side navigation', 'Tutup menu navigasi')
           }
           title={
             isSidebarCollapsed
-              ? 'Open side navigation'
-              : 'Close side navigation'
+              ? t('Open side navigation', 'Buka menu navigasi')
+              : t('Close side navigation', 'Tutup menu navigasi')
           }
         >
           <i
@@ -732,6 +734,7 @@ function MainLayout({ title, children }) {
 
   return (
     <div
+      lang={isDriver ? 'id' : 'en'}
       className={`layout ${
         showSideNav
           ? 'layout--with-side-nav'
@@ -757,13 +760,13 @@ function MainLayout({ title, children }) {
         onClick={toggleSidebar}
         aria-label={
           isSidebarCollapsed
-            ? 'Open side navigation'
-            : 'Close side navigation'
+            ? t('Open side navigation', 'Buka menu navigasi')
+            : t('Close side navigation', 'Tutup menu navigasi')
         }
         title={
           isSidebarCollapsed
-            ? 'Open side navigation'
-            : 'Close side navigation'
+            ? t('Open side navigation', 'Buka menu navigasi')
+            : t('Close side navigation', 'Tutup menu navigasi')
         }
       >
         <i
@@ -797,13 +800,13 @@ function MainLayout({ title, children }) {
         className="navbar-icon-button"
         aria-label={
           unreadCount
-            ? `Notifications (${unreadCount} new)`
-            : 'Notifications'
+            ? t(`Notifications (${unreadCount} new)`, `Notifikasi (${unreadCount} baru)`)
+            : t('Notifications', 'Notifikasi')
         }
         title={
           unreadCount
-            ? `Notifications (${unreadCount} new)`
-            : 'Notifications'
+            ? t(`Notifications (${unreadCount} new)`, `Notifikasi (${unreadCount} baru)`)
+            : t('Notifications', 'Notifikasi')
         }
         onClick={async () => {
           const nextOpen =
@@ -836,11 +839,11 @@ function MainLayout({ title, children }) {
         <div
           className="notifications-dropdown"
           role="menu"
-          aria-label="Notifications"
+          aria-label={t('Notifications', 'Notifikasi')}
         >
           <div className="notifications-dropdown__header">
             <span>
-              Notifications
+              {t('Notifications', 'Notifikasi')}
             </span>
 
             <button
@@ -854,8 +857,8 @@ function MainLayout({ title, children }) {
               }
             >
               {notificationsLoading
-                ? 'Loading...'
-                : 'Refresh'}
+                ? t('Loading...', 'Memuat...')
+                : t('Refresh', 'Perbarui')}
             </button>
           </div>
 
@@ -876,8 +879,7 @@ function MainLayout({ title, children }) {
                   margin: 0,
                 }}
               >
-                No notifications
-                yet.
+                {t('No notifications yet.', 'Belum ada notifikasi.')}
               </p>
             ) : (
               notifications.map(
@@ -897,7 +899,7 @@ function MainLayout({ title, children }) {
                     {item.created_at ? (
                       <p className="notification-item__meta">
                         {formatTimestamp(
-                          item.created_at
+                          item.created_at, isDriver ? 'id-ID' : undefined
                         )}
                       </p>
                     ) : null}
@@ -929,12 +931,11 @@ function MainLayout({ title, children }) {
           <span className="navbar-user__name">
             {user?.name ||
               user?.full_name ||
-              'User'}
+              t('User', 'Pengguna')}
           </span>
 
           <span className="navbar-user__role">
-            {user?.role ||
-              'Unknown role'}
+            {isDriver ? 'Pengemudi' : user?.role || 'Unknown role'}
           </span>
         </div>
         <div className='user-dropdown-toogle'>
@@ -957,7 +958,7 @@ function MainLayout({ title, children }) {
             onClick={handleLogout}
           >
             <i className="bi bi-box-arrow-right" aria-hidden="true" />
-            Logout
+            {t('Logout', 'Keluar')}
           </button>
         </div>
       ) : null}
@@ -978,7 +979,7 @@ function MainLayout({ title, children }) {
   )
 }
 
-function formatTimestamp(value) {
+function formatTimestamp(value, locale) {
   if (!value) return ''
 
   const dateValue = value?.seconds
@@ -996,7 +997,7 @@ function formatTimestamp(value) {
   }
 
   return dateValue.toLocaleString(
-    undefined,
+    locale,
     {
       year: 'numeric',
       month: 'short',

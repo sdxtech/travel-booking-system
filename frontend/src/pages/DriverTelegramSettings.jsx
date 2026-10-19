@@ -3,10 +3,10 @@ import DriverTelegram from '../components/DriverTelegram'
 
 export default function DriverTelegramSettings() {
   return (
-    <MainLayout title="Connect Telegram">
+    <MainLayout title="Hubungkan Telegram">
       <section className="office-content">
         <header className="office-header">
-          <h1>Connect Telegram</h1>
+          <h1>Hubungkan Telegram</h1>
         </header>
         <DriverTelegram />
       </section>

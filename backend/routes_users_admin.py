@@ -826,6 +826,7 @@ def distribute_accounts(payload: DistributeAccountRequest, current_user=Depends(
                 reset_url=reset_url,
                 invitation=True,
                 expires_in_minutes=60,
+                language="id" if payload.role == "driver" else "en",
             )
             if email_id is None:
                 raise EmailDeliveryError("Invitation email service is not configured")

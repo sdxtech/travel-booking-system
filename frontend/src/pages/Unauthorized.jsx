@@ -1,6 +1,5 @@
 
 
-import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
 
@@ -12,12 +11,12 @@ const Unauthorized = () => {
   }
   return (
 
-    <section className='unauthorized'>
+    <section className='unauthorized' lang="id">
 
-        <h1 className='unauthorized-heading'>UNAUTHORIZED!</h1>
-        <p>You not authorized to access this page</p>
+        <h1 className='unauthorized-heading'>AKSES DITOLAK</h1>
+        <p>Anda tidak memiliki akses ke halaman ini.</p>
         <button onClick={handleGoBack}>
-          Go Back
+          Kembali
         </button>
     </section>
 

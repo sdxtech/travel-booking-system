@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import { indonesianError } from "../utils/indonesian";
 import { API_BASE_URL } from "../config";
 
 function ForgotPassword() {
@@ -20,27 +21,26 @@ function ForgotPassword() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.detail || "Failed to send password reset email.");
+        setError(indonesianError(data?.detail, "Email pengaturan ulang kata sandi gagal dikirim. Silakan coba lagi."));
+        return;
       }
       setMessage(
-        data?.message ||
-          "If an account exists with this email, a password reset link has been sent (dont forget to check the spam folder also).",
+        "Jika akun dengan email ini terdaftar, tautan pengaturan ulang kata sandi telah dikirim. Periksa juga folder spam.",
       );
       setEmail("");
-    } catch (err) {
-      console.error("Forgot password error:", err);
-      setError(err?.message || "Something went wrong. Please try again.");
+    } catch {
+      setError("Koneksi bermasalah. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }
   };
   return (
-    <div className="login-page">
+    <div className="login-page" lang="id">
      
       <div className="login-card login-card-branded">
        
-        <h1 className="login-title"> Forgot Password </h1>
-        <p>Enter your email so we can send verification link to your email.</p>
+        <h1 className="login-title"> Lupa Kata Sandi </h1>
+        <p>Masukkan email Anda untuk menerima tautan pengaturan ulang kata sandi.</p>
         <form className="login-form" onSubmit={handleSubmit}>
          
           <label className="form-field">
@@ -52,14 +52,14 @@ function ForgotPassword() {
               onChange={(event) => setEmail(event.target.value)}
               required
               disabled={loading}
-              placeholder="you@example.com"
+              placeholder="nama@contoh.com"
             />
           </label>
           {error && <p className="error-text"> {error} </p>}
           {message && <p className="success-text"> {message} </p>}
           <button type="submit" disabled={loading}>
             
-            {loading ? "SENDING..." : "SEND VERIFICATION EMAIL"}
+            {loading ? "MENGIRIM..." : "KIRIM TAUTAN"}
           </button>
         </form>
       </div>

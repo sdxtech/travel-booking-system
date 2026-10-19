@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { indonesianError } from "../utils/indonesian";
 import { API_BASE_URL } from "../config";
 
 function ResetPassword() {
@@ -28,18 +29,18 @@ function ResetPassword() {
 
     if (!token) {
       setError(
-        "Invalid or missing reset token. Please request a new password reset link."
+        "Tautan tidak valid atau tidak lengkap. Silakan minta tautan pengaturan ulang kata sandi yang baru."
       );
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+      setError("Kata sandi harus terdiri dari minimal 8 karakter.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError("Kata sandi dan konfirmasinya tidak sama.");
       return;
     }
 
@@ -64,16 +65,14 @@ function ResetPassword() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-            data?.message ||
-            "Failed to reset password."
+        setError(
+          indonesianError(data?.detail, "Kata sandi gagal diatur ulang. Silakan coba lagi.")
         );
+        return;
       }
 
       setMessage(
-        data?.message ||
-          "Your password has been reset successfully."
+        "Kata sandi berhasil diatur ulang. Anda akan diarahkan ke halaman masuk."
       );
 
       setPassword("");
@@ -85,33 +84,27 @@ function ResetPassword() {
           replace: true,
         });
       }, 2000);
-    } catch (err) {
-      console.error("Reset password error:", err);
-
-      setError(
-        err?.message ||
-          "Something went wrong. Please try again."
-      );
+    } catch {
+      setError("Koneksi bermasalah. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="login-page">
+    <div className="login-page" lang="id">
       <div className="login-card login-card-branded">
         <h1 className="login-title">
-          Reset Password
+          Atur Ulang Kata Sandi
         </h1>
 
         <p>
-          Enter your new password below.
+          Masukkan kata sandi baru Anda di bawah ini.
         </p>
 
         {!token && (
           <div>
-            Invalid or missing reset token. Please request
-            a new password reset link.
+            Tautan tidak valid atau tidak lengkap. Silakan minta tautan pengaturan ulang kata sandi yang baru.
           </div>
         )}
 
@@ -133,7 +126,7 @@ function ResetPassword() {
             onSubmit={handleSubmit}
           >
             <label className="form-field">
-              <span>New Password</span>
+              <span>Kata Sandi Baru</span>
 
               <div className="password-input-wrapper">
                 <input
@@ -148,7 +141,7 @@ function ResetPassword() {
                   }
                   required
                   minLength={8}
-                  placeholder="Enter your new password"
+                  placeholder="Masukkan kata sandi baru"
                   disabled={loading}
                 />
 
@@ -156,7 +149,7 @@ function ResetPassword() {
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
                   aria-pressed={showPassword}
                 >
                   <i
@@ -170,7 +163,7 @@ function ResetPassword() {
             </label>
 
             <label className="form-field">
-              <span>Confirm Password</span>
+              <span>Konfirmasi Kata Sandi</span>
 
               <div className="password-input-wrapper">
                 <input
@@ -187,7 +180,7 @@ function ResetPassword() {
                   }
                   required
                   minLength={8}
-                  placeholder="Confirm your new password"
+                  placeholder="Masukkan kembali kata sandi baru"
                   disabled={loading}
                 />
 
@@ -195,7 +188,7 @@ function ResetPassword() {
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  aria-label={showConfirmPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
                   aria-pressed={showConfirmPassword}
                 >
                   <i
@@ -213,8 +206,8 @@ function ResetPassword() {
               disabled={loading}
             >
               {loading
-                ? "RESETTING PASSWORD..."
-                : "RESET PASSWORD"}
+                ? "MENYIMPAN KATA SANDI..."
+                : "SIMPAN KATA SANDI"}
             </button>
           </form>
         )}
@@ -225,7 +218,7 @@ function ResetPassword() {
           className="back-to-login-button"
          
         >
-          BACK TO LOGIN
+          KEMBALI KE HALAMAN MASUK
         </a>
 </div>
       </div>

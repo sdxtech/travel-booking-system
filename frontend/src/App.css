@@ -2165,6 +2165,23 @@ user-dropdown-toogle {
   background-color: #16a34a;
 }
 
+.driver-page .status-stepper__step {
+  min-width: 0;
+}
+
+.driver-page .status-stepper__label {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 28px;
+  white-space: normal;
+}
+
+.driver-page .status-stepper__connector {
+  min-width: 8px;
+  margin-top: 59px;
+}
+
 .driver-task-details {
   display: flex;
   flex-direction: column;

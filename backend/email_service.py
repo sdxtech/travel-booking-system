@@ -8,6 +8,7 @@ from email.message import EmailMessage
 from email.utils import formataddr, make_msgid, parseaddr
 from pathlib import Path
 from typing import Mapping, Optional
+from driver_localization import SUBJECTS
 
 
 EMAIL_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "DR LOGO BLUE.png"
@@ -82,13 +83,16 @@ def send_email(*, to_email: str, subject: str, html_content: str, text_content: 
         raise EmailDeliveryError("SMTP email delivery failed") from exc
 
 
-def build_notification_subject(event: str, entity_type: str) -> str:
+def build_notification_subject(event: str, entity_type: str, *, language: str = "en") -> str:
+    if language == "id":
+        entity_label = "Perjalanan" if entity_type == "booking" else "Booking App"
+        return f"{entity_label}: {SUBJECTS.get(event, 'Pemberitahuan terbaru')}"
     entity_label = "Driver Booking" if entity_type == "booking" else "Travel Request" if entity_type == "ticket" else "Booking App"
     event_label = str(event or "updated").replace("_", " ").strip().title()
     return f"{entity_label}: {event_label}"
 
 
-def build_email_layout(content: str) -> str:
+def build_email_layout(content: str, *, language: str = "en") -> str:
     """Wrap email content in a narrow, mobile-friendly centered card."""
     logo = (
         '<tr><td align="center" style="padding:24px 22px 0;text-align:center">'
@@ -97,7 +101,7 @@ def build_email_layout(content: str) -> str:
         '</td></tr>'
     )
     return (
-        '<!doctype html><html><head><meta charset="utf-8">'
+        f'<!doctype html><html lang="{language}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
         '<meta name="x-apple-disable-message-reformatting"></head>'
         '<body style="margin:0;padding:0;background:#f4f6f8;'
@@ -119,8 +123,14 @@ def build_notification_html(
     message: str,
     app_url: str,
     details: Optional[Mapping[str, object]] = None,
+    *,
+    language: str = "en",
 ) -> str:
-    safe_name = html.escape((recipient_name or "User").strip() or "User")
+    fallback_name = "Pengguna" if language == "id" else "User"
+    safe_name = html.escape((recipient_name or fallback_name).strip() or fallback_name)
+    greeting = "Halo" if language == "id" else "Hello"
+    action_label = "Buka Booking App" if language == "id" else "Open Booking App"
+    automated_note = "Ini adalah pemberitahuan otomatis dari Booking App." if language == "id" else "This is an automated notification from Booking App."
     safe_message = html.escape(message)
     detail_rows = ""
     if details:
@@ -147,19 +157,19 @@ def build_notification_html(
         action = (
             '<p style="margin:24px 0 0">'
             f'<a href="{safe_url}" style="display:inline-block;padding:10px 16px;border-radius:6px;'
-            'background:#273896;color:#ffffff;text-decoration:none;font-weight:600">Open Booking App</a>'
+            f'background:#273896;color:#ffffff;text-decoration:none;font-weight:600">{action_label}</a>'
             "</p>"
         )
 
     content = (
         '<h1 style="margin:0 0 16px;color:#273896;font-size:22px;line-height:30px">Booking App</h1>'
-        f'<p style="margin:0 0 12px;font-size:14px;line-height:22px">Hello {safe_name},</p>'
+        f'<p style="margin:0 0 12px;font-size:14px;line-height:22px">{greeting} {safe_name},</p>'
         f'<p style="margin:0;font-size:14px;line-height:22px;overflow-wrap:anywhere">{safe_message}</p>'
         f"{detail_rows}{action}"
         '<p style="margin:8px 0 0;color:#64748b;font-size:12px;line-height:18px">'
-        'This is an automated notification from Booking App.</p>'
+        f'{automated_note}</p>'
     )
-    return build_email_layout(content)
+    return build_email_layout(content, language=language)
 
 
 def send_notification_email(
@@ -171,17 +181,19 @@ def send_notification_email(
     entity_type: str,
     notification_id: str,
     details: Optional[Mapping[str, object]] = None,
+    language: str = "en",
 ) -> Optional[str]:
     """Send one notification email and return its Message-ID when configured."""
     config = get_email_config()
     return send_email(
         to_email=to_email,
-        subject=build_notification_subject(event, entity_type),
-        html_content=build_notification_html(recipient_name, message, config["app_url"], details),
+        subject=build_notification_subject(event, entity_type, language=language),
+        html_content=build_notification_html(recipient_name, message, config["app_url"], details, language=language),
         text_content=(
-            f"Hello {recipient_name or 'User'},\n\n{message}"
+            f"{'Halo' if language == 'id' else 'Hello'} {recipient_name or ('Pengguna' if language == 'id' else 'User')},\n\n{message}"
             + ("\n\n" + "\n".join(f"{label} : {value or '-'}" for label, value in details.items()) if details else "")
-            + f"\n\nOpen Booking App: {config['app_url']}"
+            + f"\n\n{'Buka Booking App' if language == 'id' else 'Open Booking App'}: {config['app_url']}"
+            + ("\nIni adalah pemberitahuan otomatis dari Booking App." if language == "id" else "")
         ).strip(),
     )
 
@@ -192,6 +204,7 @@ def send_password_reset_email(
     reset_url: str,
     invitation: bool = False,
     expires_in_minutes: int = 30,
+    language: str = "en",
 ) -> Optional[str]:
     if not (email_delivery_enabled() and to_email):
         return None
@@ -215,6 +228,22 @@ def send_password_reset_email(
         else "We received a request to reset your Booking App password."
     )
     action_label = "Set Password" if is_invitation else "Reset Password"
+    greeting = "Hello"
+    expiry_note = f"This link will expire in {expiry_label} and can only be used once."
+    ignore_note = "If you did not request a password reset, you can safely ignore this email."
+    if language == "id":
+        greeting = "Halo"
+        subject = "Aktifkan Akun Booking App Anda" if is_invitation else "Atur Ulang Kata Sandi Booking App"
+        heading = "Buat Kata Sandi Anda" if is_invitation else "Atur Ulang Kata Sandi"
+        intro = (
+            "Super Admin telah membuat akun pengemudi untuk Anda. Buat kata sandi untuk mengaktifkan akun Anda."
+            if is_invitation else "Kami menerima permintaan untuk mengatur ulang kata sandi akun Booking App Anda."
+        )
+        action_label = "Buat Kata Sandi" if is_invitation else "Atur Ulang Kata Sandi"
+        expiry_label = "1 jam" if expires_in_minutes == 60 else f"{expires_in_minutes} menit"
+        expiry_note = f"Tautan ini berlaku selama {expiry_label} dan hanya dapat digunakan satu kali."
+        ignore_note = "Jika Anda tidak meminta pengaturan ulang kata sandi, abaikan email ini."
+        safe_name = html.escape((recipient_name or "Pengemudi").strip() or "Pengemudi")
 
     content = (
         '<h1 style="margin:0 0 16px;color:#273896;'
@@ -224,7 +253,7 @@ def send_password_reset_email(
 
         f'<p style="margin:0 0 12px;font-size:14px;'
         f'line-height:22px">'
-        f'Hello {safe_name},'
+        f'{greeting} {safe_name},'
         f'</p>'
 
         '<p style="margin:0 0 16px;font-size:14px;'
@@ -243,25 +272,23 @@ def send_password_reset_email(
 
         '<p style="margin:0;font-size:13px;'
         'line-height:20px;color:#64748b">'
-        f'This link will expire in {expiry_label} and can only be used once.'
+        f'{expiry_note}'
         '</p>'
 
         '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;'
         'padding-top:16px;color:#64748b;font-size:12px;'
         'line-height:18px">'
-        'If you did not request a password reset, you can safely ignore '
-        'this email.'
+        f'{ignore_note}'
         '</p>'
     )
-    html_content = build_email_layout(content)
+    html_content = build_email_layout(content, language=language)
 
     text_content = (
-        f"Hello {recipient_name or 'User'},\n\n"
+        f"{greeting} {recipient_name or ('Pengemudi' if language == 'id' else 'User')},\n\n"
         f"{intro}\n\n"
-        f"{action_label} here:\n{reset_url}\n\n"
-        f"This link will expire in {expiry_label} and can only be used once.\n\n"
-        "If you did not request a password reset, you can safely ignore "
-        "this email."
+        f"{action_label}:\n{reset_url}\n\n"
+        f"{expiry_note}\n\n"
+        f"{ignore_note}"
     )
 
     return send_email(

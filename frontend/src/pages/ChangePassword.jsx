@@ -2,6 +2,8 @@ import { useState } from "react";
 import MainLayout from "../components/MainLayout";
 import { API_BASE_URL } from "../config";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { indonesianError } from "../utils/indonesian";
 
 const initialForm = {
   current_password: "",
@@ -10,6 +12,9 @@ const initialForm = {
 };
 
 function ChangePassword() {
+  const { user } = useAuth();
+  const isDriver = user?.role === "driver";
+  const t = (english, indonesian) => isDriver ? indonesian : english;
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -36,12 +41,12 @@ function ChangePassword() {
     setSuccess("");
 
     if (form.new_password !== form.confirm_password) {
-      setError("New password and confirmation password do not match.");
+      setError(t("New password and confirmation password do not match.", "Kata sandi baru dan konfirmasinya tidak sama."));
       return;
     }
 
     if (form.new_password.length < 6) {
-      setError("New password must be at least 6 characters.");
+      setError(t("New password must be at least 6 characters.", "Kata sandi baru harus terdiri dari minimal 6 karakter."));
       return;
     }
 
@@ -64,16 +69,16 @@ function ChangePassword() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(data?.detail || "Failed to change password.");
+        setError(isDriver ? indonesianError(data?.detail, "Kata sandi gagal diubah. Silakan coba lagi.") : data?.detail || "Failed to change password.");
         return;
       }
 
-      setSuccess(data?.message || "Password changed successfully.");
+      setSuccess(isDriver ? "Kata sandi berhasil diubah." : data?.message || "Password changed successfully.");
 
       setForm(initialForm);
       setShowPassword(false);
     } catch {
-      setError("Network error. Please try again.");
+      setError(t("Network error. Please try again.", "Koneksi bermasalah. Silakan coba lagi."));
     } finally {
       setSaving(false);
     }
@@ -81,16 +86,16 @@ function ChangePassword() {
   const inputType = showPassword ? "text" : "password";
 
   return (
-    <MainLayout title="Reset Password">
+    <MainLayout title={t("Reset Password", "Ubah Kata Sandi")}>
       <section className="ticket-history">
         <header className="history-header">
           <div className="header-title">
-              <button className="back-link" type="button" onClick={() => navigate(-1)}>
+              <button className="back-link" type="button" onClick={() => navigate(-1)} aria-label={t("Go back", "Kembali")}>
     <i className="bi bi-arrow-left" aria-hidden="true" />
     
   </button>
 
-          <h1>Reset Password</h1>
+          <h1>{t("Reset Password", "Ubah Kata Sandi")}</h1>
           </div>
          
           
@@ -107,21 +112,21 @@ function ChangePassword() {
               </span>
 
               <div>
-                <h2>Change password</h2>
+                <h2>{t("Change password", "Ubah Kata Sandi")}</h2>
                 <p className="muted">
-                  Enter your current password and choose a new password.
+                  {t("Enter your current password and choose a new password.", "Masukkan kata sandi saat ini, lalu buat kata sandi baru.")}
                 </p>
               </div>
             </div>
 
             <div className="field-grid">
               <label className="form-field" style={{ position: "relative" }}>
-                <span>Current password</span>
+                <span>{t("Current password", "Kata Sandi Saat Ini")}</span>
                 <input
                   type={inputType}
                   value={form.current_password}
                   onChange={handleChange("current_password")}
-                  placeholder="Enter your current password"
+                  placeholder={t("Enter your current password", "Masukkan kata sandi saat ini")}
                   disabled={saving}
                   autoComplete="current-password"
                   required
@@ -130,6 +135,7 @@ function ChangePassword() {
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
+                  aria-label={showPassword ? t("Hide password", "Sembunyikan kata sandi") : t("Show password", "Tampilkan kata sandi")}
                   style={{
                     position: "absolute",
                     right: "10px",
@@ -139,7 +145,7 @@ function ChangePassword() {
                     cursor: "pointer",
                     color: "#6c757d",
                   }}
-                  title={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? t("Hide password", "Sembunyikan kata sandi") : t("Show password", "Tampilkan kata sandi")}
                 >
                   <i
                     className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"}
@@ -148,12 +154,12 @@ function ChangePassword() {
               </label>
 
               <label className="form-field" style={{ position: "relative" }}>
-                <span>New password</span>
+                <span>{t("New password", "Kata Sandi Baru")}</span>
                 <input
                   type={inputType}
                   value={form.new_password}
                   onChange={handleChange("new_password")}
-                  placeholder="Enter your new password"
+                  placeholder={t("Enter your new password", "Masukkan kata sandi baru")}
                   disabled={saving}
                   autoComplete="new-password"
                   minLength="6"
@@ -163,6 +169,7 @@ function ChangePassword() {
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
+                  aria-label={showPassword ? t("Hide password", "Sembunyikan kata sandi") : t("Show password", "Tampilkan kata sandi")}
                   style={{
                     position: "absolute",
                     right: "10px",
@@ -180,12 +187,12 @@ function ChangePassword() {
               </label>
 
               <label className="form-field" style={{ position: "relative" }}>
-                <span>Confirm new password</span>
+                <span>{t("Confirm new password", "Konfirmasi Kata Sandi Baru")}</span>
                 <input
                   type={inputType}
                   value={form.confirm_password}
                   onChange={handleChange("confirm_password")}
-                  placeholder="Re-enter your new password"
+                  placeholder={t("Re-enter your new password", "Masukkan kembali kata sandi baru")}
                   disabled={saving}
                   autoComplete="new-password"
                   minLength="6"
@@ -195,6 +202,7 @@ function ChangePassword() {
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
+                  aria-label={showPassword ? t("Hide password", "Sembunyikan kata sandi") : t("Show password", "Tampilkan kata sandi")}
                   style={{
                     position: "absolute",
                     right: "10px",
@@ -215,8 +223,7 @@ function ChangePassword() {
             <div className="admin-settings__preview">
               <i className="bi bi-shield-lock" aria-hidden="true" />
               <span>
-                Your new password must be at least 6 characters and should not
-                be shared with anyone else.
+                {t("Your new password must be at least 6 characters and should not be shared with anyone else.", "Kata sandi baru minimal 6 karakter. Jangan bagikan kata sandi kepada siapa pun.")}
               </span>
             </div>
 
@@ -231,7 +238,7 @@ function ChangePassword() {
                 disabled={saving}
               >
                 <i className="bi bi-key" aria-hidden="true" />
-                {saving ? "Changing password..." : "Change password"}
+                {saving ? t("Changing password...", "Menyimpan...") : t("Change password", "Ubah Kata Sandi")}
               </button>
             </div>
           </section>

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { indonesianError } from '../utils/indonesian'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
 
 const STATUS_STEPS = [
-  { key: 'approved', label: 'Approved' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'completed', label: 'Completed' },
+  { key: 'approved', label: 'Disetujui' },
+  { key: 'in_progress', label: 'Dalam Perjalanan' },
+  { key: 'completed', label: 'Selesai' },
 ]
 
 // Driver task quick view (calendar + status stepper + start/finish flow).
@@ -58,10 +59,10 @@ function DriverHome() {
            credentials: 'include',
         })
         if (!res.ok) {
-          let detail = 'Failed to load assignments.'
+          let detail = 'Tugas gagal dimuat. Silakan coba lagi.'
           try {
             const data = await res.json()
-            if (data?.detail) detail = data.detail
+            if (data?.detail) detail = indonesianError(data.detail, detail)
           } catch {
             // ignore parse error
           }
@@ -72,7 +73,7 @@ function DriverHome() {
           setBookings(Array.isArray(data) ? data : [])
         }
       } catch {
-        setError('Network error. Please try again.')
+        setError('Koneksi bermasalah. Silakan coba lagi.')
         setBookings([])
       } finally {
         setLoading(false)
@@ -125,7 +126,7 @@ function DriverHome() {
 
     const mileageValue = Number(startingMileage)
     if (!Number.isFinite(mileageValue) || mileageValue < 0) {
-      setActionError('Starting mileage must be a valid number.')
+      setActionError('Masukkan angka kilometer awal yang valid.')
       return
     }
 
@@ -147,10 +148,10 @@ function DriverHome() {
       })
 
       if (!res.ok) {
-        let detail = 'Failed to start booking.'
+        let detail = 'Perjalanan gagal dimulai. Silakan coba lagi.'
         try {
           const data = await res.json()
-          if (data?.detail) detail = data.detail
+          if (data?.detail) detail = indonesianError(data.detail, detail)
         } catch {
           // ignore parse error
         }
@@ -160,10 +161,10 @@ function DriverHome() {
 
       const updated = await res.json()
       updateBookingInState(activeBooking.id, updated)
-      setActionMessage('Trip started.')
+      setActionMessage('Perjalanan berhasil dimulai.')
       closeModals()
     } catch {
-      setActionError('Network error. Please try again.')
+      setActionError('Koneksi bermasalah. Silakan coba lagi.')
     } finally {
       setProcessing((prev) => {
         const next = { ...prev }
@@ -179,7 +180,7 @@ function DriverHome() {
 
     const endingValue = Number(endingMileage)
     if (!Number.isFinite(endingValue) || endingValue < 0) {
-      setActionError('Ending mileage must be a valid number.')
+      setActionError('Masukkan angka kilometer akhir yang valid.')
       return
     }
 
@@ -201,10 +202,10 @@ function DriverHome() {
       })
 
       if (!res.ok) {
-        let detail = 'Failed to complete booking.'
+        let detail = 'Laporan perjalanan gagal dikirim. Silakan coba lagi.'
         try {
           const data = await res.json()
-          if (data?.detail) detail = data.detail
+          if (data?.detail) detail = indonesianError(data.detail, detail)
         } catch {
           // ignore parse error
         }
@@ -214,10 +215,10 @@ function DriverHome() {
 
       const updated = await res.json()
       updateBookingInState(activeBooking.id, updated)
-      setActionMessage('Finish submitted. Waiting for completion validation.')
+      setActionMessage('Laporan perjalanan berhasil dikirim. Menunggu konfirmasi penyelesaian.')
       closeModals()
     } catch {
-      setActionError('Network error. Please try again.')
+      setActionError('Koneksi bermasalah. Silakan coba lagi.')
     } finally {
       setProcessing((prev) => {
         const next = { ...prev }
@@ -242,14 +243,14 @@ function DriverHome() {
   // Format status values into human readable text.
   const formatStatusText = (value) => {
     if (!value) return '-'
-    return String(value).replace(/_/g, ' ')
+    return ({ pending: 'Menunggu Persetujuan', approved: 'Disetujui', in_progress: 'Dalam Perjalanan', awaiting_validation: 'Menunggu Konfirmasi', completed: 'Selesai', rejected: 'Ditolak', cancelled: 'Dibatalkan' })[value] || 'Status Belum Tersedia'
   }
 
   // Render the horizontal status stepper for a booking status value.
   const renderStatusStepper = (value) => {
     const statusValue = String(value || '').toLowerCase()
     const steps = statusValue === 'awaiting_validation'
-      ? [STATUS_STEPS[0], STATUS_STEPS[1], { key: 'awaiting_validation', label: 'Awaiting Validation' }]
+      ? [STATUS_STEPS[0], STATUS_STEPS[1], { key: 'awaiting_validation', label: 'Menunggu Konfirmasi' }]
       : STATUS_STEPS
     const activeIndex = steps.findIndex((step) => step.key === statusValue)
 
@@ -293,7 +294,7 @@ function DriverHome() {
     })
 
     return (
-      <div className="status-stepper" aria-label="Task status" role="list">
+      <div className="status-stepper" aria-label="Status tugas" role="list">
         {nodes}
       </div>
     )
@@ -348,7 +349,7 @@ function DriverHome() {
   }, [normalizedBookings, selectedDate])
 
   const monthLabel = useMemo(() => {
-    const label = calendarMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+    const label = calendarMonth.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
     return label ? label.charAt(0).toUpperCase() + label.slice(1) : ''
   }, [calendarMonth])
 
@@ -404,8 +405,8 @@ function DriverHome() {
     if (!value) return '-'
     const dt = new Date(value)
     if (Number.isNaN(dt.getTime())) return '-'
-    const datePart = dt.toLocaleDateString('en-GB')
-    const timePart = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+    const datePart = dt.toLocaleDateString('id-ID')
+    const timePart = dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false })
     return `${datePart} ${timePart}`
   }
 
@@ -427,19 +428,19 @@ function DriverHome() {
 
   const selectedDateLabel =
     selectedDate instanceof Date && !Number.isNaN(selectedDate.getTime())
-      ? selectedDate.toLocaleDateString('en-GB')
-      : 'this date'
+      ? selectedDate.toLocaleDateString('id-ID')
+      : 'tanggal ini'
 
   return (
-    <MainLayout title="Driver Tasks">
+    <MainLayout title="Tugas Saya">
       <div className="driver-page">
-        <section className="driver-calendar" aria-label="Task calendar">
+        <section className="driver-calendar" aria-label="Kalender tugas">
           <div className="calendar-header">
             <button
               type="button"
               className="calendar-nav"
               onClick={() => changeMonth(-1)}
-              aria-label="Previous month"
+              aria-label="Bulan sebelumnya"
             >
               <i className="bi bi-chevron-left" aria-hidden="true" />
             </button>
@@ -450,29 +451,29 @@ function DriverHome() {
               type="button"
               className="calendar-nav"
               onClick={() => changeMonth(1)}
-              aria-label="Next month"
+              aria-label="Bulan berikutnya"
             >
               <i className="bi bi-chevron-right" aria-hidden="true" />
             </button>
           </div>
 
-          <div className="calendar-legend" aria-label="Calendar legend">
+          <div className="calendar-legend" aria-label="Keterangan kalender">
             <div className="calendar-legend-item">
               <span className="calendar-dot task-pending" aria-hidden="true" />
-              <span>Pending tasks</span>
+              <span>Tugas Belum Selesai</span>
             </div>
             <div className="calendar-legend-item">
               <span className="calendar-dot task-completed" aria-hidden="true" />
-              <span>Active tasks</span>
+              <span>Tugas Selesai</span>
             </div>
             <div className="calendar-legend-item">
               <span className="calendar-dot no-task" aria-hidden="true" />
-              <span>No tasks</span>
+              <span>Tidak Ada Tugas</span>
             </div>
           </div>
 
           <div className="calendar-grid" role="grid" aria-label={monthLabel}>
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
+            {['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'].map((label) => (
               <div key={label} className="calendar-weekday" role="columnheader">
                 {label}
               </div>
@@ -498,7 +499,7 @@ function DriverHome() {
                     type="button"
                     className={`calendar-cell ${isSelected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''}`}
                     onClick={() => setSelectedDate(date)}
-                    aria-label={`${dayNumber} ${monthLabel}${count ? `, ${count} task(s)` : ''}`}
+                    aria-label={`${dayNumber} ${monthLabel}${count ? `, ${count} tugas` : ''}`}
                   >
                     <span className="calendar-date">{dayNumber}</span>
                     <span className={`calendar-dot ${dotState}`} aria-hidden="true" />
@@ -509,15 +510,15 @@ function DriverHome() {
           </div>
         </section>
 
-        {loading ? <p className="muted">Loading assignments...</p> : null}
+        {loading ? <p className="muted">Memuat tugas...</p> : null}
         {!loading && error ? <p className="error-text">{error}</p> : null}
         {!loading && !error && actionMessage ? <p className="success-text">{actionMessage}</p> : null}
         {!loading && !error && actionError ? <p className="error-text">{actionError}</p> : null}
 
         {!loading && !error && items.length === 0 ? (
           <div className="driver-empty">
-            <h2>No tasks for {selectedDateLabel}</h2>
-            <p className="muted">Try selecting another date or navigating to another month.</p>
+            <h2>Tidak ada tugas pada {selectedDateLabel}</h2>
+            <p className="muted">Pilih tanggal atau bulan lain untuk melihat tugas Anda.</p>
           </div>
         ) : null}
 
@@ -536,31 +537,31 @@ function DriverHome() {
 
                   <dl className="driver-task-details">
                     <div className="driver-task-details__row">
-                      <dt>Requestor</dt>
+                      <dt>Pemohon</dt>
                       <dd>{booking.requester_name || '-'}</dd>
                     </div>
                     <div className="driver-task-details__row">
-                      <dt>Pick Up Location</dt>
+                      <dt>Lokasi Jemput</dt>
                       <dd>{booking.pickup_location || '-'}</dd>
                     </div>
                     <div className="driver-task-details__row">
-                      <dt>Destination</dt>
+                      <dt>Tujuan</dt>
                       <dd>{booking.destination || '-'}</dd>
                     </div>
                     <div className="driver-task-details__row">
-                      <dt>Departure</dt>
+                      <dt>Keberangkatan</dt>
                       <dd>{formatDeparture(booking.departure_time)}</dd>
                     </div>
                     <div className="driver-task-details__row">
-                      <dt>Estimated Arrival</dt>
+                      <dt>Perkiraan Tiba</dt>
                       <dd>{formatDeparture(booking.estimated_arrival_time)}</dd>
                     </div>
                     <div className="driver-task-details__row">
-                      <dt>Total Passenger</dt>
+                      <dt>Jumlah Penumpang</dt>
                       <dd>{booking.passenger_count ?? '-'}</dd>
                     </div>
                     <div className="driver-task-details__row driver-task-details__row--spaced">
-                      <dt>Phone/WA</dt>
+                      <dt>Telepon/WA</dt>
                       <dd>{phone || '-'}</dd>
                     </div>
                     <div className="driver-task-details__row">
@@ -583,13 +584,13 @@ function DriverHome() {
                           }
                         }}
                       >
-                        {isStarted ? 'Finish' : 'Start'}
+                        {isStarted ? 'Selesaikan Perjalanan' : 'Mulai Perjalanan'}
                       </button>
                     ) : null}
                     {isAwaitingValidation ? (
                       <span className="driver-validation-waiting">
                         <i className="bi bi-clock-history" aria-hidden="true" />
-                        Waiting for completion validation
+                        Menunggu konfirmasi penyelesaian
                       </span>
                     ) : null}
                   </div>
@@ -608,8 +609,8 @@ function DriverHome() {
               }}
             >
               <div className="modal-header">
-                <h2>Start Trip</h2>
-                <button type="button" className="modal-close" onClick={closeModals} aria-label="Close">
+                <h2>Mulai Perjalanan</h2>
+                <button type="button" className="modal-close" onClick={closeModals} aria-label="Tutup">
                   &times;
                 </button>
               </div>
@@ -618,11 +619,11 @@ function DriverHome() {
 
               <div className="field-grid">
                 <label className="inline-label">
-                  <span>Starting mileage</span>
+                  <span>Kilometer Awal</span>
                   <input
                     type="number"
                     min="0"
-                    placeholder="Starting mileage"
+                    placeholder="Kilometer Awal"
                     value={startingMileage}
                     onChange={(e) => setStartingMileage(e.target.value)}
                     required
@@ -637,10 +638,10 @@ function DriverHome() {
                   onClick={handleStart}
                   disabled={processing[activeBooking?.id]}
                 >
-                  Save & Start
+                  Simpan & Mulai
                 </button>
                 <button type="button" className="btn btn-outline-danger" onClick={closeModals} disabled={processing[activeBooking?.id]}>
-                  Cancel
+                  Batal
                 </button>
               </div>
             </div>
@@ -656,8 +657,8 @@ function DriverHome() {
               }}
             >
               <div className="modal-header">
-                <h2>Completion Report</h2>
-                <button type="button" className="modal-close" onClick={closeModals} aria-label="Close">
+                <h2>Laporan Penyelesaian</h2>
+                <button type="button" className="modal-close" onClick={closeModals} aria-label="Tutup">
                   &times;
                 </button>
               </div>
@@ -666,32 +667,32 @@ function DriverHome() {
 
               <div className="field-grid">
                 <label className="inline-label">
-                  <span>Starting mileage</span>
+                  <span>Kilometer Awal</span>
                   <input type="number" value={activeBooking?.starting_mileage ?? ''} disabled readOnly />
                 </label>
                 <label className="inline-label">
-                  <span>Ending mileage</span>
+                  <span>Kilometer Akhir</span>
                   <input
                     type="number"
                     min="0"
-                    placeholder="Ending mileage"
+                    placeholder="Kilometer Akhir"
                     value={endingMileage}
                     onChange={(e) => setEndingMileage(e.target.value)}
                     required
                   />
                 </label>
                 <label className="inline-label">
-                  <span>Total distance (auto)</span>
-                  <input type="number" placeholder="Auto calculated" value={completedDistance} disabled readOnly />
+                  <span>Jarak Tempuh (km)</span>
+                  <input type="number" placeholder="Dihitung otomatis" value={completedDistance} disabled readOnly />
                 </label>
                 {distanceInvalid ? (
                   <p className="error-text" style={{ gridColumn: '1 / -1' }}>
-                    Ending mileage must be greater than or equal to starting mileage.
+                    Angka kilometer akhir tidak boleh lebih kecil dari angka kilometer awal.
                   </p>
                 ) : null}
                 <div className="driver-completion-validation-note" style={{ gridColumn: '1 / -1' }}>
                   <i className="bi bi-person-check" aria-hidden="true" />
-                  <span>The trip will be marked as awaiting validation after this report is submitted.</span>
+                  <span>Setelah laporan dikirim, perjalanan menunggu konfirmasi penyelesaian dari pemohon atau koordinator.</span>
                 </div>
               </div>
 
@@ -702,10 +703,10 @@ function DriverHome() {
                   onClick={handleFinish}
                   disabled={processing[activeBooking?.id]}
                 >
-                  Submit Finish
+                  Kirim Laporan Selesai
                 </button>
                 <button type="button" className="btn btn-outline-danger" onClick={closeModals} disabled={processing[activeBooking?.id]}>
-                  Cancel
+                  Batal
                 </button>
               </div>
             </div>

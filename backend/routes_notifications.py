@@ -7,6 +7,7 @@ from pymongo import ReturnDocument
 
 from main import get_current_user
 from mongo_client import db
+from driver_localization import driver_notification_message
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -27,12 +28,15 @@ class MarkAllReadResponse(BaseModel):
     updated: int
 
 
-def serialize_notification(doc_snapshot) -> NotificationResponse:
+def serialize_notification(doc_snapshot, *, driver: bool = False) -> NotificationResponse:
     """Map a MongoDB notification document into the response model."""
     data = doc_snapshot or {}
+    message = data.get("message") or ""
+    if driver:
+        message = driver_notification_message(message, data.get("event"), data.get("status"))
     return NotificationResponse(
         id=str(data.get("_id")),
-        message=data.get("message") or "",
+        message=message,
         read=bool(data.get("read", False)),
         event=data.get("event"),
         entity_type=data.get("entity_type"),
@@ -62,7 +66,7 @@ def list_my_notifications(limit: int = 25, current_user=Depends(get_current_user
         .sort("created_at", -1)
         .limit(limit)
     )
-    return [serialize_notification(doc) for doc in snapshots]
+    return [serialize_notification(doc, driver=current_user.get("role") == "driver") for doc in snapshots]
 
 
 @router.patch("/mark-all-read", response_model=MarkAllReadResponse)
@@ -89,4 +93,4 @@ def mark_notification_read(notification_id: str, current_user=Depends(get_curren
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 
-    return serialize_notification(updated)
+    return serialize_notification(updated, driver=current_user.get("role") == "driver")

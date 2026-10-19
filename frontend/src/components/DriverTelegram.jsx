@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { indonesianError } from '../utils/indonesian'
 import { API_BASE_URL } from '../config'
 
 export default function DriverTelegram() {
@@ -10,13 +11,13 @@ export default function DriverTelegram() {
   const refresh = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/telegram/me`, { credentials: 'include' })
-      if (!res.ok) throw new Error('Failed to check Telegram connection.')
+      if (!res.ok) throw new Error('Koneksi Telegram gagal diperiksa. Silakan coba lagi.')
       const data = await res.json()
       setStatus(data)
       if (data.connected) setLink('')
       setError('')
-    } catch (err) {
-      setError(err.message || 'Failed to check Telegram connection.')
+    } catch {
+      setError('Koneksi Telegram gagal diperiksa. Silakan coba lagi.')
     }
   }, [])
 
@@ -31,7 +32,7 @@ export default function DriverTelegram() {
     const interval = window.setInterval(refresh, 5000)
     const expiry = window.setTimeout(() => {
       setLink('')
-      setError('Connection link expired. Please connect again.')
+      setError('Tautan sudah kedaluwarsa. Silakan hubungkan kembali.')
     }, 10 * 60 * 1000)
     return () => {
       window.clearInterval(interval)
@@ -47,42 +48,45 @@ export default function DriverTelegram() {
         credentials: 'include', method: disconnect ? 'DELETE' : 'POST',
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Telegram connection failed.')
+      if (!res.ok) {
+        setError(indonesianError(data.detail, 'Telegram gagal dihubungkan. Silakan coba lagi.'))
+        return
+      }
       if (disconnect) {
         setLink('')
         await refresh()
       } else {
         setLink(data.url)
       }
-    } catch (err) {
-      setError(err.message || 'Telegram connection failed.')
+    } catch {
+      setError('Koneksi bermasalah. Silakan coba lagi.')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="driver-telegram" aria-label="Telegram notifications">
+    <section className="driver-telegram" aria-label="Notifikasi Telegram">
       <div>
-        <strong><i className="bi bi-telegram" aria-hidden="true" /> Telegram notifications</strong>
-        <p>{!status ? 'Checking connection…' : !status.configured
-          ? 'Telegram is awaiting administrator setup. Email notifications remain active.'
-          : status.connected ? `Connected to @${status.bot_username}. Email notifications remain active.`
-            : 'Connect your personal Telegram to receive Driver notifications. Email stays active.'}</p>
+        <strong><i className="bi bi-telegram" aria-hidden="true" /> Notifikasi Telegram</strong>
+        <p>{!status ? 'Memeriksa koneksi...' : !status.configured
+          ? 'Telegram belum diatur oleh administrator. Notifikasi email tetap aktif.'
+          : status.connected ? `Terhubung ke @${status.bot_username}. Notifikasi email tetap aktif.`
+            : 'Hubungkan Telegram pribadi Anda untuk menerima pemberitahuan tugas. Notifikasi email tetap aktif.'}</p>
       </div>
       <div className="driver-telegram-actions">
         {link ? (
           <>
-            <a className="btn btn-primary" href={link} target="_blank" rel="noopener noreferrer">Open Telegram</a>
-            <span className="muted">Click Start in the bot, then return here. Link valid for 10 minutes.</span>
+            <a className="btn btn-primary" href={link} target="_blank" rel="noopener noreferrer">Buka Telegram</a>
+            <span className="muted">Tekan tombol Mulai (Start) di bot Telegram, lalu kembali ke halaman ini. Tautan berlaku selama 10 menit.</span>
           </>
         ) : (
           <button className="btn btn-neutral" disabled={busy || !status || (!status.configured && !status.connected)}
             onClick={() => updateConnection(Boolean(status?.connected))}>
-            {busy ? 'Please wait…' : status?.connected ? 'Disconnect Telegram' : 'Connect Telegram'}
+            {busy ? 'Mohon tunggu...' : status?.connected ? 'Putuskan Telegram' : 'Hubungkan Telegram'}
           </button>
         )}
-        <button className="btn btn-neutral" onClick={refresh} disabled={busy}>Check status</button>
+        <button className="btn btn-neutral" onClick={refresh} disabled={busy}>Periksa Status</button>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
     </section>

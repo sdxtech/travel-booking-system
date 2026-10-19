@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Mapping, Optional
 from uuid import uuid4
 
+from driver_localization import driver_notification_details, driver_notification_message
 from email_service import email_delivery_enabled, send_notification_email
 from mongo_client import db
 from telegram_service import telegram_delivery_enabled, send_notification_telegram
@@ -32,6 +33,10 @@ def create_user_notification(
     user_snapshot = db["users"].find_one(
         {"_id": str(user_id)}, {"email": 1, "name": 1, "role": 1, "disabled": 1, "telegram_chat_id": 1},
     ) or {}
+    language = "id" if user_snapshot.get("role") == "driver" else "en"
+    if language == "id":
+        message = driver_notification_message(message, event, status)
+        email_details = driver_notification_details(email_details)
     recipient_email = str(user_snapshot.get("email") or "").strip().lower()
     should_send_email = bool(recipient_email and email_delivery_enabled())
     chat_id = user_snapshot.get("telegram_chat_id")
@@ -67,6 +72,7 @@ def create_user_notification(
                 entity_type=entity_type,
                 notification_id=notification_id,
                 details=email_details,
+                language=language,
             )
             db["notifications"].update_one(
                 {"_id": notification_id},
