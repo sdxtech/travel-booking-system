@@ -120,8 +120,8 @@ function BookingHistory() {
         return booking.requester_name || ''
       case 'requester_nik':
         return booking.requester_nik || ''
-      case 'requester_dept_job_position':
-        return booking.requester_dept_job_position || ''
+      case 'requester_department':
+        return booking.requester_department || ''
       case 'requester_phone':
         return booking.requester_phone || ''
       case 'requester_email':
@@ -521,8 +521,12 @@ function BookingHistory() {
                         <dd>{selectedBooking.requester_nik || '-'}</dd>
                       </div>
                       <div className="ticket-details-item">
-                        <dt>Department / Job Position</dt>
-                        <dd>{selectedBooking.requester_dept_job_position || '-'}</dd>
+                        <dt>Department</dt>
+                        <dd>{selectedBooking.requester_department || '-'}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Title/Position</dt>
+                        <dd>{selectedBooking.requester_job_position || '-'}</dd>
                       </div>
                       <div className="ticket-details-item">
                         <dt>Phone</dt>

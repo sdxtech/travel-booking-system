@@ -62,8 +62,10 @@ const isSuperadmin =
         return ticket.request_id || ''
       case 'full_name':
         return ticket.full_name || ''
-      case 'dept_job_position':
-        return ticket.dept_job_position || ''
+      case 'department':
+        return ticket.department || ''
+      case 'job_position':
+        return ticket.job_position || ''
       case 'phone_number':
         return ticket.phone_number || ''
       case 'email':
@@ -124,7 +126,7 @@ const isSuperadmin =
   const sortedTickets = useMemo(() => {
     const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
     const filtered = tickets.filter((ticket) => {
-      const text = [ticket.request_id, ticket.full_name, ticket.dept_job_position, ticket.phone_number, ticket.email, ticket.national_id, ticket.departure_point, ticket.destination, ticket.purpose_of_travel, ticket.trip_type, ticket.hotel_name, ticket.hotel_location, ticket.transportation_mode, ticket.additional_notes, ticket.status]
+      const text = [ticket.request_id, ticket.full_name, ticket.department, ticket.job_position, ticket.phone_number, ticket.email, ticket.national_id, ticket.departure_point, ticket.destination, ticket.purpose_of_travel, ticket.trip_type, ticket.hotel_name, ticket.hotel_location, ticket.transportation_mode, ticket.additional_notes, ticket.status]
         .filter((value) => value != null).join(' ').toLowerCase()
       return terms.every((term) => text.includes(term))
     })
@@ -373,7 +375,8 @@ const isSuperadmin =
       'No',
       'Request ID',
       'Name',
-      'User Dept/Job Position',
+      'Department',
+      'Title/Position',
       'Phone',
       'Email',
       'National ID',
@@ -396,7 +399,8 @@ const isSuperadmin =
       index + 1,
       ticket.request_id || '',
       ticket.full_name || '',
-      ticket.dept_job_position || '',
+      ticket.department || '',
+      ticket.job_position || '',
       ticket.phone_number || '',
       ticket.email || '',
       ticket.national_id || '',
@@ -546,8 +550,13 @@ const isSuperadmin =
                     </button>
                   </th>
                   <th>
-                    <button type="button" className="table-sort" onClick={() => toggleSort('dept_job_position')}>
-                      User Dept/Job Position {renderSortIcon('dept_job_position')}
+                    <button type="button" className="table-sort" onClick={() => toggleSort('department')}>
+                      Department {renderSortIcon('department')}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="table-sort" onClick={() => toggleSort('job_position')}>
+                      Title/Position {renderSortIcon('job_position')}
                     </button>
                   </th>
                   <th>
@@ -636,25 +645,25 @@ const isSuperadmin =
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="21" className="muted">
+                    <td colSpan="22" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="21" className="error-text">
+                    <td colSpan="22" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : !hasLoaded ? (
                   <tr>
-                    <td colSpan="21" className="muted">
+                    <td colSpan="22" className="muted">
                       Select a date range to load travel history.
                     </td>
                   </tr>
                 ) : sortedTickets.length === 0 ? (
                   <tr>
-                    <td colSpan="21" className="muted">
+                    <td colSpan="22" className="muted">
                       No ticket history found.
                     </td>
                   </tr>
@@ -664,7 +673,8 @@ const isSuperadmin =
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td className="request-id-cell">{ticket.request_id || '-'}</td>
                       <td>{ticket.full_name || '-'}</td>
-                      <td>{ticket.dept_job_position || '-'}</td>
+                      <td>{ticket.department || '-'}</td>
+                      <td>{ticket.job_position || '-'}</td>
                       <td>{ticket.phone_number || '-'}</td>
                       <td>{ticket.email || '-'}</td>
                       <td>{ticket.national_id || '-'}</td>

@@ -29,7 +29,8 @@ class DistributeAccountTests(unittest.TestCase):
         inserted_user = users.insert_one.call_args.args[0]
         self.assertEqual(inserted_user["email"], "employee@example.com")
         self.assertEqual(inserted_user["role"], "user")
-        self.assertEqual(inserted_user["dept_job_position"], "")
+        self.assertEqual(inserted_user["department"], "")
+        self.assertEqual(inserted_user["job_position"], "")
         token = tokens.insert_one.call_args.args[0]
         self.assertEqual(token["purpose"], "account_invitation")
         self.assertEqual((token["expires_at"] - token["created_at"]).total_seconds(), 3600)

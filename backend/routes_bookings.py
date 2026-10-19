@@ -3,10 +3,11 @@ from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from main import get_current_user
 from mongo_client import db
+from profile_fields import department_value
 from realtime_service import publish_document_change
 from notifications_service import create_user_notification, notify_roles
 from page_permissions_service import enforce_employee_page_permission
@@ -28,7 +29,8 @@ class BookingCreate(BaseModel):
 
 class BookingAssignCreate(BaseModel):
     requester_name: str = Field(..., min_length=1)
-    requester_dept_job_position: Optional[str] = Field(default=None, min_length=1)
+    requester_department: Optional[str] = Field(default=None, min_length=1, validation_alias=AliasChoices("requester_department", "requester_dept_job_position"))
+    requester_job_position: Optional[str] = None
     requester_nik: Optional[str] = Field(default=None, min_length=1)
     requester_phone: str = Field(..., min_length=1)
     requester_email: str = Field(..., min_length=1)
@@ -48,7 +50,8 @@ class BookingResponse(BaseModel):
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     requester_name: Optional[str] = None
-    requester_dept_job_position: Optional[str] = None
+    requester_department: Optional[str] = None
+    requester_job_position: Optional[str] = None
     requester_nik: Optional[str] = None
     requester_phone: Optional[str] = None
     requester_email: Optional[str] = None
@@ -130,7 +133,8 @@ def serialize_booking(doc_snapshot) -> BookingResponse:
         driver_id=data.get("driver_id"),
         driver_name=data.get("driver_name"),
         requester_name=data.get("requester_name"),
-        requester_dept_job_position=data.get("requester_dept_job_position"),
+        requester_department=department_value(data, "requester_"),
+        requester_job_position=data.get("requester_job_position"),
         requester_nik=data.get("requester_nik"),
         requester_phone=data.get("requester_phone"),
         requester_email=data.get("requester_email"),
@@ -335,14 +339,16 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
 
     requester_name = None
     requester_phone = None
-    requester_dept_job_position = None
+    requester_department = None
+    requester_job_position = None
     requester_nik = None
     doc = db["users"].find_one({"_id": uid})
     if doc:
         data = doc or {}
         requester_name = data.get("name")
         requester_phone = data.get("phone_number") or data.get("phone")
-        requester_dept_job_position = data.get("dept_job_position") or data.get("department") or data.get("job_position")
+        requester_department = department_value(data)
+        requester_job_position = data.get("job_position")
         requester_nik = data.get("nik") or data.get("national_id")
 
     booking_id = uuid4().hex
@@ -369,8 +375,10 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
         data["requester_name"] = requester_name
     if requester_phone:
         data["requester_phone"] = requester_phone
-    if requester_dept_job_position:
-        data["requester_dept_job_position"] = requester_dept_job_position
+    if requester_department:
+        data["requester_department"] = requester_department
+    if requester_job_position:
+        data["requester_job_position"] = requester_job_position
     if requester_nik:
         data["requester_nik"] = requester_nik
     db["bookings"].insert_one(data)
@@ -464,7 +472,8 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
         "driver_id": driver_uid,
         "driver_name": driver_name,
         "requester_name": payload.requester_name,
-        "requester_dept_job_position": payload.requester_dept_job_position,
+        "requester_department": payload.requester_department,
+        "requester_job_position": payload.requester_job_position,
         "requester_nik": payload.requester_nik,
         "requester_phone": payload.requester_phone,
         "requester_email": payload.requester_email,

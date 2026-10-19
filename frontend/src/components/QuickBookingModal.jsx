@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import BookingFormSelect from './BookingFormSelect'
 import { API_BASE_URL } from '../config'
 import useBookingLocations from '../hooks/useBookingLocations'
+import { useAuth } from '../hooks/useAuth'
 
 const OTHER_LOCATION_VALUE = '__other_location__'
 
@@ -23,9 +25,18 @@ function formatDriverHeader(calendar) {
 
 function QuickBookingModal({ slot, onClose, onBooked }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isOfficeBooking = ['office_coordinator', 'superadmin'].includes(user?.role)
+  const submittingRef = useRef(false)
   const defaultEnd = new Date(slot.start)
   defaultEnd.setMinutes(defaultEnd.getMinutes() + 30)
   const [form, setForm] = useState({
+    requester_name: '',
+    requester_department: '',
+    requester_job_position: '',
+    requester_nik: '',
+    requester_phone: '',
+    requester_email: '',
     pickup_location: '',
     destination: '',
     passenger_count: 1,
@@ -46,6 +57,15 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
 
   const submit = async (event) => {
     event.preventDefault()
+    if (submittingRef.current) return
+    if (isOfficeBooking && !slot.calendar.email) {
+      setError('The selected driver is no longer available. Close this form and select a driver again.')
+      return
+    }
+    if (isOfficeBooking && [form.requester_name, form.requester_department, form.requester_nik, form.requester_phone, form.requester_email].some((value) => !value.trim())) {
+      setError('Please complete all requester details.')
+      return
+    }
     if (!form.pickup_location || !form.destination) {
       setError('Pickup location and destination are required.')
       return
@@ -57,15 +77,24 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
       return
     }
 
+    submittingRef.current = true
     setSubmitting(true)
     setError('')
     try {
-      const response = await fetch(`${API_BASE_URL}/bookings`, {
+      const response = await fetch(`${API_BASE_URL}/bookings${isOfficeBooking ? '/assign' : ''}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          driver_id: slot.calendar.id,
+          ...(isOfficeBooking ? {
+            driver_email: slot.calendar.email,
+            requester_name: form.requester_name.trim(),
+            requester_department: form.requester_department.trim(),
+            requester_job_position: form.requester_job_position.trim(),
+            requester_nik: form.requester_nik.trim(),
+            requester_phone: form.requester_phone.trim(),
+            requester_email: form.requester_email.trim(),
+          } : { driver_id: slot.calendar.id }),
           pickup_location: form.pickup_location,
           destination: form.destination,
           passenger_count: Number(form.passenger_count) || 1,
@@ -84,12 +113,13 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
     } catch (requestError) {
       setError(requestError.message || 'Network error. Please try again.')
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
 
-  return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="quick-booking-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+  return createPortal(
+    <div className="modal-overlay quick-calendar-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="quick-booking-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       {submissionStatus ? (
         <div className="modal success-modal">
           <div className="success-modal-icon" aria-hidden="true">
@@ -99,7 +129,9 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
             {submissionStatus === 'approved' ? 'Booking Approved' : 'Request Sent'}
           </h2>
           <p className="success-modal-message">
-            {submissionStatus === 'approved'
+            {isOfficeBooking
+              ? 'The booking has been created and the driver has been assigned successfully.'
+              : submissionStatus === 'approved'
               ? 'The selected driver is available, so your booking was approved automatically by the system.'
               : 'Your booking request has been sent for review.'}
           </p>
@@ -109,7 +141,7 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
               className="btn btn-brand"
               onClick={() => {
                 onClose()
-                navigate('/user/booking-history')
+                navigate(isOfficeBooking ? '/office/driver-history' : '/user/booking-history')
               }}
             >
               View History
@@ -130,6 +162,16 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
           <form className="ticket-form quick-booking-modal__form" onSubmit={submit}>
             <p className="quick-booking-modal__driver"><i className="bi bi-car-front" aria-hidden="true" /> {formatDriverHeader(slot.calendar)}</p>
             <div className="booking-grid">
+              {isOfficeBooking ? (
+                <>
+                  <label className="form-field"><span>Full Name</span><input type="text" required value={form.requester_name} onChange={updateField('requester_name')} /></label>
+                  <label className="form-field"><span>Department</span><input type="text" required value={form.requester_department} onChange={updateField('requester_department')} /></label>
+                  <label className="form-field"><span>Title/Position</span><input type="text" value={form.requester_job_position} onChange={updateField('requester_job_position')} /></label>
+                  <label className="form-field"><span>National ID</span><input type="text" required value={form.requester_nik} onChange={updateField('requester_nik')} /></label>
+                  <label className="form-field"><span>Phone/WA</span><input type="tel" required value={form.requester_phone} onChange={updateField('requester_phone')} /></label>
+                  <label className="form-field"><span>Email</span><input type="email" required value={form.requester_email} onChange={updateField('requester_email')} /></label>
+                </>
+              ) : null}
               <label className="form-field"><span>Departure Date</span><input type="date" required value={form.departure_date} onChange={updateField('departure_date')} /></label>
               <label className="form-field"><span>Departure Time</span><input type="time" required value={form.departure_time} onChange={updateField('departure_time')} /></label>
               <label className="form-field"><span>Estimated Arrival Time</span><input type="time" required value={form.arrival_time} onChange={updateField('arrival_time')} /></label>
@@ -141,13 +183,14 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
             {error ? <p className="error-text">{error}</p> : null}
             {locationsError ? <p className="error-text">{locationsError}</p> : null}
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary" disabled={submitting || locationsLoading}>{submitting ? 'Submitting...' : 'Submit Request'}</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting || locationsLoading}>{submitting ? 'Submitting...' : isOfficeBooking ? 'Assign Driver' : 'Submit Request'}</button>
               <button type="button" className="btn btn-outline-danger" onClick={onClose} disabled={submitting}>Cancel</button>
             </div>
           </form>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
 

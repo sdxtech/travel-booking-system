@@ -17,7 +17,8 @@ const menuItems = [
 
 const initialForm = {
   full_name: '',
-  dept_job_position: '',
+  department: '',
+  job_position: '',
   phone_number: '',
   email: '',
   national_id: '',
@@ -186,14 +187,18 @@ const isSuperadmin =
                   />
                 </label>
                 <label className="inline-label">
-                  <span>User Dept/Job Position</span>
+                  <span>Department</span>
                   <input
                     type="text"
-                    placeholder="User Dept/Job Position"
-                    value={form.dept_job_position}
-                    onChange={handleChange('dept_job_position')}
+                    placeholder="Department"
+                    value={form.department}
+                    onChange={handleChange('department')}
                     required
                   />
+                </label>
+                <label className="inline-label">
+                  <span>Title/Position</span>
+                  <input type="text" placeholder="Title/Position" value={form.job_position} onChange={handleChange('job_position')} />
                 </label>
                 <label className="inline-label">
                   <span>Phone number</span>

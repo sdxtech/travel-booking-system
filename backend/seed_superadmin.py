@@ -18,7 +18,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--email", required=True, help="Superadmin email address")
     parser.add_argument("--password", required=True, help="Superadmin password")
     parser.add_argument("--name", default="Super Admin", help="Display name")
-    parser.add_argument("--dept-job-position", dest="dept_job_position", default="IT", help="Department / job position")
+    parser.add_argument("--department", "--dept-job-position", dest="department", default="IT", help="Department")
+    parser.add_argument("--job-position", default="", help="Title/Position")
     parser.add_argument("--nik", default="LOCAL-SUPERADMIN", help="NIK / national ID")
     parser.add_argument("--phone", default="080000000000", help="Phone number")
     return parser.parse_args()
@@ -55,7 +56,8 @@ def main() -> None:
             {
                 "$set": {
                     "name": args.name,
-                    "dept_job_position": args.dept_job_position,
+                    "department": args.department,
+                    "job_position": args.job_position,
                     "role": "superadmin",
                     "nik": args.nik,
                     "phone": args.phone,
@@ -74,7 +76,8 @@ def main() -> None:
         {
             "_id": uuid4().hex,
             "name": args.name,
-            "dept_job_position": args.dept_job_position,
+            "department": args.department,
+            "job_position": args.job_position,
             "role": "superadmin",
             "nik": args.nik,
             "phone": args.phone,

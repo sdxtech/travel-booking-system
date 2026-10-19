@@ -13,7 +13,7 @@ from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field, ValidationError, model_validator, field_validator
+from pydantic import AliasChoices, BaseModel, Field, ValidationError, model_validator, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from auth_utils import hash_password
@@ -21,6 +21,7 @@ from audit_service import record_audit_event
 from email_service import EmailDeliveryError, send_password_reset_email
 from main import get_current_user
 from mongo_client import db
+from profile_fields import department_value
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -51,7 +52,8 @@ class TelegramUserFields(BaseModel):
 class UserCreate(TelegramUserFields):
     plate_number: Optional[str] = Field(default=None, max_length=20)
     name: str = Field(..., min_length=1)
-    dept_job_position: str = Field(..., min_length=1)
+    department: str = Field(..., min_length=1, validation_alias=AliasChoices("department", "dept_job_position"))
+    job_position: str = ""
     role: Role
     nik: str = Field(..., min_length=1)
     phone: str = Field(..., min_length=1)
@@ -67,7 +69,8 @@ class UserCreate(TelegramUserFields):
 class UserUpdate(TelegramUserFields):
     plate_number: Optional[str] = Field(default=None, max_length=20)
     name: Optional[str] = Field(default=None, min_length=1)
-    dept_job_position: Optional[str] = Field(default=None, min_length=1)
+    department: Optional[str] = Field(default=None, min_length=1, validation_alias=AliasChoices("department", "dept_job_position"))
+    job_position: Optional[str] = None
     role: Optional[Role] = None
     nik: Optional[str] = Field(default=None, min_length=1)
     phone: Optional[str] = Field(default=None, min_length=1)
@@ -83,7 +86,8 @@ class UserResponse(BaseModel):
     plate_number: Optional[str] = None
     uid: str
     name: Optional[str] = None
-    dept_job_position: Optional[str] = None
+    department: Optional[str] = None
+    job_position: Optional[str] = None
     role: Optional[str] = None
     nik: Optional[str] = None
     phone: Optional[str] = None
@@ -148,7 +152,8 @@ def serialize_user(doc_snapshot) -> UserResponse:
     return UserResponse(
         uid=str(data.get("_id")),
         name=data.get("name"),
-        dept_job_position=data.get("dept_job_position") or data.get("department") or data.get("job_position"),
+        department=department_value(data),
+        job_position=data.get("job_position"),
         role=data.get("role"),
         plate_number=data.get("plate_number") if data.get("role") == "driver" else None,
         nik=data.get("nik") or data.get("national_id"),
@@ -200,11 +205,14 @@ HEADER_TO_FIELD: dict[str, str] = {
     "user_name": "name",
     "full_name": "name",
     "nama": "name",
-    "dept_job_position": "dept_job_position",
-    "dept_job": "dept_job_position",
-    "department": "dept_job_position",
-    "job_position": "dept_job_position",
-    "position": "dept_job_position",
+    "dept_job_position": "department",
+    "dept_job": "department",
+    "dept": "department",
+    "department": "department",
+    "job_position": "job_position",
+    "title_position": "job_position",
+    "title": "job_position",
+    "position": "job_position",
     "role": "role",
     "plate_number": "plate_number",
     "plat_no": "plate_number",
@@ -225,7 +233,7 @@ HEADER_TO_FIELD: dict[str, str] = {
 }
 
 
-REQUIRED_IMPORT_FIELDS = ("name", "dept_job_position", "nik", "phone", "email", "password")
+REQUIRED_IMPORT_FIELDS = ("name", "department", "nik", "phone", "email", "password")
 
 
 def normalize_cell_value(value: str) -> str:
@@ -519,8 +527,8 @@ def xml_escape_text(value: str) -> str:
 
 def build_user_import_template_xlsx() -> bytes:
     """Build an in-memory .xlsx template for user import (headers + example row)."""
-    headers = ["name", "dept_job_position", "role", "nik", "phone", "email", "password", "plate_number", "telegram_id"]
-    example_row = ["John Doe", "Finance", "user", "1234567890", "081234567890", "john@example.com", "password123", "", ""]
+    headers = ["name", "department", "job_position", "role", "nik", "phone", "email", "password", "plate_number", "telegram_id"]
+    example_row = ["John Doe", "Finance", "Accountant", "user", "1234567890", "081234567890", "john@example.com", "password123", "", ""]
 
     def make_row(row_number: int, values: list[str]) -> str:
         """Generate a <row> element with inline string <c> cells."""
@@ -654,6 +662,9 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
         email = normalized.get("email") or None
 
         try:
+            existing = db["users"].find_one({"email": email}) if email else None
+            if payload.update_existing and existing and not normalized.get("role"):
+                normalized["role"] = existing.get("role") or "user"
             user_payload = UserCreate(**normalized)
         except ValidationError as exc:
             errors.append(
@@ -676,8 +687,6 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
             continue
 
         try:
-            existing = db["users"].find_one({"email": user_payload.email})
-
             if existing:
                 if not payload.update_existing:
                     errors.append(
@@ -706,7 +715,8 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
                         {
                             **telegram_profile_changes(user_payload, existing),
                             "name": user_payload.name,
-                            "dept_job_position": user_payload.dept_job_position,
+                            "department": user_payload.department,
+                            **({"job_position": user_payload.job_position} if "job_position" in user_payload.model_fields_set else {}),
                             "role": user_payload.role,
                             "plate_number": user_payload.plate_number,
                             "nik": user_payload.nik,
@@ -725,7 +735,8 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
                         "_id": user_id,
                         "telegram_chat_id": user_payload.telegram_chat_id,
                         "name": user_payload.name,
-                        "dept_job_position": user_payload.dept_job_position,
+                        "department": user_payload.department,
+                        "job_position": user_payload.job_position,
                         "role": user_payload.role,
                         "plate_number": user_payload.plate_number,
                         "nik": user_payload.nik,
@@ -797,7 +808,8 @@ def distribute_accounts(payload: DistributeAccountRequest, current_user=Depends(
             insert_user_profile({
                 "_id": user_id,
                 "name": invitation_name(email),
-                "dept_job_position": "",
+                "department": "",
+                "job_position": "",
                 "role": payload.role,
                 "plate_number": None,
                 "nik": "",
@@ -865,7 +877,8 @@ def create_user(payload: UserCreate, current_user=Depends(get_current_user)):
             "_id": user_id,
             "telegram_chat_id": payload.telegram_chat_id,
             "name": payload.name,
-            "dept_job_position": payload.dept_job_position,
+            "department": payload.department,
+            "job_position": payload.job_position,
             "role": payload.role,
             "plate_number": payload.plate_number,
             "nik": payload.nik,

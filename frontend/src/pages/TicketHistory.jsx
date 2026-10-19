@@ -54,8 +54,8 @@ function TicketHistory() {
         return ticket.full_name || "";
       case "national_id":
         return ticket.national_id || "";
-      case "dept_job_position":
-        return ticket.dept_job_position || "";
+      case "department":
+        return ticket.department || "";
       case "phone_number":
         return ticket.phone_number || "";
       case "email":
@@ -464,8 +464,12 @@ function TicketHistory() {
                         <dd>{selectedTicket.national_id || "-"}</dd>
                       </div>
                       <div className="ticket-details-item">
-                        <dt>Department / Job Position</dt>
-                        <dd>{selectedTicket.dept_job_position || "-"}</dd>
+                        <dt>Department</dt>
+                        <dd>{selectedTicket.department || "-"}</dd>
+                      </div>
+                      <div className="ticket-details-item">
+                        <dt>Title/Position</dt>
+                        <dd>{selectedTicket.job_position || "-"}</dd>
                       </div>
                       <div className="ticket-details-item">
                         <dt>Phone</dt>

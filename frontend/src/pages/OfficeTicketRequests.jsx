@@ -196,7 +196,8 @@ const isSuperadmin =
                 <tr>
                   <th className="table-col-no">No</th>
                   <th>Name</th>
-                  <th>User Dept/Job Position</th>
+                  <th>Department</th>
+                  <th>Title/Position</th>
                   <th>Phone</th>
                   <th>Email</th>
                   <th>National ID</th>
@@ -219,19 +220,19 @@ const isSuperadmin =
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="20" className="muted">
+                    <td colSpan="21" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="20" className="error-text">
+                    <td colSpan="21" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : tickets.length === 0 ? (
                   <tr>
-                    <td colSpan="20" className="muted">
+                    <td colSpan="21" className="muted">
                       No ticket requests found.
                     </td>
                   </tr>
@@ -240,7 +241,8 @@ const isSuperadmin =
                     <tr key={ticket.id}>
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td>{ticket.full_name || '-'}</td>
-                      <td>{ticket.dept_job_position || '-'}</td>
+                      <td>{ticket.department || '-'}</td>
+                      <td>{ticket.job_position || '-'}</td>
                       <td>{ticket.phone_number || '-'}</td>
                       <td>{ticket.email || '-'}</td>
                       <td>{ticket.national_id || '-'}</td>

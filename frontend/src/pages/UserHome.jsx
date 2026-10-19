@@ -124,12 +124,12 @@ function UserHome() {
 
   const driverCalendars = useMemo(
     () =>
-      driverSchedules.map((driver, index) => ({
+      driverSchedules.flatMap((driver, index) => driver.booking_enabled === false ? [] : [{
         id: driver.driver_id,
         name: driver.driver_name || driver.driver_email || `Driver ${index + 1}`,
         plateLabel: formatDriverPlate(driver.plate_number),
         color: driverCalendarColors[index % driverCalendarColors.length],
-      })),
+      }]),
     [driverSchedules]
   )
 

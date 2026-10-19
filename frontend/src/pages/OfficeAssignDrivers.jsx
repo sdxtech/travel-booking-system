@@ -21,7 +21,8 @@ const menuItems = [
 
 const initialForm = {
   requester_name: '',
-  requester_dept_job_position: '',
+  requester_department: '',
+  requester_job_position: '',
   requester_nik: '',
   requester_phone: '',
   requester_email: '',
@@ -263,7 +264,8 @@ const isSuperadmin =
 
     const payload = {
       requester_name: form.requester_name,
-      requester_dept_job_position: form.requester_dept_job_position,
+      requester_department: form.requester_department,
+      requester_job_position: form.requester_job_position,
       requester_nik: form.requester_nik,
       requester_phone: form.requester_phone,
       requester_email: form.requester_email,
@@ -396,14 +398,18 @@ const isSuperadmin =
                   />
                 </label>
                 <label className="inline-label">
-                  <span>User Dept/Job Position</span>
+                  <span>Department</span>
                   <input
                     type="text"
-                    placeholder="User Dept/Job Position"
-                    value={form.requester_dept_job_position}
-                    onChange={handleChange('requester_dept_job_position')}
+                    placeholder="Department"
+                    value={form.requester_department}
+                    onChange={handleChange('requester_department')}
                     required
                   />
+                </label>
+                <label className="inline-label">
+                  <span>Title/Position</span>
+                  <input type="text" placeholder="Title/Position" value={form.requester_job_position} onChange={handleChange('requester_job_position')} />
                 </label>
                 <label className="inline-label">
                   <span>National ID</span>

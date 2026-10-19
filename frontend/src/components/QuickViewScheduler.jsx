@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { addMinutes, parseApiDate, toDateKey } from './quickViewSchedulerUtils'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -160,7 +161,25 @@ function QuickViewScheduler({
   }, [selectedEventId, normalizedEvents, calendars])
   const selectedEventKey = selectedEvent?.id
   useEffect(() => {
-    if (selectedEventKey) eventDialogRef.current?.showModal()
+    if (!selectedEventKey) return
+    const previousFocus = document.activeElement
+    const closeButton = eventDialogRef.current?.querySelector('button')
+    closeButton?.focus()
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setSelectedEventId(null)
+      } else if (event.key === 'Tab') {
+        // The details popup has one interactive control: its Close button.
+        event.preventDefault()
+        closeButton?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      if (previousFocus?.isConnected) previousFocus.focus()
+    }
   }, [selectedEventKey])
 
   const eventsByCalendar = useMemo(() => {
@@ -410,28 +429,26 @@ function QuickViewScheduler({
           </div>
         )}
       </div>
-      {selectedEvent ? (
-        <dialog
-          ref={eventDialogRef}
-          className="modal quick-scheduler-event-dialog"
+      {selectedEvent ? createPortal(
+        <div
+          className="modal-overlay quick-calendar-modal-overlay"
+          role="dialog"
+          aria-modal="true"
           aria-labelledby="scheduler-event-details-title"
-          onClose={() => setSelectedEventId(null)}
-          onClick={(event) => {
-            if (event.target !== event.currentTarget) return
-            const bounds = event.currentTarget.getBoundingClientRect()
-            if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
-              event.currentTarget.close()
-            }
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedEventId(null)
           }}
         >
+          <div ref={eventDialogRef} className="modal quick-scheduler-event-dialog">
           <div className="modal-header">
             <h2 id="scheduler-event-details-title">Booking Driver Details</h2>
-            <button type="button" className="modal-close" aria-label="Close details" onClick={() => eventDialogRef.current?.close()}>
+            <button type="button" className="modal-close" aria-label="Close details" onClick={() => setSelectedEventId(null)}>
               <i className="bi bi-x-lg" aria-hidden="true" />
             </button>
           </div>
           <dl className="ticket-details-grid">
             {[
+              ...(selectedEvent.requesterName ? [['Requestor', selectedEvent.requesterName]] : []),
               ['Driver', selectedEvent.driverName],
               ['Status', selectedEvent.statusLabel],
               ['Departure Date & Time', formatEventDateTime(selectedEvent.start)],
@@ -445,7 +462,9 @@ function QuickViewScheduler({
               </div>
             ))}
           </dl>
-        </dialog>
+          </div>
+        </div>,
+        document.body
       ) : null}
     </section>
   )

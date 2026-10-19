@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { indonesianError } from "../utils/indonesian";
 import { APP_NAME } from "../config";
 import { useAuth } from "../hooks/useAuth";
 
@@ -18,20 +17,24 @@ const LOGO_SOURCES = [
 
 const getLoginErrorMessage = (message) => {
   if (!message) {
-    return "Gagal masuk. Periksa kembali email dan kata sandi Anda.";
+    return "Login failed. Please check your email and password.";
   }
 
   const normalized = message.toLowerCase();
 
   if (normalized.includes("disabled")) {
-    return "Akun Anda dinonaktifkan. Silakan hubungi administrator.";
+    return "Your account is disabled. Please contact your administrator.";
   }
 
   if (normalized.includes("invalid email or password")) {
-    return "Email atau kata sandi salah. Jika akun Anda dibuat melalui impor, minta administrator mengatur ulang kata sandi.";
+    return "Invalid email or password. If your account was imported, ask your administrator to reset your password.";
   }
 
-  return indonesianError(message, "Gagal masuk. Periksa kembali email dan kata sandi Anda.");
+  if (normalized.includes("failed to fetch") || normalized.includes("networkerror")) {
+    return "Connection error. Please check your internet connection and try again.";
+  }
+
+  return "Login failed. Please check your email and password.";
 };
 
 function Login() {
@@ -48,7 +51,7 @@ function Login() {
   const { login } = useAuth();
 
   useEffect(() => {
-    document.title = `Masuk | ${APP_NAME}`;
+    document.title = `Login | ${APP_NAME}`;
   }, []);
 
   const handleSubmit = async (event) => {
@@ -77,7 +80,7 @@ function Login() {
   };
 
   return (
-    <div className="login-page" lang="id">
+    <div className="login-page" lang="en">
       <div className="login-wrapper">
         <div className="login-logo">
           <div className="login-logo__circle">
@@ -89,13 +92,13 @@ function Login() {
                 onError={() => setLogoIndex((prev) => prev + 1)}
               />
             ) : (
-              <span className="login-logo__fallback">LOGO APLIKASI</span>
+              <span className="login-logo__fallback">APP LOGO</span>
             )}
           </div>
         </div>
 
         <div className="login-card login-card-branded">
-          <h1 className="login-title">MASUK</h1>
+          <h1 className="login-title">LOGIN</h1>
 
           <form className="login-form" onSubmit={handleSubmit}>
             <label className="form-field">
@@ -106,12 +109,12 @@ function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="nama@contoh.com"
+                placeholder="name@example.com"
               />
             </label>
 
             <label className="form-field">
-              <span>Kata Sandi</span>
+              <span>Password</span>
 
               <div className="password-input-wrapper">
                 <input
@@ -126,7 +129,7 @@ function Login() {
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   aria-pressed={showPassword}
                 >
                   <i
@@ -149,17 +152,17 @@ function Login() {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <span>Ingat saya</span>
+              <span>Remember me</span>
             </label>
 
-            <a href="/forgot-password" className="forgot-password-link">Lupa Kata Sandi?</a>
+            <a href="/forgot-password" className="forgot-password-link">Forgot Password?</a>
             </div>
 
 
             {error && <p className="error-text">{error}</p>}
 
             <button type="submit" disabled={loading}>
-              {loading ? "Memproses..." : "Masuk"}
+              {loading ? "Logging in..." : "Login"}
             </button>
           </form>
         </div>

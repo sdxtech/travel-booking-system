@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import QuickViewScheduler from '../components/QuickViewScheduler'
+import QuickBookingModal from '../components/QuickBookingModal'
+import { formatDriverPlate } from '../components/driverPlate'
 import {
   addMinutes,
   formatStatusLabel,
@@ -68,6 +70,7 @@ function buildDriverBookingEvent(booking, calendarId, color) {
     id: `driver-calendar-${calendarId}-${booking.id}`,
     calendarId,
     title: booking.requester_name || 'Employee',
+    requesterName: booking.requester_name,
     meta: `${booking.requester_name || 'Employee'} - ${formatStatusLabel(status)}`,
     statusLabel: formatStatusLabel(status),
     departurePoint: booking.pickup_location,
@@ -88,6 +91,7 @@ function OfficeHome() {
   const [driverSchedules, setDriverSchedules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [quickBookingSlot, setQuickBookingSlot] = useState(null)
 
   const beginLoadQuickView = useLatestRequest()
   const loadQuickView = useCallback(async (background = false) => {
@@ -245,11 +249,13 @@ function OfficeHome() {
 
   const driverCalendars = useMemo(
     () =>
-      driverSchedules.map((driver, index) => ({
+      driverSchedules.flatMap((driver, index) => driver.booking_enabled === false ? [] : [{
         id: driver.driver_id,
         name: driver.driver_name || driver.driver_email || `Driver ${index + 1}`,
+        email: driver.driver_email,
+        plateLabel: formatDriverPlate(driver.plate_number),
         color: driverCalendarColors[index % driverCalendarColors.length],
-      })),
+      }]),
     [driverSchedules]
   )
 
@@ -347,7 +353,15 @@ function OfficeHome() {
             loading={loading}
             error={error}
             emptyMessage="No office schedule for this work week."
+            onEmptySlotClick={setQuickBookingSlot}
           />
+          {quickBookingSlot ? (
+            <QuickBookingModal
+              slot={quickBookingSlot}
+              onClose={() => setQuickBookingSlot(null)}
+              onBooked={() => loadQuickView(true)}
+            />
+          ) : null}
         </section>
       </div>
     </MainLayout>

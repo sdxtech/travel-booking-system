@@ -22,6 +22,27 @@ const menuItems = [
   { label: 'Manage User', icon: 'bi-people' },
 ]
 
+const statusFilterOptions = [
+  { value: 'all', label: 'All Statuses', icon: 'bi-funnel' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'awaiting_validation', label: 'Awaiting Validation' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'rejected', label: 'Rejected' },
+]
+
+// Normalize booking status for UI (approved + started => in_progress).
+function getBookingStatus(booking) {
+  const raw = String(booking?.status || 'pending').toLowerCase()
+  if (raw === 'approved') {
+    const hasStarted = booking?.starting_mileage !== null && booking?.starting_mileage !== undefined
+    if (hasStarted || booking?.started_at) return 'in_progress'
+  }
+  return raw
+}
+
 // Driver booking history page for office coordinators (with export + date range).
 function OfficeDriverHistory() {
   const historyTableRef = useFrozenHistoryColumns()
@@ -62,6 +83,7 @@ function OfficeDriverHistory() {
 
   const pageSize = 10
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -88,8 +110,10 @@ function OfficeDriverHistory() {
         return booking.request_id || ''
       case 'requester_name':
         return booking.requester_name || ''
-      case 'requester_dept_job_position':
-        return booking.requester_dept_job_position || ''
+      case 'requester_department':
+        return booking.requester_department || ''
+      case 'requester_job_position':
+        return booking.requester_job_position || ''
       case 'requester_phone':
         return booking.requester_phone || ''
       case 'requester_email':
@@ -144,7 +168,7 @@ function OfficeDriverHistory() {
       case 'total_distance':
         return getDistanceNumber(booking) ?? null
       case 'status':
-        return String(booking.status || '').toLowerCase()
+        return getBookingStatus(booking)
       case 'validated_by':
         return booking.validated_by_name || booking.validated_by || ''
       default:
@@ -171,11 +195,13 @@ function OfficeDriverHistory() {
     })
   }
 
-  // Sort bookings based on the active column/direction.
+  // Apply search and status filters before sorting, summaries, pagination, and export.
   const sortedBookings = useMemo(() => {
     const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
     const filtered = bookings.filter((booking) => {
-      const text = [booking.request_id, booking.requester_name, booking.requester_dept_job_position, booking.requester_phone, booking.requester_email, booking.requester_nik, booking.pickup_location, booking.destination, booking.driver_name, booking.status]
+      const status = getBookingStatus(booking)
+      if (statusFilter !== 'all' && status !== statusFilter) return false
+      const text = [booking.request_id, booking.requester_name, booking.requester_department, booking.requester_job_position, booking.requester_phone, booking.requester_email, booking.requester_nik, booking.pickup_location, booking.destination, booking.driver_name, booking.status, status.replace(/_/g, ' ')]
         .filter((value) => value != null).join(' ').toLowerCase()
       return terms.every((term) => text.includes(term))
     })
@@ -197,12 +223,12 @@ function OfficeDriverHistory() {
       .map((entry) => entry.booking)
   // Sorting helpers are pure and intentionally scoped to this component.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, sortConfig, searchQuery])
+  }, [bookings, sortConfig, searchQuery, statusFilter])
 
   const statusSummary = useMemo(() => {
     const counts = { total: sortedBookings.length, approved: 0, cancelled: 0, rejected: 0, completed: 0 }
     sortedBookings.forEach((booking) => {
-      const status = String(booking.status || '').toLowerCase()
+      const status = getBookingStatus(booking)
       if (Object.prototype.hasOwnProperty.call(counts, status)) counts[status] += 1
     })
     return counts
@@ -494,16 +520,6 @@ function OfficeDriverHistory() {
     return dt
       ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
       : '-'
-  }
-
-  // Normalize booking status for UI (approved + started => in_progress).
-  const getBookingStatus = (booking) => {
-    const raw = String(booking?.status || 'pending').toLowerCase()
-    if (raw === 'approved') {
-      const hasStarted = booking?.starting_mileage !== null && booking?.starting_mileage !== undefined
-      if (hasStarted || booking?.started_at) return 'in_progress'
-    }
-    return raw
   }
 
   // Format status strings for display.
@@ -945,7 +961,8 @@ function OfficeDriverHistory() {
       'No',
       'Request ID',
       'Name',
-      'User Dept/Job Position',
+      'Department',
+      'Title/Position',
       'Phone',
       'Email',
       'National ID',
@@ -974,7 +991,8 @@ function OfficeDriverHistory() {
       index + 1,
       booking.request_id || '',
       booking.requester_name || '',
-      booking.requester_dept_job_position || '',
+      booking.requester_department || '',
+      booking.requester_job_position || '',
       booking.requester_phone || '',
       booking.requester_email || '',
       booking.requester_nik || '',
@@ -1081,6 +1099,18 @@ function OfficeDriverHistory() {
                 }}
               />
             </label>
+            <div className="history-status-filter">
+              <BookingFormSelect
+                value={statusFilter}
+                options={statusFilterOptions}
+                placeholder="All Statuses"
+                ariaLabel="Filter booking history by status"
+                onChange={(value) => {
+                  setStatusFilter(value)
+                  setPage(1)
+                }}
+              />
+            </div>
             <button type="button" className="btn btn-neutral" onClick={openRangeModal} disabled={loading}>
               <i className="bi bi-calendar3" aria-hidden="true" />
               {hasLoaded ? 'Change Date Range' : 'Date Range'}
@@ -1140,9 +1170,14 @@ function OfficeDriverHistory() {
                     <button
                       type="button"
                       className="table-sort"
-                      onClick={() => toggleSort('requester_dept_job_position')}
+                      onClick={() => toggleSort('requester_department')}
                     >
-                      User Dept/Job Position {renderSortIcon('requester_dept_job_position')}
+                      Department {renderSortIcon('requester_department')}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="table-sort" onClick={() => toggleSort('requester_job_position')}>
+                      Title/Position {renderSortIcon('requester_job_position')}
                     </button>
                   </th>
                   <th>
@@ -1261,25 +1296,25 @@ function OfficeDriverHistory() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="27" className="muted">
+                    <td colSpan="28" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="27" className="error-text">
+                    <td colSpan="28" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : !hasLoaded ? (
                   <tr>
-                    <td colSpan="27" className="muted">
+                    <td colSpan="28" className="muted">
                       Select a date range to load driver history.
                     </td>
                   </tr>
                 ) : sortedBookings.length === 0 ? (
                   <tr>
-                    <td colSpan="27" className="muted">
+                    <td colSpan="28" className="muted">
                       No driver history found.
                     </td>
                   </tr>
@@ -1289,7 +1324,8 @@ function OfficeDriverHistory() {
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td>{booking.request_id || '-'}</td>
                       <td>{booking.requester_name || '-'}</td>
-                      <td>{booking.requester_dept_job_position || '-'}</td>
+                      <td>{booking.requester_department || '-'}</td>
+                      <td>{booking.requester_job_position || '-'}</td>
                       <td>{booking.requester_phone || '-'}</td>
                       <td>{booking.requester_email || '-'}</td>
                       <td>{booking.requester_nik || '-'}</td>

@@ -3,10 +3,11 @@ from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from main import get_current_user
 from mongo_client import db
+from profile_fields import department_value
 from realtime_service import publish_document_change
 from notifications_service import create_user_notification, notify_roles
 from page_permissions_service import enforce_employee_page_permission
@@ -34,7 +35,8 @@ class TicketBase(BaseModel):
 
 class TicketCreate(TicketBase):
     full_name: str
-    dept_job_position: Optional[str] = None
+    department: Optional[str] = Field(default=None, validation_alias=AliasChoices("department", "dept_job_position"))
+    job_position: Optional[str] = None
     phone_number: str
     email: str
     national_id: str
@@ -65,7 +67,8 @@ def serialize_ticket(doc_snapshot) -> TicketResponse:
         request_id=data.get("request_id"),
         user_id=data.get("user_id"),
         full_name=data.get("full_name"),
-        dept_job_position=data.get("dept_job_position"),
+        department=department_value(data),
+        job_position=data.get("job_position"),
         phone_number=data.get("phone_number"),
         email=data.get("email"),
         national_id=data.get("national_id"),
@@ -159,7 +162,8 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
     enforce_employee_page_permission(uid, "ticket_request")
 
     full_name = user_profile.get("name") or user_profile.get("full_name")
-    dept_job_position = user_profile.get("dept_job_position") or user_profile.get("department") or user_profile.get("job_position")
+    department = department_value(user_profile)
+    job_position = user_profile.get("job_position")
     phone_number = user_profile.get("phone") or user_profile.get("phone_number")
     national_id = user_profile.get("nik") or user_profile.get("national_id")
     email = user_profile.get("email") or current_user.get("email")
@@ -189,7 +193,8 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
         **payload.model_dump(),
         "departure_date": departure_date_value,
         "full_name": str(full_name),
-        "dept_job_position": dept_job_position,
+        "department": department,
+        "job_position": job_position,
         "phone_number": str(phone_number),
         "email": str(email),
         "national_id": str(national_id),

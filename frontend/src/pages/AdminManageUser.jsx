@@ -17,7 +17,8 @@ const menuItems = [
 
 const initialCreate = {
   name: '',
-  dept_job_position: '',
+  department: '',
+  job_position: '',
   role: 'user',
   plate_number: '',
   nik: '',
@@ -70,7 +71,7 @@ function AdminManageUser() {
   const [searchQuery, setSearchQuery] = useState('')
   const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const filteredUsers = users.filter((user) => {
-    const text = [user.name, user.dept_job_position, user.role, user.plate_number, user.nik, user.phone, user.email, user.telegram_chat_id]
+    const text = [user.name, user.department, user.job_position, user.role, user.plate_number, user.nik, user.phone, user.email, user.telegram_chat_id]
       .filter((value) => value != null).join(' ').toLowerCase()
     return searchTerms.every((term) => text.includes(term))
   })
@@ -264,7 +265,8 @@ function AdminManageUser() {
     setSelectedUser(user)
     setEditForm({
       name: user.name || '',
-      dept_job_position: user.dept_job_position || '',
+      department: user.department || '',
+      job_position: user.job_position || '',
       role: user.role || 'user',
       plate_number: user.plate_number || '',
       nik: user.nik || '',
@@ -584,7 +586,7 @@ function AdminManageUser() {
               <input
                 type="search"
                 aria-label="Search users"
-                placeholder="Search by name, email, department, or role..."
+                placeholder="Search by name, email, department, position, or role..."
                 value={searchQuery}
                 onChange={(event) => {
                   setSearchQuery(event.target.value)
@@ -617,13 +619,17 @@ function AdminManageUser() {
                     <input placeholder="User Name" value={createForm.name} onChange={handleCreateChange('name')} required />
                   </label>
                   <label className="inline-label">
-                    <span>User Dept/Job Position</span>
+                    <span>Department</span>
                     <input
-                      placeholder="User Dept/Job Position"
-                      value={createForm.dept_job_position}
-                      onChange={handleCreateChange('dept_job_position')}
+                      placeholder="Department"
+                      value={createForm.department}
+                      onChange={handleCreateChange('department')}
                       required
                     />
+                  </label>
+                  <label className="inline-label">
+                    <span>Title/Position</span>
+                    <input placeholder="Title/Position" value={createForm.job_position} onChange={handleCreateChange('job_position')} />
                   </label>
                   <label className="inline-label">
                     <span>Role</span>
@@ -713,13 +719,17 @@ function AdminManageUser() {
                     <input placeholder="User Name" value={editForm.name} onChange={handleEditChange('name')} required />
                   </label>
                   <label className="inline-label">
-                    <span>User Dept/Job Position</span>
+                    <span>Department</span>
                     <input
-                      placeholder="User Dept/Job Position"
-                      value={editForm.dept_job_position}
-                      onChange={handleEditChange('dept_job_position')}
+                      placeholder="Department"
+                      value={editForm.department}
+                      onChange={handleEditChange('department')}
                       required
                     />
+                  </label>
+                  <label className="inline-label">
+                    <span>Title/Position</span>
+                    <input placeholder="Title/Position" value={editForm.job_position} onChange={handleEditChange('job_position')} />
                   </label>
                   <label className="inline-label">
                     <span>Role</span>
@@ -786,7 +796,8 @@ function AdminManageUser() {
                 <tr>
                   <th className="table-col-no">No</th>
                   <th>User Name</th>
-                  <th>User Dept/Job Position</th>
+                  <th>Department</th>
+                  <th>Title/Position</th>
                   <th>Role</th>
                   <th>Plat No</th>
                   <th>National ID</th>
@@ -799,19 +810,19 @@ function AdminManageUser() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="10" className="muted">
+                    <td colSpan="11" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="10" className="error-text">
+                    <td colSpan="11" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="muted">
+                    <td colSpan="11" className="muted">
                       No users found.
                     </td>
                   </tr>
@@ -820,7 +831,8 @@ function AdminManageUser() {
                     <tr key={user.uid} style={{ background: selectedUser?.uid === user.uid ? 'var(--brand-soft)' : undefined }}>
                       <td className="table-col-no">{(currentPage - 1) * pageSize + index + 1}</td>
                       <td>{user.name || '-'}</td>
-                      <td>{user.dept_job_position || '-'}</td>
+                      <td>{user.department || '-'}</td>
+                      <td>{user.job_position || '-'}</td>
                       <td>{user.role || '-'}</td>
                       <td>{user.role === 'driver' ? user.plate_number || '-' : '-'}</td>
                       <td>{user.nik || '-'}</td>
@@ -1109,8 +1121,8 @@ function AdminManageUser() {
                 </label>
 
                 {!updateExisting ? <p className="muted" style={{ marginTop: 0 }}>
-                  Required columns: <code>name</code>, <code>dept_job_position</code>, <code>nik</code>, <code>phone</code>
-                  , <code>email</code>, <code>password</code>. Optional: <code>role</code>, <code>telegram_id</code>.
+                  Required columns: <code>name</code>, <code>department</code>, <code>nik</code>, <code>phone</code>
+                  , <code>email</code>, <code>password</code>. Optional: <code>job_position</code>, <code>role</code>, <code>telegram_id</code>.
                 </p> : null}
 
                 {importError ? <p className="error-text">{importError}</p> : null}

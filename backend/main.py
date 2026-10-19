@@ -29,6 +29,7 @@ from auth_utils import decode_access_token, get_jwt_secret
 from audit_service import audit_changes, record_audit_event, safe_request_details
 from cache_service import invalidate_response_cache
 from mongo_client import db, init_mongo
+from profile_fields import department_value
 from realtime_service import hub, publish_api_change
 
 is_production = os.getenv("APP_ENV", "development").strip().lower() == "production"
@@ -237,6 +238,8 @@ def get_me(current_user=Depends(get_current_user)):
         "uid": uid,
         "email": current_user.get("email"),
         "name": data.get("name"),
+        "department": department_value(data),
+        "job_position": data.get("job_position"),
         "telegram_chat_id": data.get("telegram_chat_id"),
         "role": data.get("role"),
     }
