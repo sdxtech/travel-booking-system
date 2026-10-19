@@ -92,12 +92,8 @@ function QuickViewScheduler({
 }) {
   const today = useMemo(() => new Date(), [])
   const [selectedDate, setSelectedDate] = useState(today)
-  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [selectedEventId, setSelectedEventId] = useState(null)
   const eventDialogRef = useRef(null)
-
-  useEffect(() => {
-    if (selectedEvent) eventDialogRef.current?.showModal()
-  }, [selectedEvent])
   const [selectedCalendarIds, setSelectedCalendarIds] = useState([])
   const [hasCustomizedCalendarSelection, setHasCustomizedCalendarSelection] = useState(false)
   const availableCalendarIds = useMemo(() => new Set(calendars.map((calendar) => String(calendar.id))), [calendars])
@@ -154,6 +150,18 @@ function QuickViewScheduler({
         .filter((event) => event.start && event.end),
     [events]
   )
+
+  // Read details from current data so an open popup follows live updates.
+  const selectedEvent = useMemo(() => {
+    const event = normalizedEvents.find((item) => item.id === selectedEventId)
+    if (!event) return null
+    const driverName = calendars.find((calendar) => String(calendar.id) === String(event.calendarId))?.name
+    return { ...event, driverName }
+  }, [selectedEventId, normalizedEvents, calendars])
+  const selectedEventKey = selectedEvent?.id
+  useEffect(() => {
+    if (selectedEventKey) eventDialogRef.current?.showModal()
+  }, [selectedEventKey])
 
   const eventsByCalendar = useMemo(() => {
     const map = new Map(visibleCalendars.map((calendar) => [String(calendar.id), []]))
@@ -374,7 +382,7 @@ function QuickViewScheduler({
                           return (
                           <button
                             type="button"
-                            onClick={() => setSelectedEvent({ ...event, driverName: calendar.name })}
+                            onClick={() => setSelectedEventId(event.id)}
                             aria-haspopup="dialog"
                             key={`${event.id}-${placement.dayIndex}`}
                             className={`quick-scheduler-event ${compact ? 'is-compact' : ''}`}
@@ -407,7 +415,7 @@ function QuickViewScheduler({
           ref={eventDialogRef}
           className="modal quick-scheduler-event-dialog"
           aria-labelledby="scheduler-event-details-title"
-          onClose={() => setSelectedEvent(null)}
+          onClose={() => setSelectedEventId(null)}
           onClick={(event) => {
             if (event.target !== event.currentTarget) return
             const bounds = event.currentTarget.getBoundingClientRect()

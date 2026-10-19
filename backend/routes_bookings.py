@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from main import get_current_user
 from mongo_client import db
+from realtime_service import publish_document_change
 from notifications_service import create_user_notification, notify_roles
 from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
@@ -373,6 +374,7 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
     if requester_nik:
         data["requester_nik"] = requester_nik
     db["bookings"].insert_one(data)
+    publish_document_change("bookings", booking_id, data)
 
     create_user_notification(
         uid,
@@ -477,6 +479,7 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
         "updated_at": created_at,
     }
     db["bookings"].insert_one(data)
+    publish_document_change("bookings", booking_id, data)
     snapshot = db["bookings"].find_one({"_id": booking_id})
     booking = serialize_booking(snapshot)
 
@@ -722,6 +725,8 @@ def update_booking_status(
     elif booking_data.get("cancellation_status") == "pending":
         updates["cancellation_status"] = "superseded"
     result = db["bookings"].update_one(update_filter, {"$set": updates})
+    if result.modified_count:
+        publish_document_change("bookings", booking_id, booking_data)
     if not result.modified_count:
         raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
 
@@ -803,6 +808,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
                 }
             },
         )
+        publish_document_change("bookings", booking_id, data)
 
         target_user_id = data.get("user_id")
         if target_user_id:
@@ -857,6 +863,8 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
             }
         },
     )
+    if result.modified_count:
+        publish_document_change("bookings", booking_id, data)
 
     if not result.modified_count:
         raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
@@ -966,6 +974,8 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
                     "updated_at": utc_now(),
                 }},
             )
+            if result.modified_count:
+                publish_document_change("bookings", booking_id, data)
             if not result.modified_count:
                 raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
             notify_roles(
@@ -1012,6 +1022,8 @@ def cancel_booking(booking_id: str, current_user=Depends(get_current_user)):
             }
         },
     )
+    if result.modified_count:
+        publish_document_change("bookings", booking_id, data)
 
     if not result.modified_count:
         raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
@@ -1087,6 +1099,8 @@ def review_cancellation(booking_id: str, payload: CancellationReview, current_us
             "updated_at": utc_now(),
         }},
     )
+    if result.modified_count:
+        publish_document_change("bookings", booking_id, data)
     if not result.modified_count:
         raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
     if data.get("user_id"):
@@ -1129,6 +1143,7 @@ def start_booking(booking_id: str, payload: BookingStart, current_user=Depends(g
             }
         },
     )
+    publish_document_change("bookings", booking_id, data)
 
     updated_snapshot = db["bookings"].find_one({"_id": booking_id})
     return serialize_booking(updated_snapshot)
@@ -1180,6 +1195,7 @@ def complete_booking(booking_id: str, payload: BookingComplete, current_user=Dep
             },
         },
     )
+    publish_document_change("bookings", booking_id, data)
 
     target_user_id = data.get("user_id")
     if target_user_id:
@@ -1249,6 +1265,7 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
             }
         },
     )
+    publish_document_change("bookings", booking_id, data)
 
     driver_id = data.get("driver_id")
     if driver_id:

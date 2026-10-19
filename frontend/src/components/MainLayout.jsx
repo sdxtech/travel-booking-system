@@ -4,6 +4,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { API_BASE_URL, APP_NAME } from '../config'
 import { useAuth } from '../hooks/useAuth'
 import { indonesianError } from '../utils/indonesian'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useLatestRequest } from '../hooks/useLatestRequest'
 
 const userNavSections = [
   {
@@ -296,8 +298,10 @@ function MainLayout({ title, children }) {
     [notifications]
   )
 
-  const fetchNotifications = useCallback(async () => {
-    setNotificationsLoading(true)
+  const beginNotifications = useLatestRequest()
+  const fetchNotifications = useCallback(async (background = false) => {
+    const signal = beginNotifications()
+    if (!background) setNotificationsLoading(true)
     setNotificationsError('')
 
     try {
@@ -305,10 +309,12 @@ function MainLayout({ title, children }) {
         `${API_BASE_URL}/notifications/my?limit=25`,
         {
           credentials: 'include',
+          signal,
         }
       )
 
       if (!res.ok) {
+        if (background) return
         let detail =
           t('Failed to load notifications.', 'Notifikasi gagal dimuat. Silakan coba lagi.')
 
@@ -322,6 +328,7 @@ function MainLayout({ title, children }) {
           // Ignore parse error.
         }
 
+        if (signal.aborted) return
         setNotificationsError(detail)
         setNotifications([])
 
@@ -329,6 +336,7 @@ function MainLayout({ title, children }) {
       }
 
       const data = await res.json()
+      if (signal.aborted) return
 
       setNotifications(
         Array.isArray(data)
@@ -336,15 +344,18 @@ function MainLayout({ title, children }) {
           : []
       )
     } catch {
+      if (signal.aborted || background) return
       setNotificationsError(
         t('Network error. Please try again.', 'Koneksi bermasalah. Silakan coba lagi.')
       )
 
       setNotifications([])
     } finally {
-      setNotificationsLoading(false)
+      if (!signal.aborted) setNotificationsLoading(false)
     }
-  }, [isDriver, t])
+  }, [isDriver, t, beginNotifications])
+
+  useRealtimeRefresh(['notifications'], () => fetchNotifications(true))
 
   const markAllNotificationsRead = async () => {
     try {
@@ -373,11 +384,6 @@ function MainLayout({ title, children }) {
   useEffect(() => {
     fetchNotifications()
 
-    const intervalId =
-      window.setInterval(() => {
-        fetchNotifications()
-      }, 30000)
-
     const handleRefresh = () => {
       fetchNotifications()
     }
@@ -388,8 +394,6 @@ function MainLayout({ title, children }) {
     )
 
     return () => {
-      window.clearInterval(intervalId)
-
       window.removeEventListener(
         'notifications:refresh',
         handleRefresh
@@ -849,9 +853,7 @@ function MainLayout({ title, children }) {
             <button
               type="button"
               className="notifications-refresh"
-              onClick={
-                fetchNotifications
-              }
+              onClick={() => fetchNotifications()}
               disabled={
                 notificationsLoading
               }

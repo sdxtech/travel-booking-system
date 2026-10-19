@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from main import get_current_user
 from mongo_client import db
+from realtime_service import publish_document_change
 from notifications_service import create_user_notification, notify_roles
 from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
@@ -202,6 +203,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
     data["_id"] = ticket_id
     data["request_id"] = generate_request_id(db, "TR", created_at)
     db["tickets"].insert_one(data)
+    publish_document_change("tickets", ticket_id, data)
 
     create_user_notification(
         uid,
@@ -259,6 +261,7 @@ def create_travel_accommodation(payload: TicketCreate, current_user=Depends(get_
     data["_id"] = ticket_id
     data["request_id"] = generate_request_id(db, "TR", created_at)
     db["tickets"].insert_one(data)
+    publish_document_change("tickets", ticket_id, data)
 
     if linked_user_id:
         create_user_notification(
@@ -297,6 +300,7 @@ def update_ticket_status(ticket_id: str, payload: TicketStatusUpdate, current_us
             }
         },
     )
+    publish_document_change("tickets", ticket_id, ticket_data)
 
     user_id = ticket_data.get("user_id")
     if user_id:
@@ -348,6 +352,7 @@ def update_ticket(ticket_id: str, payload: TicketUserCreate, current_user=Depend
     }
 
     db["tickets"].update_one({"_id": ticket_id}, {"$set": update_data})
+    publish_document_change("tickets", ticket_id, ticket_data)
 
     create_user_notification(
         uid,
@@ -391,6 +396,7 @@ def cancel_ticket(ticket_id: str, current_user=Depends(get_current_user)):
             }
         },
     )
+    publish_document_change("tickets", ticket_id, ticket_data)
 
     create_user_notification(
         uid,

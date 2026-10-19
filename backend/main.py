@@ -29,6 +29,7 @@ from auth_utils import decode_access_token, get_jwt_secret
 from audit_service import audit_changes, record_audit_event, safe_request_details
 from cache_service import invalidate_response_cache
 from mongo_client import db, init_mongo
+from realtime_service import hub, publish_api_change
 
 is_production = os.getenv("APP_ENV", "development").strip().lower() == "production"
 app = FastAPI(
@@ -93,6 +94,9 @@ async def audit_mutating_api_requests(request: Request, call_next):
         details=details,
         ip_address=request.client.host if request.client else None,
     )
+    if response.status_code < 400:
+        from starlette.concurrency import run_in_threadpool
+        await run_in_threadpool(publish_api_change, request.url.path, actor.get("uid") if actor else None)
     return response
 
 
@@ -123,6 +127,16 @@ def startup_event():
     """Initialize backend dependencies once the app starts."""
     init_mongo()
     get_jwt_secret()
+
+
+@app.on_event("startup")
+async def start_realtime():
+    await hub.start()
+
+
+@app.on_event("shutdown")
+async def stop_realtime():
+    await hub.stop()
 
 
 def get_current_user(
@@ -195,6 +209,7 @@ from routes_page_permissions import router as pages_router
 from routes_telegram import router as telegram_router
 from routes_locations import router as locations_router
 from routes_audit_logs import router as audit_logs_router
+from routes_realtime import router as realtime_router
 
 
 @app.get("/health")
@@ -237,3 +252,4 @@ app.include_router(pages_router)
 app.include_router(telegram_router)
 app.include_router(locations_router)
 app.include_router(audit_logs_router)
+app.include_router(realtime_router)

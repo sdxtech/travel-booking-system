@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../components/MainLayout";
 import { API_BASE_URL } from "../config";
@@ -15,7 +17,8 @@ function TicketHistory() {
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [selectedTicketSnapshot, setSelectedTicket] = useState(null);
+  const selectedTicket = selectedTicketSnapshot ? tickets.find((ticket) => ticket.id === selectedTicketSnapshot.id) || null : null;
   const [page, setPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "asc" });
   const [searchQuery, setSearchQuery] = useState("");
@@ -172,40 +175,44 @@ function TicketHistory() {
   }, [selectedTicket]);
 
   // Load the current user's ticket history.
-  useEffect(() => {
-    const fetchTickets = async () => {
-      setLoading(true);
-      setError("");
+  const beginFetchTickets = useLatestRequest()
+  const fetchTickets = useCallback(async (background = false) => {
+    const signal = beginFetchTickets()
+    if (!background) setLoading(true);
+    setError("");
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/tickets/my`, {
-          credentials: "include",
-        });
+    try {
+      const response = await fetch(`${API_BASE_URL}/tickets/my`, {
+        credentials: 'include', signal,
+      });
 
-        if (!response.ok) {
-          let detail = "Failed to load tickets.";
-          try {
-            const data = await response.json();
-            if (data?.detail) detail = data.detail;
-          } catch {
-            // ignore parse error
-          }
-          setError(detail);
-          setTickets([]);
-        } else {
+      if (!response.ok) {
+        if (background) return
+        let detail = "Failed to load tickets.";
+        try {
           const data = await response.json();
-          setTickets(Array.isArray(data) ? data : []);
+          if (signal.aborted) return
+          if (data?.detail) detail = data.detail;
+        } catch {
+          // ignore parse error
         }
-      } catch {
-        setError("Network error. Please try again.");
+        setError(detail);
         setTickets([]);
-      } finally {
-        setLoading(false);
+      } else {
+        const data = await response.json();
+        if (signal.aborted) return
+        setTickets(Array.isArray(data) ? data : []);
       }
-    };
-
-    fetchTickets();
-  }, []);
+    } catch {
+      if (signal.aborted || background) return
+      setError("Network error. Please try again.");
+      setTickets([]);
+    } finally {
+      if (!signal.aborted) setLoading(false);
+    }
+  }, [beginFetchTickets])
+  useRealtimeRefresh(['tickets'], () => fetchTickets(true))
+  useEffect(() => { fetchTickets() }, [fetchTickets])
 
   // Open the travel request form with the selected request for editing.
   const handleEdit = (ticket) => {

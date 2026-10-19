@@ -8,6 +8,7 @@ from driver_localization import driver_notification_details, driver_notification
 from email_service import email_delivery_enabled, send_notification_email
 from mongo_client import db
 from telegram_service import telegram_delivery_enabled, send_notification_telegram
+from realtime_service import publish_notification
 
 
 def utc_now() -> datetime:
@@ -61,6 +62,8 @@ def create_user_notification(
             "telegram_status": "pending" if should_send_telegram else "skipped",
         }
     )
+
+    publish_notification(str(user_id), event)
 
     if should_send_email:
         try:

@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import QuickViewScheduler from '../components/QuickViewScheduler'
@@ -67,57 +69,58 @@ function UserHome() {
   const [quickBookingSlot, setQuickBookingSlot] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  useEffect(() => {
+  const beginLoadQuickView = useLatestRequest()
+  const loadQuickView = useCallback(async (background = false) => {
+    const signal = beginLoadQuickView()
+    if (!background) setLoading(true)
+    setError('')
 
+    try {
+      const [ticketsRes, bookingsRes, driverCalendarRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/tickets/my`, {
+           credentials: 'include', signal,
+        }),
+        fetch(`${API_BASE_URL}/bookings/my`, {
+          credentials: 'include', signal,
+        }),
+        fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
+           credentials: 'include', signal,
+        }),
+      ])
 
-    const loadQuickView = async () => {
-      setLoading(true)
-      setError('')
-
-      try {
-        const [ticketsRes, bookingsRes, driverCalendarRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/tickets/my`, {
-             credentials: 'include',
-          }),
-          fetch(`${API_BASE_URL}/bookings/my`, {
-            credentials: 'include',
-          }),
-          fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
-             credentials: 'include',
-          }),
-        ])
-
-        if (!driverCalendarRes.ok) {
-          setError(await getErrorDetail(driverCalendarRes, 'Failed to load driver calendars.'))
-          setTickets([])
-          setBookings([])
-          setDriverSchedules([])
-          return
-        }
-
-        // History permissions should not prevent the shared driver calendar
-        // from rendering. Those two responses are only used for the old
-        // summary counts, while the calendar endpoint is the core view.
-        const [ticketsData, bookingsData, driverCalendarData] = await Promise.all([
-          ticketsRes.ok ? ticketsRes.json() : Promise.resolve([]),
-          bookingsRes.ok ? bookingsRes.json() : Promise.resolve([]),
-          driverCalendarRes.json(),
-        ])
-        setTickets(Array.isArray(ticketsData) ? ticketsData : [])
-        setBookings(Array.isArray(bookingsData) ? bookingsData : [])
-        setDriverSchedules(Array.isArray(driverCalendarData) ? driverCalendarData : [])
-      } catch {
-        setError('Network error. Please try again.')
+      if (!driverCalendarRes.ok) {
+        if (background) return
+        setError(await getErrorDetail(driverCalendarRes, 'Failed to load driver calendars.'))
         setTickets([])
         setBookings([])
         setDriverSchedules([])
-      } finally {
-        setLoading(false)
+        return
       }
-    }
 
-    loadQuickView()
-  }, [refreshKey])
+      // History permissions should not prevent the shared driver calendar
+      // from rendering. Those two responses are only used for the old
+      // summary counts, while the calendar endpoint is the core view.
+      const [ticketsData, bookingsData, driverCalendarData] = await Promise.all([
+        ticketsRes.ok ? ticketsRes.json() : Promise.resolve([]),
+        bookingsRes.ok ? bookingsRes.json() : Promise.resolve([]),
+        driverCalendarRes.json(),
+      ])
+      if (signal.aborted) return
+      setTickets(Array.isArray(ticketsData) ? ticketsData : [])
+      setBookings(Array.isArray(bookingsData) ? bookingsData : [])
+      setDriverSchedules(Array.isArray(driverCalendarData) ? driverCalendarData : [])
+    } catch {
+      if (signal.aborted || background) return
+      setError('Network error. Please try again.')
+      setTickets([])
+      setBookings([])
+      setDriverSchedules([])
+    } finally {
+      if (!signal.aborted) setLoading(false)
+    }
+  }, [beginLoadQuickView])
+  useRealtimeRefresh(['bookings', 'tickets', 'calendars', 'availability'], () => loadQuickView(true))
+  useEffect(() => { loadQuickView() }, [loadQuickView, refreshKey])
 
   const driverCalendars = useMemo(
     () =>

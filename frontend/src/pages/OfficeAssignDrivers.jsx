@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
@@ -36,6 +38,8 @@ const initialForm = {
 
 // Manual driver assignment form for office coordinators.
 function OfficeAssignDrivers() {
+  const [availabilityRevision, setAvailabilityRevision] = useState(0)
+  useRealtimeRefresh(['availability', 'calendars'], () => setAvailabilityRevision((value) => value + 1))
   const navigate = useNavigate()
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const { user } = useAuth()
@@ -57,48 +61,49 @@ const isSuperadmin =
   const [availabilityChecked, setAvailabilityChecked] = useState(false)
 
   // Load the list of available drivers (role === 'driver').
-  useEffect(() => {
+  const beginLoadDrivers = useLatestRequest()
+  const loadDrivers = useCallback(async (background = false) => {
+    const signal = beginLoadDrivers()
+    if (!background) setDriversLoading(true)
+    setDriversError('')
 
-
-    // Fetch drivers from the user list endpoint.
-    const loadDrivers = async () => {
-      setDriversLoading(true)
-      setDriversError('')
-
-      try {
-        const res = await fetch(`${API_BASE_URL}/users`, {
-          credentials: 'include',
-        })
-        if (!res.ok) {
-          let detail = 'Failed to load drivers.'
-          try {
-            const data = await res.json()
-            if (data?.detail) detail = data.detail
-          } catch {
-            // ignore parse error
-          }
-          setDriversError(detail)
-          setDrivers([])
-          return
+    try {
+      const res = await fetch(`${API_BASE_URL}/users`, {
+        credentials: 'include', signal,
+      })
+      if (!res.ok) {
+        if (background) return
+        let detail = 'Failed to load drivers.'
+        try {
+          const data = await res.json()
+          if (signal.aborted) return
+          if (data?.detail) detail = data.detail
+        } catch {
+          // ignore parse error
         }
-
-        const data = await res.json()
-        const allUsers = Array.isArray(data) ? data : []
-        setDrivers(
-          allUsers.filter(
-            (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
-          )
-        )
-      } catch {
-        setDriversError('Network error. Please try again.')
+        setDriversError(detail)
         setDrivers([])
-      } finally {
-        setDriversLoading(false)
+        return
       }
-    }
 
-    loadDrivers()
-  }, [isSuperadmin])
+      const data = await res.json()
+      if (signal.aborted) return
+      const allUsers = Array.isArray(data) ? data : []
+      setDrivers(
+        allUsers.filter(
+          (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
+        )
+      )
+    } catch {
+      if (signal.aborted || background) return
+      setDriversError('Network error. Please try again.')
+      setDrivers([])
+    } finally {
+      if (!signal.aborted) setDriversLoading(false)
+    }
+  }, [beginLoadDrivers, isSuperadmin])
+  useRealtimeRefresh(['users', 'availability'], () => loadDrivers(true))
+  useEffect(() => { loadDrivers() }, [loadDrivers])
 
   // Check driver availability whenever the requested time range changes.
   useEffect(() => {
@@ -169,7 +174,7 @@ const isSuperadmin =
 
     loadUnavailableDrivers()
     return () => controller.abort()
-  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time])
+  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time, availabilityRevision])
 
   // Guard against selecting a driver that is flagged as unavailable.
   useEffect(() => {

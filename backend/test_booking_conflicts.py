@@ -86,6 +86,21 @@ class BookingConflictTests(unittest.TestCase):
         self.collection.update_one.assert_called_once()
         self.assertEqual(self.collection.update_one.call_args.args[1]["$set"]["status"], "approved")
 
+    def test_committed_approval_emits_before_notification_delivery(self):
+        order = []
+        self.pending["user_id"] = "employee"
+        self.collection.update_one.side_effect = lambda *args, **kwargs: (order.append("saved") or Mock(modified_count=1))
+        with patch.object(bookings, "publish_document_change", side_effect=lambda *args: order.append("realtime")), \
+                patch.object(bookings, "create_user_notification", side_effect=lambda *args, **kwargs: order.append("notification")):
+            self.approve()
+        self.assertEqual(order[:3], ["saved", "realtime", "notification"])
+
+    def test_rejected_mutation_does_not_emit_realtime_change(self):
+        self.collection.find.return_value = [self.booking("a", "CONFLICT")]
+        with patch.object(bookings, "publish_document_change") as publish, self.assertRaises(HTTPException):
+            self.approve()
+        publish.assert_not_called()
+
     def test_superadmin_retains_overlap_override(self):
         bookings.ensure_role.return_value = "superadmin"
         self.collection.find.return_value = [self.booking("a", "SDX-BD-08092026-003")]

@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { indonesianError } from '../utils/indonesian'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
@@ -47,41 +49,42 @@ function DriverHome() {
   }, [activeBooking?.starting_mileage, endingMileage])
 
   // Load bookings assigned to the signed-in driver.
-  useEffect(() => {
-
-
-    // Fetch assigned bookings for the driver.
-    const loadAssigned = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const res = await fetch(`${API_BASE_URL}/bookings/assigned`, {
-           credentials: 'include',
-        })
-        if (!res.ok) {
-          let detail = 'Tugas gagal dimuat. Silakan coba lagi.'
-          try {
-            const data = await res.json()
-            if (data?.detail) detail = indonesianError(data.detail, detail)
-          } catch {
-            // ignore parse error
-          }
-          setError(detail)
-          setBookings([])
-        } else {
+  const beginLoadAssigned = useLatestRequest()
+  const loadAssigned = useCallback(async (background = false) => {
+    const signal = beginLoadAssigned()
+    if (!background) setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`${API_BASE_URL}/bookings/assigned`, {
+         credentials: 'include', signal,
+      })
+      if (!res.ok) {
+        if (background) return
+        let detail = 'Tugas gagal dimuat. Silakan coba lagi.'
+        try {
           const data = await res.json()
-          setBookings(Array.isArray(data) ? data : [])
+          if (signal.aborted) return
+          if (data?.detail) detail = indonesianError(data.detail, detail)
+        } catch {
+          // ignore parse error
         }
-      } catch {
-        setError('Koneksi bermasalah. Silakan coba lagi.')
+        setError(detail)
         setBookings([])
-      } finally {
-        setLoading(false)
+      } else {
+        const data = await res.json()
+        if (signal.aborted) return
+        setBookings(Array.isArray(data) ? data : [])
       }
+    } catch {
+      if (signal.aborted || background) return
+      setError('Koneksi bermasalah. Silakan coba lagi.')
+      setBookings([])
+    } finally {
+      if (!signal.aborted) setLoading(false)
     }
-
-    loadAssigned()
-  }, [])
+  }, [beginLoadAssigned])
+  useRealtimeRefresh(['bookings'], () => loadAssigned(true))
+  useEffect(() => { loadAssigned() }, [loadAssigned])
 
   // Update a booking record in local state after actions.
   const updateBookingInState = (bookingId, updatedFields) => {

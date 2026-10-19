@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
@@ -277,36 +279,39 @@ function OfficeDriverHistory() {
   const closeActionMenu = () => setActionMenu(null)
 
   // Load drivers once so pending bookings can be reviewed and assigned from this table.
-  useEffect(() => {
-    const loadDrivers = async () => {
-      setDriversLoading(true)
-      setDriversError('')
-      try {
-        const res = await fetch(`${API_BASE_URL}/users`, { credentials: 'include' })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          setDriversError(data?.detail || 'Failed to load drivers.')
-          setDrivers([])
-          return
-        }
-
-        const data = await res.json()
-        const allUsers = Array.isArray(data) ? data : []
-        setDrivers(
-          allUsers.filter(
-            (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
-          )
-        )
-      } catch {
-        setDriversError('Network error. Please try again.')
+  const beginLoadDrivers = useLatestRequest()
+  const loadDrivers = useCallback(async (background = false) => {
+    const signal = beginLoadDrivers()
+    if (!background) setDriversLoading(true)
+    setDriversError('')
+    try {
+      const res = await fetch(`${API_BASE_URL}/users`, { credentials: 'include', signal })
+      if (!res.ok) {
+        if (background) return
+        const data = await res.json().catch(() => ({}))
+        setDriversError(data?.detail || 'Failed to load drivers.')
         setDrivers([])
-      } finally {
-        setDriversLoading(false)
+        return
       }
-    }
 
-    loadDrivers()
-  }, [isSuperadmin])
+      const data = await res.json()
+      if (signal.aborted) return
+      const allUsers = Array.isArray(data) ? data : []
+      setDrivers(
+        allUsers.filter(
+          (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
+        )
+      )
+    } catch {
+      if (signal.aborted || background) return
+      setDriversError('Network error. Please try again.')
+      setDrivers([])
+    } finally {
+      if (!signal.aborted) setDriversLoading(false)
+    }
+  }, [beginLoadDrivers, isSuperadmin])
+  useRealtimeRefresh(['users', 'availability'], () => loadDrivers(true))
+  useEffect(() => { loadDrivers() }, [loadDrivers])
 
   const driverOptions = useMemo(
     () =>
@@ -366,16 +371,19 @@ function OfficeDriverHistory() {
   }
 
   // Load driver booking history and apply optional date filtering client-side.
-  const loadBookings = async (range) => {
+  const beginLoadBookings = useLatestRequest()
+  const loadBookings = async (range, background = false) => {
+    const signal = beginLoadBookings()
 
 
-    setLoading(true)
+    if (!background) setLoading(true)
     setError('')
     try {
       const res = await fetch(`${API_BASE_URL}/bookings/history`, {
-         credentials: 'include',
+         credentials: 'include', signal,
       })
       if (!res.ok) {
+        if (background) return
         let detail = 'Failed to load driver history.'
         try {
           const data = await res.json()
@@ -389,6 +397,7 @@ function OfficeDriverHistory() {
       }
 
       const data = await res.json()
+      if (signal.aborted) return
       const rawBookings = Array.isArray(data) ? data : []
 
       if (range?.mode === 'range') {
@@ -407,13 +416,16 @@ function OfficeDriverHistory() {
         setBookings(rawBookings)
       }
     } catch {
+      if (signal.aborted || background) return
       setError('Network error. Please try again.')
       setBookings([])
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
       setHasLoaded(true)
     }
   }
+
+  useRealtimeRefresh(['bookings'], () => loadBookings(activeRange, true))
 
   // Load the combined request/history table immediately on entry.
   useEffect(() => {
@@ -519,7 +531,7 @@ function OfficeDriverHistory() {
     setAvailabilityError('')
     setUnavailableDriverIds([])
     try {
-      const url = new URL(`${API_BASE_URL}/bookings/unavailable-drivers`)
+      const url = new URL(`${API_BASE_URL}/bookings/unavailable-drivers`, window.location.origin)
       url.searchParams.set('departure_time', booking.departure_time)
       if (booking.estimated_arrival_time) {
         url.searchParams.set('estimated_arrival_time', booking.estimated_arrival_time)
@@ -640,6 +652,11 @@ function OfficeDriverHistory() {
   const handleEditFormChange = (field) => (event) => {
     setEditForm((current) => ({ ...current, [field]: event.target.value }))
   }
+
+  useRealtimeRefresh(['availability', 'calendars'], () => {
+    if (assignTarget) return loadUnavailableDrivers(assignTarget)
+    if (editTarget && editForm) return loadUnavailableDrivers({ ...editTarget, ...editForm })
+  })
 
   // Save a Super Admin booking edit without changing its current workflow status.
   const handleSaveEdit = async (event) => {

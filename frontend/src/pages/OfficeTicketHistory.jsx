@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useLatestRequest } from '../hooks/useLatestRequest'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import TableActionDropdown from '../components/TableActionDropdown'
@@ -191,16 +193,19 @@ const isSuperadmin =
   }
 
   // Load ticket history and apply optional date filtering client-side.
-  const loadTickets = async (range) => {
+  const beginLoadTickets = useLatestRequest()
+  const loadTickets = async (range, background = false) => {
+    const signal = beginLoadTickets()
 
 
-    setLoading(true)
+    if (!background) setLoading(true)
     setError('')
     try {
       const res = await fetch(`${API_BASE_URL}/tickets/history`, {
-        credentials: 'include',
+        credentials: 'include', signal,
       })
       if (!res.ok) {
+        if (background) return
         let detail = 'Failed to load tickets.'
         try {
           const data = await res.json()
@@ -214,6 +219,7 @@ const isSuperadmin =
       }
 
       const data = await res.json()
+      if (signal.aborted) return
       const rawTickets = Array.isArray(data) ? data : []
 
       if (range?.mode === 'range') {
@@ -232,13 +238,16 @@ const isSuperadmin =
         setTickets(rawTickets)
       }
     } catch {
+      if (signal.aborted || background) return
       setError('Network error. Please try again.')
       setTickets([])
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
       setHasLoaded(true)
     }
   }
+
+  useRealtimeRefresh(['tickets'], () => loadTickets(activeRange, true))
 
   // Load the combined request/history table immediately on entry.
   useEffect(() => {

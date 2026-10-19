@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
@@ -16,7 +18,8 @@ function BookingHistory() {
   const [actionError, setActionError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
   const [actionLoadingId, setActionLoadingId] = useState('')
-  const [selectedBooking, setSelectedBooking] = useState(null)
+  const [selectedBookingSnapshot, setSelectedBooking] = useState(null)
+  const selectedBooking = selectedBookingSnapshot ? bookings.find((booking) => booking.id === selectedBookingSnapshot.id) || null : null
   const [cancellationPolicy, setCancellationPolicy] = useState(null)
 
   const [page, setPage] = useState(1)
@@ -211,46 +214,51 @@ function BookingHistory() {
   }, [selectedBooking])
 
   // Load the current user's booking history.
-  useEffect(() => {
-    const fetchBookings = async () => {
-      setLoading(true)
-      setError('')
+  const beginFetchBookings = useLatestRequest()
+  const fetchBookings = useCallback(async (background = false) => {
+    const signal = beginFetchBookings()
+    if (!background) setLoading(true)
+    setError('')
 
-      try {
-        const [response, policyResponse] = await Promise.all([
-          fetch(`${API_BASE_URL}/bookings/my`, { credentials: 'include' }),
-          fetch(`${API_BASE_URL}/settings/booking-cancellation`, { credentials: 'include' }),
-        ])
+    try {
+      const [response, policyResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/bookings/my`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/settings/booking-cancellation`, { credentials: 'include' }),
+      ])
 
-        if (policyResponse.ok) {
-          const policyData = await policyResponse.json()
-          setCancellationPolicy(policyData)
-        }
-
-        if (!response.ok) {
-          let detail = 'Failed to load bookings.'
-          try {
-            const data = await response.json()
-            if (data?.detail) detail = data.detail
-          } catch {
-            // ignore parse error
-          }
-          setError(detail)
-          setBookings([])
-        } else {
-          const data = await response.json()
-          setBookings(Array.isArray(data) ? data : [])
-        }
-      } catch {
-        setError('Network error. Please try again.')
-        setBookings([])
-      } finally {
-        setLoading(false)
+      if (policyResponse.ok) {
+        const policyData = await policyResponse.json()
+        if (signal.aborted) return
+        setCancellationPolicy(policyData)
       }
-    }
 
-    fetchBookings()
-  }, [])
+      if (!response.ok) {
+        if (background) return
+        let detail = 'Failed to load bookings.'
+        try {
+          const data = await response.json()
+          if (signal.aborted) return
+          if (data?.detail) detail = data.detail
+        } catch {
+          // ignore parse error
+        }
+        setError(detail)
+        setBookings([])
+      } else {
+        const data = await response.json()
+        if (signal.aborted) return
+        setBookings(Array.isArray(data) ? data : [])
+      }
+    } catch {
+      if (signal.aborted || background) return
+      setError('Network error. Please try again.')
+      setBookings([])
+    } finally {
+      if (!signal.aborted) setLoading(false)
+    }
+  }, [beginFetchBookings])
+  useRealtimeRefresh(['bookings', 'settings'], () => fetchBookings(true))
+  useEffect(() => { fetchBookings() }, [fetchBookings])
 
   const handleEdit = (booking) => {
     navigate('/user/booking-driver', { state: { booking } })

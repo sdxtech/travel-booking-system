@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useState } from 'react'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
 
@@ -10,31 +12,34 @@ function AdminDriverAvailability() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  useEffect(() => {
-    const loadDrivers = async () => {
+  const beginLoadDrivers = useLatestRequest()
+  const loadDrivers = useCallback(async (background = false) => {
+    const signal = beginLoadDrivers()
 
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/settings/drivers`, {
-         credentials: 'include',
-        })
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          setError(data?.detail || 'Failed to load drivers.')
-          return
-        }
-
-        const data = await response.json()
-        setDrivers(Array.isArray(data) ? data : [])
-      } catch {
-        setError('Network error. Please try again.')
-      } finally {
-        setLoading(false)
+    try {
+      const response = await fetch(`${API_BASE_URL}/settings/drivers`, {
+       credentials: 'include', signal,
+      })
+      if (!response.ok) {
+        if (background) return
+        const data = await response.json().catch(() => ({}))
+        setError(data?.detail || 'Failed to load drivers.')
+        return
       }
-    }
 
-    loadDrivers()
-  }, [])
+      const data = await response.json()
+      if (signal.aborted) return
+      setDrivers(Array.isArray(data) ? data : [])
+    } catch {
+      if (signal.aborted || background) return
+      setError('Network error. Please try again.')
+    } finally {
+      if (!signal.aborted) setLoading(false)
+    }
+  }, [beginLoadDrivers])
+  useRealtimeRefresh(['users', 'availability'], () => loadDrivers(true))
+  useEffect(() => { loadDrivers() }, [loadDrivers])
 
   const toggleDriver = async (driver) => {
     if (updatingId) return

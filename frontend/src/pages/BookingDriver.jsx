@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { useLocation, useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
@@ -22,6 +23,8 @@ const initialForm = {
 
 // Create/edit a driver booking request.
 function BookingDriver() {
+  const [availabilityRevision, setAvailabilityRevision] = useState(0)
+  useRealtimeRefresh(['availability', 'calendars', 'users'], () => setAvailabilityRevision((value) => value + 1))
   const navigate = useNavigate()
   const location = useLocation()
   const [form, setForm] = useState(initialForm)
@@ -82,27 +85,30 @@ function BookingDriver() {
 
   // Load active drivers for the employee's required driver selection.
   useEffect(() => {
-
-
+    const controller = new AbortController()
     const loadDrivers = async () => {
-      setDriversLoading(true)
+      if (!availabilityRevision) setDriversLoading(true)
       try {
         const response = await fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
           credentials: 'include',
+          signal: controller.signal,
         })
         if (!response.ok) throw new Error('Failed to load drivers')
         const data = await response.json()
+        if (controller.signal.aborted) return
         setDrivers(Array.isArray(data) ? data.filter((driver) => driver.booking_enabled !== false) : [])
       } catch {
+        if (controller.signal.aborted) return
         setDrivers([])
         setErrorMessage('Failed to load the driver list. Please refresh the page.')
       } finally {
-        setDriversLoading(false)
+        if (!controller.signal.aborted) setDriversLoading(false)
       }
     }
 
     loadDrivers()
-  }, [])
+    return () => controller.abort()
+  }, [availabilityRevision])
 
   // Only allow submission after checking availability for the requested interval.
   useEffect(() => {
@@ -153,7 +159,7 @@ function BookingDriver() {
 
     loadAvailability()
     return () => controller.abort()
-  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time, editingBookingId])
+  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time, editingBookingId, availabilityRevision])
 
   // Prefill the form when navigating from history with an existing booking.
   useEffect(() => {

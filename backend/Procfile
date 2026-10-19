@@ -1,1 +1,1 @@
-web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --ws-max-size 4096 --ws-max-queue 8 --ws-ping-interval 20 --ws-ping-timeout 20 --ws-per-message-deflate false

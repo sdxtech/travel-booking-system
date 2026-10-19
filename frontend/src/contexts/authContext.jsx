@@ -1,8 +1,9 @@
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { API_BASE_URL } from '../config'
 import AuthContext from './AuthContext'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -13,7 +14,7 @@ export function AuthProvider({ children }) {
   const [permissionsLoaded, setPermissionsLoaded] = useState(false)
 
 
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = useCallback(async () => {
     const response = await fetch(
       `${API_BASE_URL}/users/me`,
       {
@@ -22,7 +23,7 @@ export function AuthProvider({ children }) {
     )
 
     if (!response.ok) {
-      setUser(null)
+      if ([401, 403].includes(response.status)) setUser(null)
       return null
     }
 
@@ -31,10 +32,10 @@ export function AuthProvider({ children }) {
     setUser(userData)
 
     return userData
-  }
+  }, [])
 
 
-  const fetchPagePermissions = async (role) => {
+  const fetchPagePermissions = useCallback(async (role, background = false) => {
 
     if (!['user', 'office_coordinator'].includes(role)) {
       setPagePermissions([])
@@ -43,8 +44,10 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      setPermissionsLoading(true)
-      setPermissionsLoaded(false)
+      if (!background) {
+        setPermissionsLoading(true)
+        setPermissionsLoaded(false)
+      }
 
       const response = await fetch(
         `${API_BASE_URL}/pages/permissions/${role}`,
@@ -54,6 +57,7 @@ export function AuthProvider({ children }) {
       )
 
       if (!response.ok) {
+        if (background && ![401, 403].includes(response.status)) return []
         const data = await response.json().catch(() => ({}))
 
         console.error(
@@ -80,6 +84,7 @@ export function AuthProvider({ children }) {
 
       return permissions
     } catch (error) {
+      if (background) return []
       console.error(
         'Failed to load page permissions:',
         error
@@ -92,7 +97,20 @@ export function AuthProvider({ children }) {
       setPermissionsLoading(false)
       setPermissionsLoaded(true)
     }
-  }
+  }, [])
+
+  useRealtimeRefresh(['profile'], async () => {
+    if (!user) return
+    const profile = await fetchCurrentUser()
+    if (profile && profile.role !== user.role) await fetchPagePermissions(profile.role, true)
+  })
+  useRealtimeRefresh(['permissions'], () => user && fetchPagePermissions(user.role, true))
+
+  useEffect(() => {
+    const refresh = () => { fetchCurrentUser().catch(() => {}) }
+    window.addEventListener('auth:refresh', refresh)
+    return () => window.removeEventListener('auth:refresh', refresh)
+  }, [fetchCurrentUser])
 
 
   const login = async (email, password, rememberMe = false) => {
@@ -187,7 +205,7 @@ export function AuthProvider({ children }) {
     }
 
     initializeAuth()
-  }, [])
+  }, [fetchCurrentUser, fetchPagePermissions])
 
 
 

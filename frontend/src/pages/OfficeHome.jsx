@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import QuickViewScheduler from '../components/QuickViewScheduler'
@@ -87,9 +89,10 @@ function OfficeHome() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
- useEffect(() => {
-  const loadQuickView = async () => {
-    setLoading(true)
+  const beginLoadQuickView = useLatestRequest()
+  const loadQuickView = useCallback(async (background = false) => {
+    const signal = beginLoadQuickView()
+    if (!background) setLoading(true)
     setError('')
 
     try {
@@ -101,27 +104,28 @@ function OfficeHome() {
         driverCalendarRes,
       ] = await Promise.all([
         fetch(`${API_BASE_URL}/tickets/pending`, {
-          credentials: "include",
+          credentials: 'include', signal,
         }),
 
         fetch(`${API_BASE_URL}/tickets/history`, {
-          credentials: "include",
+          credentials: 'include', signal,
         }),
 
         fetch(`${API_BASE_URL}/bookings/pending`, {
-          credentials: "include",
+          credentials: 'include', signal,
         }),
 
         fetch(`${API_BASE_URL}/bookings/history`, {
-          credentials: "include",
+          credentials: 'include', signal,
         }),
 
         fetch(`${API_BASE_URL}/bookings/driver-calendars`, {
-          credentials: "include",
+          credentials: 'include', signal,
         }),
       ])
 
       if (!pendingTicketsRes.ok) {
+        if (background) return
         setError(
           await getErrorDetail(
             pendingTicketsRes,
@@ -134,6 +138,7 @@ function OfficeHome() {
       }
 
       if (!ticketHistoryRes.ok) {
+        if (background) return
         setError(
           await getErrorDetail(
             ticketHistoryRes,
@@ -146,6 +151,7 @@ function OfficeHome() {
       }
 
       if (!pendingBookingsRes.ok) {
+        if (background) return
         setError(
           await getErrorDetail(
             pendingBookingsRes,
@@ -158,6 +164,7 @@ function OfficeHome() {
       }
 
       if (!bookingHistoryRes.ok) {
+        if (background) return
         setError(
           await getErrorDetail(
             pendingBookingsRes,
@@ -170,6 +177,7 @@ function OfficeHome() {
       }
 
       if (!driverCalendarRes.ok) {
+        if (background) return
         setError(
           await getErrorDetail(
             driverCalendarRes,
@@ -196,6 +204,7 @@ function OfficeHome() {
         driverCalendarRes.json(),
       ])
 
+      if (signal.aborted) return
       setTickets([
         ...(Array.isArray(pendingTickets)
           ? pendingTickets
@@ -222,17 +231,17 @@ function OfficeHome() {
           : []
       )
     } catch {
+      if (signal.aborted || background) return
       setError('Network error. Please try again.')
       setTickets([])
       setBookings([])
       setDriverSchedules([])
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }
-
-  loadQuickView()
-}, [])
+  }, [beginLoadQuickView])
+  useRealtimeRefresh(['bookings', 'tickets', 'calendars', 'availability'], () => loadQuickView(true))
+  useEffect(() => { loadQuickView() }, [loadQuickView])
 
   const driverCalendars = useMemo(
     () =>
