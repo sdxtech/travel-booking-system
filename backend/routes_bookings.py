@@ -31,7 +31,7 @@ class BookingAssignCreate(BaseModel):
     requester_name: str = Field(..., min_length=1)
     requester_department: Optional[str] = Field(default=None, min_length=1, validation_alias=AliasChoices("requester_department", "requester_dept_job_position"))
     requester_job_position: Optional[str] = None
-    requester_nik: Optional[str] = Field(default=None, min_length=1)
+    requester_nik: Optional[str] = None
     requester_phone: str = Field(..., min_length=1)
     requester_email: str = Field(..., min_length=1)
     driver_email: str = Field(..., min_length=1)
@@ -349,7 +349,7 @@ def create_booking(payload: BookingCreate, current_user=Depends(get_current_user
         requester_phone = data.get("phone_number") or data.get("phone")
         requester_department = department_value(data)
         requester_job_position = data.get("job_position")
-        requester_nik = data.get("nik") or data.get("national_id")
+        requester_nik = data.get("nik", data.get("national_id"))
 
     booking_id = uuid4().hex
     created_at = utc_now()

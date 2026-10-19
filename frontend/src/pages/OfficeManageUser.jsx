@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import TableActionDropdown from '../components/TableActionDropdown'
 import TelegramIdField from '../components/TelegramIdField'
+import UserBulkUploadModal from '../components/UserBulkUploadModal'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
@@ -50,12 +51,7 @@ const isSuperadmin =
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState('')
 
-  const [importModalOpen, setImportModalOpen] = useState(false)
-  const [importFile, setImportFile] = useState(null)
-  const [importLoading, setImportLoading] = useState(false)
-  const [importError, setImportError] = useState('')
-  const [importResult, setImportResult] = useState(null)
-  const [updateExisting, setUpdateExisting] = useState(false)
+  const [bulkMode, setBulkMode] = useState('')
 
   const [selectedUser, setSelectedUser] = useState(null)
   const [editForm, setEditForm] = useState(null)
@@ -146,123 +142,6 @@ const isSuperadmin =
   // Update edit form fields.
   const handleEditChange = (field) => (event) => {
     setEditForm((prev) => ({ ...prev, [field]: event.target.value }))
-  }
-
-  // Open the import modal and reset state.
-  const openImportModal = () => {
-    setImportModalOpen(true)
-    setImportFile(null)
-    setImportLoading(false)
-    setImportError('')
-    setImportResult(null)
-  }
-
-  // Close the import modal unless an import is in progress.
-  const closeImportModal = () => {
-    if (importLoading) return
-    setImportModalOpen(false)
-    setImportError('')
-  }
-
-  // Store the selected import file and clear errors/result.
-  const handleImportFileChange = (event) => {
-    const file = event.target.files?.[0] ?? null
-    setImportFile(file)
-    setImportError('')
-    setImportResult(null)
-  }
-
-  // Read a file into base64 for API upload.
-  const readFileAsBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const result = String(reader.result || '')
-        const base64 = result.split(',')[1] || ''
-        resolve(base64)
-      }
-      reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
-      reader.readAsDataURL(file)
-    })
-
-  // Download the server-provided import template (.xlsx).
-  const downloadImportTemplate = async () => {
-    setImportError('')
-    try {
-      const res = await fetch(`${API_BASE_URL}/users/import/template`, {
-       credentials: 'include'
-      })
-
-      if (!res.ok) {
-        const message = (await res.text()) || 'Failed to download template.'
-        setImportError(message)
-        return
-      }
-
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'user_import_template.xlsx'
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
-    } catch {
-      setImportError('Failed to download template.')
-    }
-  }
-
-  // Upload and import users from the selected CSV/XLSX file.
-  const handleImportUsers = async () => {
-
-
-    if (!importFile) {
-      setImportError('Please choose a file (.xlsx or .csv).')
-      return
-    }
-
-    setImportLoading(true)
-    setImportError('')
-    setImportResult(null)
-
-    try {
-      const fileBase64 = await readFileAsBase64(importFile)
-      const res = await fetch(`${API_BASE_URL}/users/import`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-
-        },
-        credentials:'include',
-        body: JSON.stringify({
-          filename: importFile.name,
-          file_base64: fileBase64,
-          update_existing: updateExisting,
-        }),
-      })
-
-      if (!res.ok) {
-        let detail = 'Failed to import users.'
-        try {
-          const data = await res.json()
-          if (data?.detail) detail = data.detail
-        } catch {
-          // ignore parse error
-        }
-        setImportError(detail)
-        return
-      }
-
-      const data = await res.json()
-      setImportResult(data)
-      await loadUsers()
-    } catch {
-      setImportError('Network error. Please try again.')
-    } finally {
-      setImportLoading(false)
-    }
   }
 
   // Select a user and populate the edit form.
@@ -545,8 +424,11 @@ const isSuperadmin =
             <button type="button" className="btn btn-primary" onClick={() => setShowCreate((v) => !v)}>
               {showCreate ? 'Close Create Form' : 'Create Account'}
             </button>
-            <button type="button" className="btn btn-neutral" onClick={openImportModal}>
-              Import Excel
+            <button type="button" className="btn btn-neutral" onClick={() => setBulkMode('import')}>
+              Import Users
+            </button>
+            <button type="button" className="btn btn-neutral" onClick={() => setBulkMode('update')}>
+              Mass Update
             </button>
           </div>
 
@@ -597,12 +479,11 @@ const isSuperadmin =
                     </label>
                   ) : null}
                   <label className="inline-label">
-                    <span>National ID</span>
+                    <span>National ID (optional)</span>
                     <input
                       placeholder="National ID"
                       value={createForm.nik}
                       onChange={handleCreateChange('nik')}
-                      required
                     />
                   </label>
                   <label className="inline-label">
@@ -694,8 +575,8 @@ const isSuperadmin =
                     </label>
                   ) : null}
                   <label className="inline-label">
-                    <span>National ID</span>
-                    <input placeholder="National ID" value={editForm.nik} onChange={handleEditChange('nik')} required />
+                    <span>National ID (optional)</span>
+                    <input placeholder="National ID" value={editForm.nik} onChange={handleEditChange('nik')} />
                   </label>
                   <label className="inline-label">
                     <span>Phone</span>
@@ -1004,105 +885,14 @@ const isSuperadmin =
             </div>
           ) : null}
 
-          {importModalOpen ? (
-            <div
-              className="modal-overlay"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="user-import-title"
-              onClick={() => {
-                if (!importLoading) closeImportModal()
-              }}
-            >
-              <div
-                className="modal"
-                onClick={(event) => {
-                  event.stopPropagation()
-                }}
-              >
-                <div className="modal-header">
-                  <h2 id="user-import-title">Import Accounts</h2>
-                  <button
-                    type="button"
-                    className="modal-close"
-                    onClick={closeImportModal}
-                    disabled={importLoading}
-                    aria-label="Close"
-                  >
-                    &times;
-                  </button>
-                </div>
-
-                <label className="inline-label" style={{ margin: '8px 0' }}>
-                  <input type="checkbox" checked={updateExisting} onChange={(event) => setUpdateExisting(event.target.checked)} disabled={importLoading} />
-                  <span>Update existing user profiles by email</span>
-                </label>
-                <p className="muted" style={{ marginTop: 0 }}>
-                  {updateExisting ? <>Update mode: <code>email</code> is required. Fill only profile columns to change; blank cells are ignored. Passwords are never changed.</> : <>Upload an Excel (.xlsx) or CSV (.csv) file to create multiple users. Allowed roles: <code>user</code>, <code>driver</code> (role is optional; default is <code>user</code>).</>}
-                </p>
-
-                <label className="inline-label">
-                  <span>File</span>
-                  <input type="file" accept=".xlsx,.csv" onChange={handleImportFileChange} disabled={importLoading} />
-                </label>
-
-                {!updateExisting ? <p className="muted" style={{ marginTop: 0 }}>
-                  Required columns: <code>name</code>, <code>department</code>, <code>nik</code>, <code>phone</code>
-                  , <code>email</code>, <code>password</code>. Optional: <code>job_position</code>, <code>role</code>, <code>telegram_id</code>. <code>plate_number</code> is required for Driver (example: B 1234 ABC).
-                </p> : null}
-
-                {importError ? <p className="error-text">{importError}</p> : null}
-
-                {importResult ? (
-                  <>
-                    <p className="success-text" style={{ marginTop: 0 }}>
-                      Created: {importResult.created ?? 0} | Updated: {importResult.updated ?? 0} | Failed:{' '}
-                      {importResult.failed ?? 0}
-                    </p>
-                    {Array.isArray(importResult.errors) && importResult.errors.length ? (
-                      <div
-                        style={{
-                          maxHeight: 220,
-                          overflow: 'auto',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 12,
-                          padding: 12,
-                        }}
-                      >
-                        {importResult.errors.map((item, index) => (
-                          <p key={`${item.row}-${index}`} className="muted" style={{ margin: '0 0 10px 0' }}>
-                            Row {item.row}
-                            {item.email ? ` (${item.email})` : ''}: {item.message}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
-                  </>
-                ) : null}
-
-                <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleImportUsers}
-                    disabled={importLoading || !importFile}
-                  >
-                    {importLoading ? 'Importing...' : 'Import'}
-                  </button>
-                  <button type="button" className="btn btn-neutral" onClick={downloadImportTemplate} disabled={importLoading}>
-                    Download Template Excel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-danger"
-                    onClick={closeImportModal}
-                    disabled={importLoading}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
+          {bulkMode ? (
+            <UserBulkUploadModal
+              key={bulkMode}
+              mode={bulkMode}
+              isSuperadmin={false}
+              onClose={() => setBulkMode('')}
+              onComplete={loadUsers}
+            />
           ) : null}
         </section>
       </div>

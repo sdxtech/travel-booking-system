@@ -39,7 +39,7 @@ class TicketCreate(TicketBase):
     job_position: Optional[str] = None
     phone_number: str
     email: str
-    national_id: str
+    national_id: Optional[str] = None
 
 
 class TicketUserCreate(TicketBase):
@@ -165,7 +165,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
     department = department_value(user_profile)
     job_position = user_profile.get("job_position")
     phone_number = user_profile.get("phone") or user_profile.get("phone_number")
-    national_id = user_profile.get("nik") or user_profile.get("national_id")
+    national_id = user_profile.get("nik", user_profile.get("national_id"))
     email = user_profile.get("email") or current_user.get("email")
 
     missing_fields = []
@@ -173,8 +173,6 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
         missing_fields.append("name")
     if not phone_number:
         missing_fields.append("phone")
-    if not national_id:
-        missing_fields.append("nik")
     if not email:
         missing_fields.append("email")
 
@@ -197,7 +195,7 @@ def create_ticket(payload: TicketUserCreate, current_user=Depends(get_current_us
         "job_position": job_position,
         "phone_number": str(phone_number),
         "email": str(email),
-        "national_id": str(national_id),
+        "national_id": str(national_id) if national_id else None,
         "user_id": uid,
         "status": "pending",
         "created_at": created_at,

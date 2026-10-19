@@ -63,6 +63,7 @@ function describeActivity(action, path) {
     [/PATCH \/tickets\/[^/]+$/, 'Edit Travel Request'],
     [/POST \/users\/distribute-account/, 'Distribute Account Batch'],
     [/POST \/users\/import/, 'Import Users'],
+    [/POST \/users\/mass-update/, 'Mass Update Users'],
     [/POST \/users$/, 'Create User'],
     [/PATCH \/users\/[^/]+\/password/, 'Reset User Password'],
     [/PATCH \/users\/[^/]+\/deactivate/, 'Deactivate User'],

@@ -55,7 +55,7 @@ class UserCreate(TelegramUserFields):
     department: str = Field(..., min_length=1, validation_alias=AliasChoices("department", "dept_job_position"))
     job_position: str = ""
     role: Role
-    nik: str = Field(..., min_length=1)
+    nik: Optional[str] = None
     phone: str = Field(..., min_length=1)
     email: str = Field(..., min_length=3)
     password: str = Field(..., min_length=6)
@@ -72,7 +72,7 @@ class UserUpdate(TelegramUserFields):
     department: Optional[str] = Field(default=None, min_length=1, validation_alias=AliasChoices("department", "dept_job_position"))
     job_position: Optional[str] = None
     role: Optional[Role] = None
-    nik: Optional[str] = Field(default=None, min_length=1)
+    nik: Optional[str] = None
     phone: Optional[str] = Field(default=None, min_length=1)
     email: Optional[str] = Field(default=None, min_length=3)
 
@@ -96,10 +96,18 @@ class UserResponse(BaseModel):
     booking_enabled: bool = True
 
 
-class UserImportRequest(BaseModel):
+class UserUploadRequest(BaseModel):
     filename: str = Field(..., min_length=1)
     file_base64: str = Field(..., min_length=1)
+
+
+class UserImportRequest(UserUploadRequest):
+    # Retain the old API flag for clients deployed before the separate workflow.
     update_existing: bool = False
+
+
+class UserMassUpdateRequest(UserUploadRequest):
+    pass
 
 
 class UserImportError(BaseModel):
@@ -156,7 +164,7 @@ def serialize_user(doc_snapshot) -> UserResponse:
         job_position=data.get("job_position"),
         role=data.get("role"),
         plate_number=data.get("plate_number") if data.get("role") == "driver" else None,
-        nik=data.get("nik") or data.get("national_id"),
+        nik=data.get("nik", data.get("national_id")),
         phone=data.get("phone") or data.get("phone_number"),
         telegram_chat_id=data.get("telegram_chat_id"),
         email=data.get("email"),
@@ -233,7 +241,7 @@ HEADER_TO_FIELD: dict[str, str] = {
 }
 
 
-REQUIRED_IMPORT_FIELDS = ("name", "department", "nik", "phone", "email", "password")
+REQUIRED_IMPORT_FIELDS = ("name", "department", "phone", "email", "password")
 
 
 def normalize_cell_value(value: str) -> str:
@@ -525,10 +533,15 @@ def xml_escape_text(value: str) -> str:
     )
 
 
-def build_user_import_template_xlsx() -> bytes:
+def build_user_import_template_xlsx(update_existing: bool = False) -> bytes:
     """Build an in-memory .xlsx template for user import (headers + example row)."""
-    headers = ["name", "department", "job_position", "role", "nik", "phone", "email", "password", "plate_number", "telegram_id"]
-    example_row = ["John Doe", "Finance", "Accountant", "user", "1234567890", "081234567890", "john@example.com", "password123", "", ""]
+    if update_existing:
+        # Telegram is intentionally omitted: blank IDs disconnect existing links.
+        headers = ["email", "name", "department", "job_position", "role", "nik", "phone", "plate_number"]
+        example_row = ["john@example.com", "", "Finance", "Accountant", "", "", "", ""]
+    else:
+        headers = ["name", "department", "job_position", "role", "nik", "phone", "email", "password", "plate_number", "telegram_id"]
+        example_row = ["John Doe", "Finance", "Accountant", "user", "1234567890", "081234567890", "john@example.com", "password123", "", ""]
 
     def make_row(row_number: int, values: list[str]) -> str:
         """Generate a <row> element with inline string <c> cells."""
@@ -638,6 +651,23 @@ def list_users(current_user=Depends(get_current_user)):
     return [serialize_user(doc) for doc in sorted_docs]
 
 
+@router.get("/mass-update/template")
+def download_user_mass_update_template(current_user=Depends(get_current_user)):
+    """Download a profile-only template for updating existing accounts."""
+    ensure_role(current_user["uid"], ("office_coordinator", "superadmin"))
+    return Response(
+        build_user_import_template_xlsx(update_existing=True),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="user_mass_update_template.xlsx"'},
+    )
+
+
+@router.post("/mass-update", response_model=UserImportResponse)
+def mass_update_users(payload: UserMassUpdateRequest, current_user=Depends(get_current_user)):
+    """Update existing profiles only; never create accounts or reset passwords."""
+    return import_users(UserImportRequest(**payload.model_dump(), update_existing=True), current_user)
+
+
 @router.post("/import", response_model=UserImportResponse)
 def import_users(payload: UserImportRequest, current_user=Depends(get_current_user)):
     """Bulk import users from CSV/XLSX, optionally updating existing accounts."""
@@ -653,103 +683,40 @@ def import_users(payload: UserImportRequest, current_user=Depends(get_current_us
 
     for row_number, row_data in rows:
         normalized = {key: normalize_cell_value(value) for key, value in row_data.items()}
-        if not payload.update_existing:
-            normalized.setdefault("role", "user")
-            normalized["role"] = (normalized.get("role") or "user").strip().lower()
-        if "email" in normalized:
-            normalized["email"] = normalize_email(normalized.get("email"))
-
-        email = normalized.get("email") or None
-
+        email = normalize_email(normalized.get("email")) or None
         try:
-            existing = db["users"].find_one({"email": email}) if email else None
-            if payload.update_existing and existing and not normalized.get("role"):
-                normalized["role"] = existing.get("role") or "user"
-            user_payload = UserCreate(**normalized)
-        except ValidationError as exc:
-            errors.append(
-                UserImportError(
-                    row=row_number,
-                    email=email,
-                    message=format_validation_error(exc),
-                )
-            )
-            continue
+            if not email:
+                raise HTTPException(400, "Email is required")
+            normalized["email"] = email
+            existing = db["users"].find_one({"email": email})
+            if payload.update_existing:
+                if not existing:
+                    raise HTTPException(400, "Email not found. Use create mode to create a new account.")
+                if current_role == "office_coordinator" and existing.get("role") not in ("user", "driver"):
+                    raise HTTPException(403, "Office coordinator can only update roles: user, driver")
 
-        if current_role == "office_coordinator" and user_payload.role not in ("user", "driver"):
-            errors.append(
-                UserImportError(
-                    row=row_number,
-                    email=email,
-                    message="Office coordinator can only create roles: user, driver",
-                )
-            )
-            continue
-
-        try:
-            if existing:
-                if not payload.update_existing:
-                    errors.append(
-                        UserImportError(
-                            row=row_number,
-                            email=email,
-                            message="Email already exists. Enable update_existing to reset password and update profile.",
-                        )
-                    )
-                    continue
-
-                if current_role == "office_coordinator":
-                    existing_role = (existing or {}).get("role")
-                    if existing_role not in ("user", "driver"):
-                        errors.append(
-                            UserImportError(
-                                row=row_number,
-                                email=email,
-                                message="Office coordinator can only update roles: user, driver",
-                            )
-                        )
-                        continue
-
-                update_user_profile(
-                    existing.get("_id"),
-                        {
-                            **telegram_profile_changes(user_payload, existing),
-                            "name": user_payload.name,
-                            "department": user_payload.department,
-                            **({"job_position": user_payload.job_position} if "job_position" in user_payload.model_fields_set else {}),
-                            "role": user_payload.role,
-                            "plate_number": user_payload.plate_number,
-                            "nik": user_payload.nik,
-                            "phone": user_payload.phone,
-                            "email": user_payload.email,
-                            "password_hash": hash_password(user_payload.password),
-                            "updated_at": utc_now(),
-                            "updated_by": uid,
-                        },
-                )
+                # Email identifies the account; update mode never changes credentials.
+                # Omitted/blank profile cells preserve saved values. An explicitly
+                # blank Telegram ID still clears the connection, as in Manage User.
+                changes = {
+                    key: value for key, value in normalized.items()
+                    if key not in ("email", "password") and (value or key == "telegram_chat_id")
+                }
+                if "role" in changes:
+                    changes["role"] = changes["role"].lower()
+                user_payload = UserUpdate(**changes)
+                if current_role == "office_coordinator" and user_payload.role not in (None, "user", "driver"):
+                    raise HTTPException(403, "Office coordinator can only update roles: user, driver")
+                update_user(str(existing["_id"]), user_payload, current_user)
                 updated += 1
             else:
-                user_id = uuid4().hex
-                insert_user_profile(
-                    {
-                        "_id": user_id,
-                        "telegram_chat_id": user_payload.telegram_chat_id,
-                        "name": user_payload.name,
-                        "department": user_payload.department,
-                        "job_position": user_payload.job_position,
-                        "role": user_payload.role,
-                        "plate_number": user_payload.plate_number,
-                        "nik": user_payload.nik,
-                        "phone": user_payload.phone,
-                        "email": user_payload.email,
-                        "password_hash": hash_password(user_payload.password),
-                        "disabled": False,
-                        "created_at": utc_now(),
-                        "updated_at": utc_now(),
-                        "created_by": uid,
-                    }
-                )
+                if existing:
+                    raise HTTPException(400, "Email already exists. Enable update mode to update its profile.")
+                normalized["role"] = (normalized.get("role") or "user").lower()
+                create_user(UserCreate(**normalized), current_user)
                 created += 1
+        except ValidationError as exc:
+            errors.append(UserImportError(row=row_number, email=email, message=format_validation_error(exc)))
         except HTTPException as exc:
             errors.append(
                 UserImportError(

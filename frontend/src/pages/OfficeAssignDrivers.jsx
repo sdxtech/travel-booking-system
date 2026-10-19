@@ -412,13 +412,12 @@ const isSuperadmin =
                   <input type="text" placeholder="Title/Position" value={form.requester_job_position} onChange={handleChange('requester_job_position')} />
                 </label>
                 <label className="inline-label">
-                  <span>National ID</span>
+                  <span>National ID (optional)</span>
                   <input
                     type="text"
                     placeholder="National ID"
                     value={form.requester_nik}
                     onChange={handleChange('requester_nik')}
-                    required
                   />
                 </label>
                 <label className="inline-label">

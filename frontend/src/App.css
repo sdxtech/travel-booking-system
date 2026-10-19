@@ -3274,6 +3274,26 @@ user-dropdown-toogle {
   z-index: 1300;
 }
 
+.modal-overlay.user-bulk-upload-modal {
+  z-index: 1300;
+}
+
+.user-bulk-upload-modal .muted {
+  margin: 0;
+}
+
+.user-bulk-upload-errors {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.user-bulk-upload-errors p + p {
+  margin-top: 8px;
+}
+
 .quick-scheduler-event strong,
 .quick-scheduler-event span {
   display: block;

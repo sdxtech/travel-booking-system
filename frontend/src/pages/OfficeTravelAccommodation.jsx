@@ -221,13 +221,12 @@ const isSuperadmin =
                   />
                 </label>
                 <label className="inline-label">
-                  <span>National ID</span>
+                  <span>National ID (optional)</span>
                   <input
                     type="text"
                     placeholder="National ID"
                     value={form.national_id}
                     onChange={handleChange('national_id')}
-                    required
                   />
                 </label>
               </div>

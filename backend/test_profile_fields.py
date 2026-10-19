@@ -36,17 +36,20 @@ class ProfileFieldsTests(unittest.TestCase):
         collection = Mock()
         collection.find_one.side_effect = lambda query: document.copy() if "_id" in query else None
         collection.insert_one.side_effect = lambda value: document.update(value)
+        profile = self.profile()
+        profile.pop("nik")
         with patch.object(users, "db", {"users": collection}), \
                 patch.object(users, "ensure_role", return_value="superadmin"), \
                 patch.object(users, "hash_password", return_value="hash"):
-            result = users.create_user(users.UserCreate(**self.profile(), password="password123"), {"uid": "admin"})
+            result = users.create_user(users.UserCreate(**profile, password="password123"), {"uid": "admin"})
         self.assertEqual((result.department, result.job_position), ("Finance", "Accountant"))
         self.assertEqual(document["department"], "Finance")
         self.assertEqual(document["job_position"], "Accountant")
         self.assertNotIn("dept_job_position", document)
+        self.assertIsNone(result.nik)
 
     def test_updating_department_keeps_position_and_position_can_be_cleared(self):
-        document = {"_id": "employee", **self.profile(), "dept_job_position": "Legacy value"}
+        document = {"_id": "employee", **self.profile(), "dept_job_position": "Legacy value", "national_id": "Legacy NIK"}
         collection = Mock()
         collection.find_one.side_effect = lambda *args, **kwargs: document.copy()
         collection.update_one.side_effect = lambda query, change: document.update(change["$set"])
@@ -56,6 +59,8 @@ class ProfileFieldsTests(unittest.TestCase):
             self.assertEqual((result.department, result.job_position), ("Operations", "Accountant"))
             result = users.update_user("employee", users.UserUpdate(job_position=""), {"uid": "admin"})
             self.assertEqual((result.department, result.job_position), ("Operations", ""))
+            result = users.update_user("employee", users.UserUpdate(nik=""), {"uid": "admin"})
+            self.assertEqual(result.nik, "")
 
     def test_legacy_api_payload_is_department_only_and_canonical_value_wins(self):
         payload = self.profile()
@@ -83,8 +88,8 @@ class ProfileFieldsTests(unittest.TestCase):
             row = users.parse_user_rows_from_csv(csv.encode())[0][1]
             self.assertEqual((row["department"], row["job_position"]), ("Finance", "Manager"))
 
-    def test_import_update_preserves_missing_position_and_can_clear_or_change_it(self):
-        for column, value, expected in (("", "", "Manager"), (",job_position", ",", ""), (",job_position", ",Director", "Director")):
+    def test_import_update_preserves_missing_or_blank_position_and_can_change_it(self):
+        for column, value, expected in (("", "", "Manager"), (",job_position", ",", "Manager"), (",job_position", ",Director", "Director")):
             with self.subTest(column=column, value=value):
                 document = {"_id": "u", **self.profile(), "job_position": "Manager"}
                 collection = Mock()
@@ -101,6 +106,7 @@ class ProfileFieldsTests(unittest.TestCase):
 
     def test_employee_booking_snapshots_both_profile_fields(self):
         profile = self.profile()
+        profile.pop("nik")
         collection = Mock()
         document = {}
         collection.insert_one.side_effect = lambda value: document.update(value)
@@ -119,6 +125,7 @@ class ProfileFieldsTests(unittest.TestCase):
                 patch.object(bookings, "create_user_notification"):
             result = bookings.create_booking(payload, {"uid": "employee", "email": profile["email"]})
         self.assertEqual((result.requester_department, result.requester_job_position), ("Finance", "Accountant"))
+        self.assertIsNone(result.requester_nik)
         profile["department"] = "Operations"
         profile["job_position"] = "Director"
         snapshot = bookings.serialize_booking(document)
@@ -136,6 +143,7 @@ class ProfileFieldsTests(unittest.TestCase):
                 booking = self.booking()
                 payload = bookings.BookingAssignCreate(
                     requester_name="Employee", requester_department="Finance", requester_job_position="Manager",
+                    requester_nik="",
                     requester_phone="08123", requester_email="employee@example.com", driver_email="driver@example.com",
                     **{key: booking[key] for key in ("pickup_location", "destination", "passenger_count", "departure_time", "estimated_arrival_time")},
                 )
@@ -173,6 +181,32 @@ class ProfileFieldsTests(unittest.TestCase):
         })
         self.assertEqual(travel.department, "Old department")
         self.assertIsNone(travel.job_position)
+
+    def test_employee_can_request_travel_with_no_nik(self):
+        for nik in (None, ""):
+            with self.subTest(nik=nik):
+                document = {}
+                collection = Mock()
+                collection.insert_one.side_effect = lambda value: document.update(value)
+                collection.find_one.side_effect = lambda *args: document.copy()
+                with patch.object(tickets, "db", {"tickets": collection}), \
+                        patch.object(tickets, "ensure_user_role", return_value={**self.profile(), "nik": nik}), \
+                        patch.object(tickets, "enforce_employee_page_permission"), \
+                        patch.object(tickets, "generate_request_id", return_value="TRAVEL-ID"), \
+                        patch.object(tickets, "publish_document_change"), \
+                        patch.object(tickets, "create_user_notification"), \
+                        patch.object(tickets, "notify_roles"):
+                    result = tickets.create_ticket(tickets.TicketUserCreate(**self.travel()), {"uid": "employee"})
+                self.assertIsNone(result.national_id)
+                self.assertIsNone(document["national_id"])
+
+    def test_office_travel_model_and_history_allow_missing_nik(self):
+        payload = tickets.TicketCreate(
+            **self.travel(), full_name="Employee", phone_number="08123", email="employee@example.com",
+        )
+        self.assertIsNone(payload.national_id)
+        result = tickets.serialize_ticket({"_id": "travel-1", **payload.model_dump()})
+        self.assertIsNone(result.national_id)
 
 
 if __name__ == "__main__":

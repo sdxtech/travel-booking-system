@@ -62,7 +62,7 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
       setError('The selected driver is no longer available. Close this form and select a driver again.')
       return
     }
-    if (isOfficeBooking && [form.requester_name, form.requester_department, form.requester_nik, form.requester_phone, form.requester_email].some((value) => !value.trim())) {
+    if (isOfficeBooking && [form.requester_name, form.requester_department, form.requester_phone, form.requester_email].some((value) => !value.trim())) {
       setError('Please complete all requester details.')
       return
     }
@@ -167,7 +167,7 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
                   <label className="form-field"><span>Full Name</span><input type="text" required value={form.requester_name} onChange={updateField('requester_name')} /></label>
                   <label className="form-field"><span>Department</span><input type="text" required value={form.requester_department} onChange={updateField('requester_department')} /></label>
                   <label className="form-field"><span>Title/Position</span><input type="text" value={form.requester_job_position} onChange={updateField('requester_job_position')} /></label>
-                  <label className="form-field"><span>National ID</span><input type="text" required value={form.requester_nik} onChange={updateField('requester_nik')} /></label>
+                  <label className="form-field"><span>National ID (optional)</span><input type="text" value={form.requester_nik} onChange={updateField('requester_nik')} /></label>
                   <label className="form-field"><span>Phone/WA</span><input type="tel" required value={form.requester_phone} onChange={updateField('requester_phone')} /></label>
                   <label className="form-field"><span>Email</span><input type="email" required value={form.requester_email} onChange={updateField('requester_email')} /></label>
                 </>
