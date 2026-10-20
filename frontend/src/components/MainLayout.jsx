@@ -6,7 +6,6 @@ import { useAuth } from '../hooks/useAuth'
 import { indonesianError } from '../utils/indonesian'
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { useLatestRequest } from '../hooks/useLatestRequest'
-import PushNotificationControl from './PushNotificationControl'
 
 const userNavSections = [
   {
@@ -114,9 +113,9 @@ const accountSettingsSection = {
   icon: 'bi-person-gear',
   items: [
     {
-      label: 'Change Password',
-      path: '/change-password',
-      icon: 'bi-key',
+      label: 'Settings',
+      path: '/account/settings',
+      icon: 'bi-gear',
     },
   ],
 }
@@ -170,7 +169,7 @@ function MainLayout({ title, children }) {
     ['/user/', '/driver/', '/office/', '/admin/'].some((prefix) =>
       location.pathname.startsWith(prefix)
     ) ||
-    location.pathname === '/change-password'
+    location.pathname === '/account/settings'
 
   const isEmployee = role === 'user'
   const isDriver = role === 'driver'
@@ -212,17 +211,19 @@ function MainLayout({ title, children }) {
     ]
   } else if (isDriver) {
     navSections = [
-      { ...accountSettingsSection, label: 'Akun', items: accountSettingsSection.items.map((item) => ({ ...item, label: 'Ubah Kata Sandi' })) },
+      { ...accountSettingsSection, label: 'Akun', items: accountSettingsSection.items.map((item) => ({ ...item, label: 'Pengaturan' })) },
     ]
   } else if (isSuperadmin) {
     navSections = [
       ...officeNavSections,
       adminSettingsSection,
+      accountSettingsSection,
     ]
   } else if (role === 'office_coordinator') {
     navSections = [
       ...getOfficeNavSections(),
       officeSettingsSection,
+      accountSettingsSection,
     ]
   } else {
     navSections = []
@@ -865,8 +866,6 @@ function MainLayout({ title, children }) {
             </button>
           </div>
 
-          {user && <PushNotificationControl key={user.uid} user={user} />}
-
           {notificationsError ? (
             <p className="error-text">
               {notificationsError}
@@ -957,6 +956,14 @@ function MainLayout({ title, children }) {
       {/* DROPDOWN MENU */}
       {userDropdownOpen ? (
         <div className="user-dropdown-menu" role="menu">
+          <button
+            type="button"
+            className="logout-button"
+            onClick={() => { setUserDropdownOpen(false); navigate('/account/settings') }}
+          >
+            <i className="bi bi-gear" aria-hidden="true" />
+            {t('Settings', 'Pengaturan')}
+          </button>
           <button
             type="button"
             className="logout-button"

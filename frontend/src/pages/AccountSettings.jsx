@@ -1,5 +1,6 @@
 import { useState } from "react";
 import MainLayout from "../components/MainLayout";
+import PushNotificationControl from "../components/PushNotificationControl";
 import { API_BASE_URL } from "../config";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -11,7 +12,7 @@ const initialForm = {
   confirm_password: "",
 };
 
-function ChangePassword() {
+function AccountSettings() {
   const { user } = useAuth();
   const isDriver = user?.role === "driver";
   const t = (english, indonesian) => isDriver ? indonesian : english;
@@ -86,19 +87,15 @@ function ChangePassword() {
   const inputType = showPassword ? "text" : "password";
 
   return (
-    <MainLayout title={t("Reset Password", "Ubah Kata Sandi")}>
-      <section className="ticket-history">
+    <MainLayout title={t("Settings", "Pengaturan")}>
+      <section className="ticket-history account-settings">
         <header className="history-header">
           <div className="header-title">
-              <button className="back-link" type="button" onClick={() => navigate(-1)} aria-label={t("Go back", "Kembali")}>
-    <i className="bi bi-arrow-left" aria-hidden="true" />
-    
-  </button>
-
-          <h1>{t("Reset Password", "Ubah Kata Sandi")}</h1>
+            <button className="back-link" type="button" onClick={() => navigate(-1)} aria-label={t("Go back", "Kembali")}>
+              <i className="bi bi-arrow-left" aria-hidden="true" />
+            </button>
+            <h1>{t("Settings", "Pengaturan")}</h1>
           </div>
-         
-          
         </header>
 
         <form
@@ -227,9 +224,9 @@ function ChangePassword() {
               </span>
             </div>
 
-            {error ? <p className="error-text">{error}</p> : null}
+            {error ? <p className="error-text" role="alert">{error}</p> : null}
 
-            {success ? <p className="success-text">{success}</p> : null}
+            {success ? <p className="success-text" role="status">{success}</p> : null}
 
             <div className="form-actions">
               <button
@@ -243,9 +240,18 @@ function ChangePassword() {
             </div>
           </section>
         </form>
+        <section className="field-group" aria-labelledby="notification-settings-title">
+          <div className="field-heading">
+            <span className="heading-icon" aria-hidden="true">
+              <i className="bi bi-bell" />
+            </span>
+            <h2 id="notification-settings-title">{t("Notifications", "Notifikasi")}</h2>
+          </div>
+          {user && <PushNotificationControl key={user.uid} user={user} />}
+        </section>
       </section>
     </MainLayout>
   );
 }
 
-export default ChangePassword;
+export default AccountSettings;

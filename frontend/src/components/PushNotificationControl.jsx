@@ -47,21 +47,21 @@ export default function PushNotificationControl({ user }) {
   let hint = t('Receive notifications on this device, including when this tab is closed.', 'Terima notifikasi di perangkat ini, termasuk saat tab ditutup.')
   if (state.support === 'install') hint = t('On iPhone/iPad (iOS 16.4+), add Booking App to your Home Screen, then enable notifications there.', 'Di iPhone/iPad (iOS 16.4+), tambahkan Booking App ke Layar Utama, lalu aktifkan notifikasi dari sana.')
   else if (state.support === 'unsupported') hint = t('Push notifications are unavailable in this browser. Try an updated browser over HTTPS.', 'Browser ini belum mendukung notifikasi push. Gunakan browser terbaru melalui HTTPS.')
-  else if (!state.loading && !state.failed && !state.config?.enabled) hint = t('Firebase notifications are not configured on the server yet.', 'Notifikasi Firebase belum diaktifkan di server.')
+  else if (!state.loading && !state.failed && !state.config?.enabled) hint = t('Device notifications are not available yet. Contact your administrator.', 'Notifikasi perangkat belum tersedia. Hubungi administrator.')
   else if (typeof Notification !== 'undefined' && Notification.permission === 'denied') hint = t('Notifications are blocked. Allow them in your browser/site settings, then try again.', 'Notifikasi diblokir. Izinkan di pengaturan browser/situs, lalu coba lagi.')
 
   return (
     <div className="push-control">
       <div className="push-control__row">
         <span>{t('Device notifications', 'Notifikasi perangkat')}</span>
-        <button type="button" className="notifications-refresh" onClick={toggle}
+        <button type="button" className="btn btn-secondary" onClick={toggle}
           disabled={busy || state.loading || (!state.enabled && !state.config?.enabled) || state.support !== 'supported'}>
           {busy || state.loading ? t('Please wait...', 'Tunggu...') : state.enabled ? t('Disable', 'Nonaktifkan') : t('Enable', 'Aktifkan')}
         </button>
       </div>
       <p>{hint}</p>
       {state.enabled && <p className="push-control__enabled">{t('Enabled on this device.', 'Aktif di perangkat ini.')}</p>}
-      {error && <p className="error-text" role="alert">{t('Could not update push notifications. Check your connection and notification permission, then reopen this panel to retry.', 'Pengaturan notifikasi belum berhasil. Periksa koneksi dan izin notifikasi, lalu buka ulang panel ini.')}</p>}
+      {error && <p className="error-text" role="alert">{t('Could not update device notifications. Check your connection and notification permission, then reload this page to retry.', 'Pengaturan notifikasi belum berhasil. Periksa koneksi dan izin notifikasi, lalu muat ulang halaman ini.')}</p>}
     </div>
   )
 }

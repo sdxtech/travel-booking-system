@@ -4721,9 +4721,11 @@ textarea,
 }
 .push-control {
   flex-shrink: 0;
-  padding: 12px;
-  border-bottom: 1px solid var(--border-color, #d9deeb);
   color: var(--text-color, #172033);
+}
+
+.account-settings .field-heading p {
+  margin: 4px 0 0;
 }
 
 .push-control__row {

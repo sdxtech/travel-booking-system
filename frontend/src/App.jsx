@@ -25,7 +25,7 @@ import AdminLocationPoints from './pages/AdminLocationPoints'
 import AdminDistributeLogin from './pages/AdminDistributeLogin'
 import AdminAuditLog from './pages/AdminAuditLog'
 import ForgotPassword from './pages/ForgotPassword'
-import ChangePassword from './pages/ChangePassword'
+import AccountSettings from './pages/AccountSettings'
 import ResetPassword from './pages/ResetPassword'
 
 
@@ -247,13 +247,14 @@ function App() {
             }
           />
           <Route
-            path="/change-password"
+            path="/account/settings"
             element={
-              <ProtectedRoute allowedRoles={["user", "driver"]}>
-                <ChangePassword />
+              <ProtectedRoute allowedRoles={["user", "driver", "office_coordinator", "superadmin"]}>
+                <AccountSettings />
               </ProtectedRoute>
             }
           />
+          <Route path="/change-password" element={<Navigate to="/account/settings" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
           <Route path="/forgot-password" element={<ForgotPassword/>} />
           <Route path="/reset-password" element={<ResetPassword/>} />
