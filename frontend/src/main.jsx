@@ -5,12 +5,14 @@ import App from './App.jsx'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 import { AuthProvider } from './contexts/authContext.jsx'
 import RealtimeConnection from './components/RealtimeConnection'
+import PushSession from './components/PushSession'
 
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
     <RealtimeConnection />
+    <PushSession />
 
     <App />
     </AuthProvider>

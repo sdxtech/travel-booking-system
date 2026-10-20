@@ -152,3 +152,8 @@ frontend/.env
 # Local VPS SSH keys
 /travel-booking-ssh
 /travel-booking-ssh.pub
+
+# Firebase credentials stay on the VPS or in local ignored storage.
+.firebase-credentials/
+**/*firebase-adminsdk*.json
+**/firebase-service-account*.json

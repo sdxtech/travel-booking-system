@@ -595,6 +595,10 @@ user-dropdown-toogle {
 }
 
 .notifications-dropdown {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 90px);
+  max-height: calc(100dvh - 90px);
   position: fixed;
   top: 70px; 
   left: 50%;
@@ -654,6 +658,8 @@ user-dropdown-toogle {
 }
 
 .notifications-dropdown__body {
+  flex: 1;
+  min-height: 0;
   padding: 12px 14px 14px;
   max-height: 360px;
   overflow-y: auto;
@@ -4713,3 +4719,26 @@ textarea,
 .sidebar-role {
   font-weight: 600;
 }
+.push-control {
+  flex-shrink: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color, #d9deeb);
+  color: var(--text-color, #172033);
+}
+
+.push-control__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.push-control p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.push-control__enabled { color: #16803d; }

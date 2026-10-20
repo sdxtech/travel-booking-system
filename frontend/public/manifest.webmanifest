@@ -1,0 +1,14 @@
+{
+  "id": "/",
+  "name": "Booking App",
+  "short_name": "Booking App",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#293894",
+  "icons": [
+    { "src": "/dr-logo-blue.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/app-logo-blue.png", "sizes": "500x500", "type": "image/png", "purpose": "any" }
+  ]
+}

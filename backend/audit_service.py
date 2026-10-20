@@ -7,6 +7,7 @@ from mongo_client import db
 SENSITIVE_KEYS = {
     "password", "password_hash", "new_password", "confirm_password", "token", "token_hash",
     "file_base64", "telegram_link_hash", "telegram_link_expires_at",
+    "endpoint", "keys", "p256dh", "auth", "fid", "fcm_token", "private_key", "private_key_id",
 }
 IGNORED_CHANGE_KEYS = {"_id", "created_at", "updated_at", "created_by", "updated_by", "invited_at", "invited_by"}
 

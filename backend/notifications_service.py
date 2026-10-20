@@ -9,6 +9,7 @@ from email_service import email_delivery_enabled, send_notification_email
 from mongo_client import db
 from telegram_service import telegram_delivery_enabled, send_notification_telegram
 from realtime_service import publish_notification
+from push_service import queue_notification_push
 
 
 def utc_now() -> datetime:
@@ -64,6 +65,13 @@ def create_user_notification(
     )
 
     publish_notification(str(user_id), event)
+
+    if user_snapshot and not user_snapshot.get("disabled"):
+        try:
+            queue_notification_push(str(user_id), notification_id)
+        except Exception:
+            # Push problems must not block in-app, email, Telegram, or the booking itself.
+            pass
 
     if should_send_email:
         try:

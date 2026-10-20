@@ -189,4 +189,5 @@ Jika konfigurasi SMTP belum lengkap atau pengiriman gagal, notifikasi aplikasi t
 ## Deploy Notes
 
 Detail deploy container ada di `DEPLOY.md`.
+Panduan aktivasi Firebase Cloud Messaging untuk semua role dan perangkat ada di [FIREBASE_PUSH.md](FIREBASE_PUSH.md).
 Konfigurasi environment tersimpan di `.env.development` dan `.env.production`.

@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth'
 import { indonesianError } from '../utils/indonesian'
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { useLatestRequest } from '../hooks/useLatestRequest'
+import PushNotificationControl from './PushNotificationControl'
 
 const userNavSections = [
   {
@@ -863,6 +864,8 @@ function MainLayout({ title, children }) {
                 : t('Refresh', 'Perbarui')}
             </button>
           </div>
+
+          {user && <PushNotificationControl key={user.uid} user={user} />}
 
           {notificationsError ? (
             <p className="error-text">

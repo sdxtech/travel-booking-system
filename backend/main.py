@@ -133,10 +133,14 @@ def startup_event():
 @app.on_event("startup")
 async def start_realtime():
     await hub.start()
+    from push_service import worker
+    await worker.start()
 
 
 @app.on_event("shutdown")
 async def stop_realtime():
+    from push_service import worker
+    await worker.stop()
     await hub.stop()
 
 
@@ -211,6 +215,7 @@ from routes_telegram import router as telegram_router
 from routes_locations import router as locations_router
 from routes_audit_logs import router as audit_logs_router
 from routes_realtime import router as realtime_router
+from routes_push import router as push_router
 
 
 @app.get("/health")
@@ -256,3 +261,4 @@ app.include_router(telegram_router)
 app.include_router(locations_router)
 app.include_router(audit_logs_router)
 app.include_router(realtime_router)
+app.include_router(push_router)

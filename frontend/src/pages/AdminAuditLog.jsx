@@ -76,6 +76,8 @@ function describeActivity(action, path) {
     [/PATCH \/locations\//, 'Update Location Point'],
     [/DELETE \/locations\//, 'Delete Location Point'],
     [/POST \/telegram\/connect/, 'Connect Telegram'],
+    [/POST \/notifications\/push\/subscribe/, 'Enable Device Notifications'],
+    [/POST \/notifications\/push\/unsubscribe/, 'Disable Device Notifications'],
     [/DELETE \/telegram\/connection/, 'Disconnect Telegram'],
     [/PATCH \/notifications\//, 'Update Notification'],
   ]

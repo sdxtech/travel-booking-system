@@ -57,6 +57,10 @@ def init_mongo():
     """Initialize Mongo connection early (useful for startup checks)."""
     database = db.get_db()
 
+    database["push_subscriptions"].create_index([("user_id", ASCENDING)])
+    database["push_jobs"].create_index([("status", ASCENDING), ("next_attempt_at", ASCENDING)])
+    database["push_jobs"].create_index("expires_at", expireAfterSeconds=0)
+
     # Required for safe one-to-one Telegram linking; do not silently skip failure.
     database["users"].create_index(
         [("telegram_chat_id", ASCENDING)], unique=True,

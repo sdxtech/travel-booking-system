@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { API_BASE_URL } from '../config'
 import AuthContext from './AuthContext'
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { disablePush } from '../lib/push'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -162,6 +163,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
+      await disablePush(API_BASE_URL).catch(() => {})
       await fetch(
         `${API_BASE_URL}/auth/logout`,
         {

@@ -4,3 +4,6 @@ dist
 .env.*
 Dockerfile
 .dockerignore
+*firebase-adminsdk*.json
+firebase-service-account*.json
+.firebase-credentials
