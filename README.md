@@ -155,7 +155,7 @@ Frontend otomatis membaca konfigurasi melalui Vite. Mode ini biasanya tersedia d
 
 ## Email Notification dengan Hostinger SMTP
 
-Telegram tambahan khusus Driver tersedia melalui @BookingDriverBot. Email tetap aktif. Panduan token, webhook, dan penghubungan akun ada di [TELEGRAM.md](TELEGRAM.md).
+Telegram tambahan khusus Driver tersedia melalui @BookingDriverBot. Email tetap aktif.
 
 Email dikirim melalui mailbox Hostinger. Buat mailbox di hPanel **Emails → Manage**, lalu lihat **Connect Apps & Devices → Manual Configuration** untuk pengaturan SMTP. Isi `SMTP_USERNAME`, `SMTP_PASSWORD`, dan `SMTP_FROM_EMAIL` pada `.env.development` atau `.env.production` sesuai lingkungan; jangan commit password mailbox. Default Hostinger Email adalah `smtp.hostinger.com` port `465` dengan `SMTP_SECURITY=ssl`. Alternatif port `587` memakai `SMTP_SECURITY=starttls` jika hPanel mengharuskannya.
 
@@ -188,6 +188,4 @@ Jika konfigurasi SMTP belum lengkap atau pengiriman gagal, notifikasi aplikasi t
 
 ## Deploy Notes
 
-Detail deploy container ada di `DEPLOY.md`.
-Panduan aktivasi Firebase Cloud Messaging untuk semua role dan perangkat ada di [FIREBASE_PUSH.md](FIREBASE_PUSH.md).
 Konfigurasi environment tersimpan di `.env.development` dan `.env.production`.

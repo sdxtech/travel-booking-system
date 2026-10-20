@@ -157,3 +157,10 @@ frontend/.env
 .firebase-credentials/
 **/*firebase-adminsdk*.json
 **/firebase-service-account*.json
+
+# Keep operational guides local to each workspace.
+/DEPLOY.md
+/DEPLOY_BIZNET.md
+/FIREBASE_PUSH.md
+/REALTIME.md
+/TELEGRAM.md
