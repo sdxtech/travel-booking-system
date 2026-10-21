@@ -96,8 +96,8 @@ def build_email_layout(content: str, *, language: str = "en") -> str:
     """Wrap email content in a narrow, mobile-friendly centered card."""
     logo = (
         '<tr><td align="center" style="padding:24px 22px 0;text-align:center">'
-        f'<img src="{EMAIL_LOGO_SRC}" alt="Driver Request App" width="80" height="80" '
-        'style="display:block;width:80px;height:80px;margin:0 auto;border:0">'
+        f'<img src="{EMAIL_LOGO_SRC}" alt="Driver Request App" width="240" height="240" '
+        'style="display:block;width:240px;height:240px;margin:0 auto;border:0">'
         '</td></tr>'
     )
     return (
