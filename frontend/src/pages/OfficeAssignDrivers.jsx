@@ -11,6 +11,8 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
 
+const OTHER_LOCATION_VALUE = '__other_location__'
+
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
@@ -49,6 +51,9 @@ const isSuperadmin =
   user?.role === 'superadmin'
   const [form, setForm] = useState(initialForm)
   const { locations, locationsLoading, locationsError } = useBookingLocations()
+  const [pickupLocationOther, setPickupLocationOther] = useState(false)
+  const [destinationOther, setDestinationOther] = useState(false)
+  const locationOptions = [...locations.map((item) => ({ value: item.name, label: item.name })), { value: OTHER_LOCATION_VALUE, label: 'Others' }]
   const [loading, setLoading] = useState(false)
   const submittingRef = useRef(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -253,7 +258,7 @@ const isSuperadmin =
     setErrorMessage('')
     setShowSuccessModal(false)
 
-    if (!form.pickup_location || !form.destination) {
+    if (!form.pickup_location.trim() || !form.destination.trim()) {
       setErrorMessage('Pickup location and destination are required.')
       setLoading(false)
       return
@@ -288,8 +293,8 @@ const isSuperadmin =
       requester_phone: form.requester_phone,
       requester_email: form.requester_email,
       driver_email: form.driver_email,
-      pickup_location: form.pickup_location,
-      destination: form.destination,
+      pickup_location: form.pickup_location.trim(),
+      destination: form.destination.trim(),
       departure_time: departureDateTime.toISOString(),
       estimated_arrival_time: estimatedArrivalDateTime.toISOString(),
       passenger_count: Number(form.passenger_count) || 1,
@@ -320,6 +325,8 @@ const isSuperadmin =
         setDriverAvailabilityError('')
         setSuccessMessage('Driver assigned successfully (approved).')
         setForm(initialForm)
+        setPickupLocationOther(false)
+        setDestinationOther(false)
         setShowSuccessModal(true)
       }
     } catch {
@@ -471,11 +478,35 @@ const isSuperadmin =
               <div className="field-grid">
                 <div className="inline-label">
                   <span>Pickup location</span>
-                  <BookingFormSelect value={form.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select pickup location" searchable onChange={(value) => setForm((current) => ({ ...current, pickup_location: value }))} />
+                  <BookingFormSelect
+                    value={pickupLocationOther ? OTHER_LOCATION_VALUE : form.pickup_location}
+                    options={locationOptions}
+                    placeholder={locationsLoading ? 'Loading locations...' : 'Select pickup location...'}
+                    disabled={locationsLoading || loading}
+                    ariaLabel="Select pickup location"
+                    searchable
+                    onChange={(value) => {
+                      setPickupLocationOther(value === OTHER_LOCATION_VALUE)
+                      setForm((current) => ({ ...current, pickup_location: value === OTHER_LOCATION_VALUE ? '' : value }))
+                    }}
+                  />
+                  {pickupLocationOther ? <input type="text" aria-label="Other pickup location" placeholder="Enter pickup location" value={form.pickup_location} onChange={handleChange('pickup_location')} disabled={loading} required /> : null}
                 </div>
                 <div className="inline-label">
                   <span>Destination</span>
-                  <BookingFormSelect value={form.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length} ariaLabel="Select destination" searchable onChange={(value) => setForm((current) => ({ ...current, destination: value }))} />
+                  <BookingFormSelect
+                    value={destinationOther ? OTHER_LOCATION_VALUE : form.destination}
+                    options={locationOptions}
+                    placeholder={locationsLoading ? 'Loading locations...' : 'Select destination...'}
+                    disabled={locationsLoading || loading}
+                    ariaLabel="Select destination"
+                    searchable
+                    onChange={(value) => {
+                      setDestinationOther(value === OTHER_LOCATION_VALUE)
+                      setForm((current) => ({ ...current, destination: value === OTHER_LOCATION_VALUE ? '' : value }))
+                    }}
+                  />
+                  {destinationOther ? <input type="text" aria-label="Other destination" placeholder="Enter destination" value={form.destination} onChange={handleChange('destination')} disabled={loading} required /> : null}
                 </div>
                 <label className="inline-label">
                   <span>Departure date</span>

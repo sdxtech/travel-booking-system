@@ -13,6 +13,8 @@ import { useAuth } from '../hooks/useAuth'
 import { getNightOvertimeMinutes } from '../components/bookingOvertime'
 import useBookingLocations from '../hooks/useBookingLocations'
 
+const OTHER_LOCATION_VALUE = '__other_location__'
+
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
   { label: 'Travel Status & History', icon: 'bi-clock-history' },
@@ -67,6 +69,11 @@ function OfficeDriverHistory() {
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(null)
   const { locations, locationsLoading, locationsError } = useBookingLocations()
+  const [pickupLocationOther, setPickupLocationOther] = useState(false)
+  const [destinationOther, setDestinationOther] = useState(false)
+  const locationOptions = [...locations.map((item) => ({ value: item.name, label: item.name })), { value: OTHER_LOCATION_VALUE, label: 'Others' }]
+  const pickupUsesOther = pickupLocationOther || Boolean(editForm?.pickup_location && !locations.some((item) => item.name === editForm.pickup_location))
+  const destinationUsesOther = destinationOther || Boolean(editForm?.destination && !locations.some((item) => item.name === editForm.destination))
   const [actionMenu, setActionMenu] = useState(null)
   const availabilityRequestIdRef = useRef(0)
   const actionMenuRef = useRef(null)
@@ -643,6 +650,8 @@ function OfficeDriverHistory() {
   }
 
   const openEditModal = (booking) => {
+    setPickupLocationOther(false)
+    setDestinationOther(false)
     setEditTarget(booking)
     setEditForm({
       driver_id: booking.driver_id || '',
@@ -679,7 +688,7 @@ function OfficeDriverHistory() {
     event.preventDefault()
     if (!isSuperadmin || !editTarget?.id || !editForm) return
 
-    if (!editForm.driver_id || !editForm.pickup_location || !editForm.destination) {
+    if (!editForm.driver_id || !editForm.pickup_location.trim() || !editForm.destination.trim()) {
       setActionError('Driver, pickup location, and destination are required.')
       return
     }
@@ -710,6 +719,8 @@ function OfficeDriverHistory() {
          credentials: 'include',
         body: JSON.stringify({
           ...editForm,
+          pickup_location: editForm.pickup_location.trim(),
+          destination: editForm.destination.trim(),
           departure_time: departureTime.toISOString(),
           estimated_arrival_time: estimatedArrivalTime.toISOString(),
           passenger_count: Number(editForm.passenger_count),
@@ -1576,11 +1587,35 @@ function OfficeDriverHistory() {
                   </label>
                   <div className="inline-label">
                     <span>Pickup Location</span>
-                    <BookingFormSelect value={editForm.pickup_location} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select pickup location...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select pickup location" searchable onChange={(value) => setEditForm((current) => ({ ...current, pickup_location: value }))} />
+                    <BookingFormSelect
+                      value={pickupUsesOther ? OTHER_LOCATION_VALUE : editForm.pickup_location}
+                      options={locationOptions}
+                      placeholder={locationsLoading ? 'Loading locations...' : 'Select pickup location...'}
+                      disabled={locationsLoading || Boolean(actionLoadingId)}
+                      ariaLabel="Select pickup location"
+                      searchable
+                      onChange={(value) => {
+                        setPickupLocationOther(value === OTHER_LOCATION_VALUE)
+                        setEditForm((current) => ({ ...current, pickup_location: value === OTHER_LOCATION_VALUE ? '' : value }))
+                      }}
+                    />
+                    {pickupUsesOther ? <input type="text" aria-label="Other pickup location" placeholder="Enter pickup location" value={editForm.pickup_location} onChange={handleEditFormChange('pickup_location')} disabled={Boolean(actionLoadingId)} required /> : null}
                   </div>
                   <div className="inline-label">
                     <span>Destination</span>
-                    <BookingFormSelect value={editForm.destination} options={locations.map((item) => ({ value: item.name, label: item.name }))} placeholder={locationsLoading ? 'Loading locations...' : locations.length ? 'Select destination...' : 'No locations available'} disabled={locationsLoading || !locations.length || Boolean(actionLoadingId)} ariaLabel="Select destination" searchable onChange={(value) => setEditForm((current) => ({ ...current, destination: value }))} />
+                    <BookingFormSelect
+                      value={destinationUsesOther ? OTHER_LOCATION_VALUE : editForm.destination}
+                      options={locationOptions}
+                      placeholder={locationsLoading ? 'Loading locations...' : 'Select destination...'}
+                      disabled={locationsLoading || Boolean(actionLoadingId)}
+                      ariaLabel="Select destination"
+                      searchable
+                      onChange={(value) => {
+                        setDestinationOther(value === OTHER_LOCATION_VALUE)
+                        setEditForm((current) => ({ ...current, destination: value === OTHER_LOCATION_VALUE ? '' : value }))
+                      }}
+                    />
+                    {destinationUsesOther ? <input type="text" aria-label="Other destination" placeholder="Enter destination" value={editForm.destination} onChange={handleEditFormChange('destination')} disabled={Boolean(actionLoadingId)} required /> : null}
                   </div>
                   <label className="inline-label">
                     <span>Total Passenger</span>
