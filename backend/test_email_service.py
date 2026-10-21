@@ -65,7 +65,7 @@ class EmailServiceTests(unittest.TestCase):
         self.assertEqual(sent_message["To"], "user@example.com")
         self.assertEqual(sent_message["Message-ID"], message_id)
         self.assert_inline_logo(sent_message)
-        self.assertIn("Open Booking App", sent_message.get_body(preferencelist=("html",)).get_content())
+        self.assertIn("Open Driver Request App", sent_message.get_body(preferencelist=("html",)).get_content())
 
     def test_invitation_uses_starttls_and_one_hour_link(self):
         with patch.dict(os.environ, {**SMTP_ENV, "SMTP_PORT": "587", "SMTP_SECURITY": "starttls"}):
@@ -81,7 +81,7 @@ class EmailServiceTests(unittest.TestCase):
         connection.starttls.assert_called_once()
         connection.login.assert_called_once()
         sent_message = connection.send_message.call_args.args[0]
-        self.assertEqual(sent_message["Subject"], "Set Up Your Booking App Account")
+        self.assertEqual(sent_message["Subject"], "Set Up Your Driver Request App Account")
         self.assert_inline_logo(sent_message)
         self.assertIn("1 hour", sent_message.get_body(preferencelist=("plain",)).get_content())
 

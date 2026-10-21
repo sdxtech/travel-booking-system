@@ -75,12 +75,12 @@ class DriverLocalizationTests(unittest.TestCase):
         self.assertIn("Office &amp; Depot", html_body)
         for body in (html_body, plain_body):
             self.assertIn("Halo", body)
-            self.assertIn("Buka Booking App", body)
+            self.assertIn("Buka Driver Request App", body)
             self.assertIn("19 Oktober 2026", body)
             self.assertIn("Ini adalah pemberitahuan otomatis", body)
             self.assertNotIn("Hello", body)
-            self.assertNotIn("Open Booking App", body)
-            self.assertLess(body.index("Perkiraan Tanggal"), body.index("Buka Booking App"))
+            self.assertNotIn("Open Driver Request App", body)
+            self.assertLess(body.index("Perkiraan Tanggal"), body.index("Buka Driver Request App"))
 
     def test_telegram_keeps_plain_text_and_localizes_operational_details(self):
         with patch.dict(os.environ, {"APP_PUBLIC_URL": "https://booking.example.com"}), \

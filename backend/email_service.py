@@ -85,9 +85,9 @@ def send_email(*, to_email: str, subject: str, html_content: str, text_content: 
 
 def build_notification_subject(event: str, entity_type: str, *, language: str = "en") -> str:
     if language == "id":
-        entity_label = "Perjalanan" if entity_type == "booking" else "Booking App"
+        entity_label = "Perjalanan" if entity_type == "booking" else "Driver Request App"
         return f"{entity_label}: {SUBJECTS.get(event, 'Pemberitahuan terbaru')}"
-    entity_label = "Driver Booking" if entity_type == "booking" else "Travel Request" if entity_type == "ticket" else "Booking App"
+    entity_label = "Driver Booking" if entity_type == "booking" else "Travel Request" if entity_type == "ticket" else "Driver Request App"
     event_label = str(event or "updated").replace("_", " ").strip().title()
     return f"{entity_label}: {event_label}"
 
@@ -96,7 +96,7 @@ def build_email_layout(content: str, *, language: str = "en") -> str:
     """Wrap email content in a narrow, mobile-friendly centered card."""
     logo = (
         '<tr><td align="center" style="padding:24px 22px 0;text-align:center">'
-        f'<img src="{EMAIL_LOGO_SRC}" alt="Booking App" width="80" height="80" '
+        f'<img src="{EMAIL_LOGO_SRC}" alt="Driver Request App" width="80" height="80" '
         'style="display:block;width:80px;height:80px;margin:0 auto;border:0">'
         '</td></tr>'
     )
@@ -129,8 +129,8 @@ def build_notification_html(
     fallback_name = "Pengguna" if language == "id" else "User"
     safe_name = html.escape((recipient_name or fallback_name).strip() or fallback_name)
     greeting = "Halo" if language == "id" else "Hello"
-    action_label = "Buka Booking App" if language == "id" else "Open Booking App"
-    automated_note = "Ini adalah pemberitahuan otomatis dari Booking App." if language == "id" else "This is an automated notification from Booking App."
+    action_label = "Buka Driver Request App" if language == "id" else "Open Driver Request App"
+    automated_note = "Ini adalah pemberitahuan otomatis dari Driver Request App." if language == "id" else "This is an automated notification from Driver Request App."
     safe_message = html.escape(message)
     detail_rows = ""
     if details:
@@ -162,7 +162,7 @@ def build_notification_html(
         )
 
     content = (
-        '<h1 style="margin:0 0 16px;color:#273896;font-size:22px;line-height:30px">Booking App</h1>'
+        '<h1 style="margin:0 0 16px;color:#273896;font-size:22px;line-height:30px">Driver Request App</h1>'
         f'<p style="margin:0 0 12px;font-size:14px;line-height:22px">{greeting} {safe_name},</p>'
         f'<p style="margin:0;font-size:14px;line-height:22px;overflow-wrap:anywhere">{safe_message}</p>'
         f"{detail_rows}{action}"
@@ -192,8 +192,8 @@ def send_notification_email(
         text_content=(
             f"{'Halo' if language == 'id' else 'Hello'} {recipient_name or ('Pengguna' if language == 'id' else 'User')},\n\n{message}"
             + ("\n\n" + "\n".join(f"{label} : {value or '-'}" for label, value in details.items()) if details else "")
-            + f"\n\n{'Buka Booking App' if language == 'id' else 'Open Booking App'}: {config['app_url']}"
-            + ("\nIni adalah pemberitahuan otomatis dari Booking App." if language == "id" else "")
+            + f"\n\n{'Buka Driver Request App' if language == 'id' else 'Open Driver Request App'}: {config['app_url']}"
+            + ("\nIni adalah pemberitahuan otomatis dari Driver Request App." if language == "id" else "")
         ).strip(),
     )
 
@@ -220,12 +220,12 @@ def send_password_reset_email(
 
     is_invitation = invitation is True
     expiry_label = "1 hour" if expires_in_minutes == 60 else f"{expires_in_minutes} minutes"
-    subject = "Set Up Your Booking App Account" if is_invitation else "Reset Your Booking App Password"
+    subject = "Set Up Your Driver Request App Account" if is_invitation else "Reset Your Driver Request App Password"
     heading = "Set Up Your Password" if is_invitation else "Reset Your Password"
     intro = (
         "A Super Admin created an Employee account for you. Set your password to activate your account."
         if is_invitation
-        else "We received a request to reset your Booking App password."
+        else "We received a request to reset your Driver Request App password."
     )
     action_label = "Set Password" if is_invitation else "Reset Password"
     greeting = "Hello"
@@ -233,11 +233,11 @@ def send_password_reset_email(
     ignore_note = "If you did not request a password reset, you can safely ignore this email."
     if language == "id":
         greeting = "Halo"
-        subject = "Aktifkan Akun Booking App Anda" if is_invitation else "Atur Ulang Kata Sandi Booking App"
+        subject = "Aktifkan Akun Driver Request App Anda" if is_invitation else "Atur Ulang Kata Sandi Driver Request App"
         heading = "Buat Kata Sandi Anda" if is_invitation else "Atur Ulang Kata Sandi"
         intro = (
             "Super Admin telah membuat akun pengemudi untuk Anda. Buat kata sandi untuk mengaktifkan akun Anda."
-            if is_invitation else "Kami menerima permintaan untuk mengatur ulang kata sandi akun Booking App Anda."
+            if is_invitation else "Kami menerima permintaan untuk mengatur ulang kata sandi akun Driver Request App Anda."
         )
         action_label = "Buat Kata Sandi" if is_invitation else "Atur Ulang Kata Sandi"
         expiry_label = "1 jam" if expires_in_minutes == 60 else f"{expires_in_minutes} menit"
