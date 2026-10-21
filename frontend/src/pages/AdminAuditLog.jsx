@@ -67,6 +67,7 @@ function describeActivity(action, path) {
     [/POST \/users$/, 'Create User'],
     [/PATCH \/users\/[^/]+\/password/, 'Reset User Password'],
     [/PATCH \/users\/[^/]+\/deactivate/, 'Deactivate User'],
+    [/PATCH \/users\/[^/]+\/activate/, 'Activate User'],
     [/PATCH \/users\/[^/]+$/, 'Update User'],
     [/DELETE \/users\//, 'Delete User'],
     [/PATCH \/settings\/booking-cancellation/, 'Update Cancellation Settings'],

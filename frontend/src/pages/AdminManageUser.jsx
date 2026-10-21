@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useLatestRequest } from '../hooks/useLatestRequest'
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
+import { userAccountStatusLabel } from '../components/userAccountStatus'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import TableActionDropdown from '../components/TableActionDropdown'
@@ -67,7 +70,7 @@ function AdminManageUser() {
   const [searchQuery, setSearchQuery] = useState('')
   const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const filteredUsers = users.filter((user) => {
-    const text = [user.name, user.department, user.job_position, user.role, user.plate_number, user.nik, user.phone, user.email, user.telegram_chat_id]
+    const text = [user.name, user.department, user.job_position, user.role, user.plate_number, user.nik, user.phone, user.email, user.telegram_chat_id, userAccountStatusLabel(user)]
       .filter((value) => value != null).join(' ').toLowerCase()
     return searchTerms.every((term) => text.includes(term))
   })
@@ -93,16 +96,21 @@ function AdminManageUser() {
   }
 
   // Fetch user profiles from the API.
-  const loadUsers = async () => {
+  const beginLoadUsers = useLatestRequest()
+  const loadUsers = useCallback(async (background = false) => {
+    const signal = beginLoadUsers()
 
 
-    setLoading(true)
+    if (!background) setLoading(true)
     setError('')
     try {
       const res = await fetch(`${API_BASE_URL}/users`, {
         credentials: 'include',
+        signal,
       })
+      if (signal.aborted) return
       if (!res.ok) {
+        if (background) return
         let detail = 'Failed to load users.'
         try {
           const data = await res.json()
@@ -110,24 +118,28 @@ function AdminManageUser() {
         } catch {
           // ignore parse error
         }
+        if (signal.aborted) return
         setError(detail)
         setUsers([])
       } else {
         const data = await res.json()
+        if (signal.aborted) return
         setUsers(Array.isArray(data) ? data : [])
       }
     } catch {
+      if (signal.aborted || background) return
       setError('Network error. Please try again.')
       setUsers([])
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }
+  }, [beginLoadUsers])
+  useRealtimeRefresh(['users'], () => loadUsers(true))
 
   // Initial data fetch.
   useEffect(() => {
     loadUsers()
-  }, [])
+  }, [loadUsers])
 
   // Update create form fields.
   const handleCreateChange = (field) => (event) => {
@@ -297,6 +309,29 @@ function AdminManageUser() {
       }
 
       setActionSuccess('User deactivated successfully.')
+      await loadUsers()
+    } catch {
+      setActionError('Network error. Please try again.')
+    } finally {
+      setActionLoadingId('')
+    }
+  }
+
+  const handleActivate = async (targetUser) => {
+    if (!targetUser?.uid || actionLoadingId) return
+    setActionLoadingId(targetUser.uid)
+    setActionError('')
+    setActionSuccess('')
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${targetUser.uid}/activate`, {
+        method: 'PATCH', credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setActionError(data?.detail || 'Failed to activate user.')
+        return
+      }
+      setActionSuccess('User activated successfully.')
       await loadUsers()
     } catch {
       setActionError('Network error. Please try again.')
@@ -686,25 +721,26 @@ function AdminManageUser() {
                   <th>Phone</th>
                   <th>Telegram ID</th>
                   <th>Email</th>
+                  <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="11" className="muted">
+                    <td colSpan="12" className="muted">
                       Loading...
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan="11" className="error-text">
+                    <td colSpan="12" className="error-text">
                       {error}
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="muted">
+                    <td colSpan="12" className="muted">
                       No users found.
                     </td>
                   </tr>
@@ -721,6 +757,7 @@ function AdminManageUser() {
                       <td>{user.phone || '-'}</td>
                       <td>{user.telegram_chat_id || '-'}</td>
                       <td>{user.email || '-'}</td>
+                      <td>{userAccountStatusLabel(user)}</td>
                       <td>
                         <TableActionDropdown
                           label={`Actions for ${user.name || user.email || 'user'}`}
@@ -750,6 +787,14 @@ function AdminManageUser() {
                             title="Super Admin override: deactivate user"
                           >
                             <i className="bi bi-person-slash" aria-hidden="true" /> Deactivate
+                          </button>
+                          <button
+                            type="button"
+                            disabled={actionLoadingId === user.uid}
+                            onClick={() => handleActivate(user)}
+                            title="Super Admin override: activate user and clear login ban"
+                          >
+                            <i className="bi bi-person-check" aria-hidden="true" /> Activate
                           </button>
                           <button
                             type="button"

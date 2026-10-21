@@ -1,9 +1,10 @@
 import { useLatestRequest } from '../hooks/useLatestRequest'
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
+import EmployeeRequesterName from '../components/EmployeeRequesterName'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useBookingLocations from '../hooks/useBookingLocations'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
@@ -49,10 +50,12 @@ const isSuperadmin =
   const [form, setForm] = useState(initialForm)
   const { locations, locationsLoading, locationsError } = useBookingLocations()
   const [loading, setLoading] = useState(false)
+  const submittingRef = useRef(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [drivers, setDrivers] = useState([])
+  const [employees, setEmployees] = useState([])
   const [driversLoading, setDriversLoading] = useState(false)
   const [driversError, setDriversError] = useState('')
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
@@ -84,21 +87,24 @@ const isSuperadmin =
         }
         setDriversError(detail)
         setDrivers([])
+        setEmployees([])
         return
       }
 
       const data = await res.json()
       if (signal.aborted) return
       const allUsers = Array.isArray(data) ? data : []
+      setEmployees(allUsers.filter((user) => user.role === 'user'))
       setDrivers(
         allUsers.filter(
-          (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
+          (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled && !user.banned))
         )
       )
     } catch {
       if (signal.aborted || background) return
       setDriversError('Network error. Please try again.')
       setDrivers([])
+      setEmployees([])
     } finally {
       if (!signal.aborted) setDriversLoading(false)
     }
@@ -109,8 +115,13 @@ const isSuperadmin =
   // Check driver availability whenever the requested time range changes.
   useEffect(() => {
     setAvailabilityError('')
+    setAvailabilityLoading(false)
     setAvailabilityChecked(false)
     setDriverAvailabilityError('')
+
+    // The new booking is published before submit returns (email delivery can take time).
+    // Do not treat its own realtime availability update as a conflicting booking.
+    if (loading) return
 
     if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) {
       setUnavailableDriverIds(new Set())
@@ -136,7 +147,6 @@ const isSuperadmin =
     // Fetch the driver ids that are busy for the selected departure time.
     const loadUnavailableDrivers = async () => {
       setAvailabilityLoading(true)
-      setAvailabilityChecked(true)
       setUnavailableDriverIds(new Set())
 
       try {
@@ -147,6 +157,7 @@ const isSuperadmin =
             signal: controller.signal,
           }
         )
+        if (controller.signal.aborted) return
 
         if (!res.ok) {
           let detail = 'Failed to check driver availability.'
@@ -156,29 +167,33 @@ const isSuperadmin =
           } catch {
             // ignore parse error
           }
+          if (controller.signal.aborted) return
           setAvailabilityError(detail)
           setUnavailableDriverIds(new Set())
           return
         }
 
         const data = await res.json()
+        if (controller.signal.aborted) return
         const ids = Array.isArray(data) ? data.filter((id) => typeof id === 'string') : []
         setUnavailableDriverIds(new Set(ids))
+        setAvailabilityChecked(true)
       } catch (err) {
-        if (err?.name === 'AbortError') return
+        if (controller.signal.aborted || err?.name === 'AbortError') return
         setAvailabilityError('Network error. Please try again.')
         setUnavailableDriverIds(new Set())
       } finally {
-        setAvailabilityLoading(false)
+        if (!controller.signal.aborted) setAvailabilityLoading(false)
       }
     }
 
     loadUnavailableDrivers()
     return () => controller.abort()
-  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time, availabilityRevision])
+  }, [form.departure_date, form.departure_time, form.arrival_date, form.arrival_time, availabilityRevision, loading])
 
   // Guard against selecting a driver that is flagged as unavailable.
   useEffect(() => {
+    if (loading || !availabilityChecked) return
     if (isSuperadmin) return
     if (!form.driver_email) return
     if (!form.departure_date || !form.departure_time || !form.arrival_date || !form.arrival_time) return
@@ -199,6 +214,8 @@ const isSuperadmin =
     form.arrival_time,
     form.driver_email,
     isSuperadmin,
+    loading,
+    availabilityChecked,
     unavailableDriverIds,
   ])
 
@@ -230,6 +247,7 @@ const isSuperadmin =
   // Submit the manual assignment request.
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (submittingRef.current) return
     setLoading(true)
     setSuccessMessage('')
     setErrorMessage('')
@@ -277,6 +295,7 @@ const isSuperadmin =
       passenger_count: Number(form.passenger_count) || 1,
     }
 
+    submittingRef.current = true
     try {
       const response = await fetch(`${API_BASE_URL}/bookings/assign`, {
         method: 'POST',
@@ -298,6 +317,7 @@ const isSuperadmin =
         }
         setErrorMessage(detail)
       } else {
+        setDriverAvailabilityError('')
         setSuccessMessage('Driver assigned successfully (approved).')
         setForm(initialForm)
         setShowSuccessModal(true)
@@ -305,6 +325,7 @@ const isSuperadmin =
     } catch {
       setErrorMessage('Network error. Please try again.')
     } finally {
+      submittingRef.current = false
       setLoading(false)
     }
   }
@@ -383,19 +404,13 @@ const isSuperadmin =
                 </div>
                 <div>
                   <h2>Requestor</h2>
-                  <p className="muted">User details (can be a non-account user)</p>
+                  <p className="muted">Select an Employee to fill their details, or enter requester details manually.</p>
                 </div>
               </div>
               <div className="field-grid">
                 <label className="inline-label">
                   <span>Full name</span>
-                  <input
-                    type="text"
-                    placeholder="Full name"
-                    value={form.requester_name}
-                    onChange={handleChange('requester_name')}
-                    required
-                  />
+                  <EmployeeRequesterName form={form} setForm={setForm} employees={employees} disabled={loading} />
                 </label>
                 <label className="inline-label">
                   <span>Department</span>

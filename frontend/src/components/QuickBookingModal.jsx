@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import BookingFormSelect from './BookingFormSelect'
+import EmployeeRequesterName from './EmployeeRequesterName'
 import { API_BASE_URL } from '../config'
 import useBookingLocations from '../hooks/useBookingLocations'
 import { useAuth } from '../hooks/useAuth'
@@ -164,7 +165,7 @@ function QuickBookingModal({ slot, onClose, onBooked }) {
             <div className="booking-grid">
               {isOfficeBooking ? (
                 <>
-                  <label className="form-field"><span>Full Name</span><input type="text" required value={form.requester_name} onChange={updateField('requester_name')} /></label>
+                  <label className="form-field"><span>Full Name</span><EmployeeRequesterName form={form} setForm={setForm} disabled={submitting} /></label>
                   <label className="form-field"><span>Department</span><input type="text" required value={form.requester_department} onChange={updateField('requester_department')} /></label>
                   <label className="form-field"><span>Title/Position</span><input type="text" value={form.requester_job_position} onChange={updateField('requester_job_position')} /></label>
                   <label className="form-field"><span>National ID (optional)</span><input type="text" value={form.requester_nik} onChange={updateField('requester_nik')} /></label>

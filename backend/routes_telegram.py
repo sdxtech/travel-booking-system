@@ -41,7 +41,7 @@ def connect_telegram(response: Response, current_user=Depends(driver_user)):
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     result = db["users"].update_one(
-        {"_id": current_user["uid"], "role": "driver", "disabled": {"$ne": True}},
+        {"_id": current_user["uid"], "role": "driver", "disabled": {"$ne": True}, "banned": {"$ne": True}},
         {"$set": {"telegram_link_hash": token_hash(token), "telegram_link_expires_at": expires_at}},
     )
     if not result.matched_count:
@@ -99,7 +99,7 @@ def telegram_webhook(update: TelegramUpdate, x_telegram_bot_api_secret_token: st
         db["users"].find_one_and_update(
             {"telegram_link_hash": token_hash(match[1]),
              "telegram_link_expires_at": {"$gt": datetime.now(timezone.utc)},
-             "role": "driver", "disabled": {"$ne": True}},
+             "role": "driver", "disabled": {"$ne": True}, "banned": {"$ne": True}},
             {"$set": {"telegram_chat_id": str(message.chat.id), "telegram_connected_at": datetime.now(timezone.utc)},
              "$unset": {"telegram_link_hash": "", "telegram_link_expires_at": ""}},
         )

@@ -14,6 +14,10 @@ from auth_utils import create_access_token, verify_password, hash_password, get_
 from mongo_client import db
 from notifications_service import create_user_notification
 from email_service import send_password_reset_email
+from account_status import MAX_FAILED_LOGIN_ATTEMPTS
+from audit_service import record_audit_event
+from cache_service import invalidate_response_cache
+from realtime_service import publish_api_change
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -59,14 +63,59 @@ def login(payload: LoginRequest, response: Response):
             detail="Account is disabled"
         )
     password_hash = user.get("password_hash")
+    if user.get("banned"):
+        raise HTTPException(
+            status_code=403,
+            detail="Account is banned after repeated failed login attempts. Contact Office Coordinator or Super Admin to activate it.",
+        )
     if (
         not password_hash
         or not verify_password(payload.password, password_hash)
     ):
+        # Invitations without a password cannot log in yet; do not ban those accounts.
+        if password_hash:
+            attempt = db["users"].find_one_and_update(
+                {"_id": user["_id"], "password_hash": password_hash,
+                 "disabled": {"$ne": True}, "banned": {"$ne": True}},
+                {"$inc": {"failed_login_attempts": 1},
+                 "$set": {"last_failed_login_at": datetime.now(timezone.utc)}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if attempt and attempt.get("failed_login_attempts", 0) >= MAX_FAILED_LOGIN_ATTEMPTS:
+                result = db["users"].update_one(
+                    {"_id": user["_id"], "password_hash": password_hash,
+                     "banned": {"$ne": True},
+                     "failed_login_attempts": {"$gte": MAX_FAILED_LOGIN_ATTEMPTS}},
+                    {"$set": {"banned": True, "banned_at": datetime.now(timezone.utc)}},
+                )
+                if result.modified_count:
+                    invalidate_response_cache()
+                    publish_api_change(f"/users/{user['_id']}", str(user["_id"]))
+                    record_audit_event(
+                        action="Account Banned", status="success", target=str(user["_id"]),
+                        details={"email": email, "reason": "Repeated failed login attempts",
+                                 "failed_login_attempts": attempt["failed_login_attempts"]},
+                    )
+                raise HTTPException(
+                    status_code=403,
+                    detail="Account is banned after repeated failed login attempts. Contact Office Coordinator or Super Admin to activate it.",
+                )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
+    # A simultaneous failure, deactivation, ban, or password reset must not be
+    # overwritten by a successful password check against an older snapshot.
+    authenticated = db["users"].find_one_and_update(
+        {"_id": user["_id"], "password_hash": password_hash,
+         "disabled": {"$ne": True}, "banned": {"$ne": True},
+         "$or": [{"failed_login_attempts": {"$exists": False}},
+                 {"failed_login_attempts": {"$lt": MAX_FAILED_LOGIN_ATTEMPTS}}]},
+        {"$set": {"failed_login_attempts": 0}, "$unset": {"last_failed_login_at": ""}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if not authenticated:
+        raise HTTPException(status_code=403, detail="Account access changed. Please try again or contact Office Coordinator or Super Admin.")
     if payload.remember_me:
         expires_hours = 24 * 30
         cookie_max_age = 60 * 60 * 24 * 30

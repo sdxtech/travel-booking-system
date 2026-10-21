@@ -264,7 +264,7 @@ def resolve_driver(driver_id: str, *, allow_unavailable: bool = False) -> dict:
         or driver_data.get("role") != "driver"
         or (
             not allow_unavailable
-            and (driver_data.get("disabled") is True or driver_data.get("booking_enabled", True) is False)
+            and (driver_data.get("disabled") is True or driver_data.get("banned") is True or driver_data.get("booking_enabled", True) is False)
         )
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected driver is not available")
@@ -443,7 +443,7 @@ def assign_driver(payload: BookingAssignCreate, current_user=Depends(get_current
     driver_data = driver_doc or {}
     if driver_data.get("role") != "driver" or (
         current_role != "superadmin"
-        and (driver_data.get("disabled") is True or driver_data.get("booking_enabled", True) is False)
+        and (driver_data.get("disabled") is True or driver_data.get("banned") is True or driver_data.get("booking_enabled", True) is False)
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected driver is not available")
 
@@ -567,6 +567,7 @@ def list_unavailable_drivers(
             "role": "driver",
             "$or": [
                 {"disabled": True},
+                {"banned": True},
                 {"booking_enabled": False},
             ],
         }
@@ -599,7 +600,7 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
     if cached is not None:
         return [DriverCalendarResponse.model_validate(item) for item in cached]
 
-    drivers = list(db["users"].find({"role": "driver", "disabled": {"$ne": True}}))
+    drivers = list(db["users"].find({"role": "driver", "disabled": {"$ne": True}, "banned": {"$ne": True}}))
 
     def driver_sort_value(doc):
         """Return a stable driver display name for sorting."""

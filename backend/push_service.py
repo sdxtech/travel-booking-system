@@ -171,11 +171,11 @@ def deliver_next_push():
     try:
         owner = {"_id": job["subscription_id"], "user_id": job["user_id"], "revision": job["revision"]}
         subscription = db["push_subscriptions"].find_one(owner)
-        user = db["users"].find_one({"_id": job["user_id"]}, {"role": 1, "disabled": 1})
+        user = db["users"].find_one({"_id": job["user_id"]}, {"role": 1, "disabled": 1, "banned": 1})
         notification = db["notifications"].find_one({"_id": job["notification_id"], "user_id": job["user_id"]})
         if (not subscription or subscription.get("provider") != "fcm"
                 or subscription.get("project_id") != config["firebase"]["projectId"]
-                or not user or user.get("disabled") or not notification):
+                or not user or user.get("disabled") or user.get("banned") or not notification):
             db["push_jobs"].update_one({"_id": job["_id"]}, {"$set": {"status": "skipped"}})
             return True
         payload = {

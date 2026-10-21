@@ -104,7 +104,7 @@ async def audit_mutating_api_requests(request: Request, call_next):
 def audit_snapshot(path: str):
     """Read the affected document before/after a mutation for field-level audit diffs."""
     patterns = (
-        (r"^/users/([^/]+)(?:/(?:password|deactivate))?$", "users"),
+        (r"^/users/([^/]+)(?:/(?:password|deactivate|activate))?$", "users"),
         (r"^/bookings/([^/]+)(?:/(?:status|cancel|cancellation-review|start|complete|validate-completion))?$", "bookings"),
         (r"^/tickets/([^/]+)(?:/(?:status|cancel))?$", "tickets"),
         (r"^/locations/([^/]+)$", "booking_locations"),
@@ -197,6 +197,9 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is disabled",
         )
+
+    if user_doc.get("banned"):
+        raise HTTPException(status_code=403, detail="Account is banned")
 
     return {
         "uid": str(user_doc["_id"]),

@@ -34,8 +34,8 @@ def session_user(token):
         claims = decode_access_token(token)
         if not claims.get("sub") or not claims.get("exp"):
             return None
-        user = db["users"].find_one({"_id": claims["sub"]}, {"role": 1, "disabled": 1})
-        if not user or user.get("disabled") or user.get("role") not in {"driver", "user", "office_coordinator", "superadmin"}:
+        user = db["users"].find_one({"_id": claims["sub"]}, {"role": 1, "disabled": 1, "banned": 1})
+        if not user or user.get("disabled") or user.get("banned") or user.get("role") not in {"driver", "user", "office_coordinator", "superadmin"}:
             return None
         return {"uid": str(claims["sub"]), "role": user["role"], "expires_at": float(claims["exp"])}
     except (InvalidTokenError, TypeError, ValueError):

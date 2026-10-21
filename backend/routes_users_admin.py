@@ -17,6 +17,7 @@ from pydantic import AliasChoices, BaseModel, Field, ValidationError, model_vali
 from pymongo.errors import DuplicateKeyError
 
 from auth_utils import hash_password
+from account_status import account_status
 from audit_service import record_audit_event
 from email_service import EmailDeliveryError, send_password_reset_email
 from main import get_current_user
@@ -93,6 +94,8 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     disabled: Optional[bool] = None
+    banned: bool = False
+    account_status: Literal["active", "deactive", "banned", "password_not_set"] = "active"
     booking_enabled: bool = True
 
 
@@ -149,6 +152,8 @@ def ensure_role(uid: str, allowed: tuple[str, ...]):
     role = (doc or {}).get("role")
     if (doc or {}).get("disabled"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
+    if (doc or {}).get("banned"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is banned")
     if role not in allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return role
@@ -169,6 +174,8 @@ def serialize_user(doc_snapshot) -> UserResponse:
         telegram_chat_id=data.get("telegram_chat_id"),
         email=data.get("email"),
         disabled=data.get("disabled", False),
+        banned=bool(data.get("banned")),
+        account_status=account_status(data),
         booking_enabled=data.get("booking_enabled", True) is not False,
     )
 
@@ -951,6 +958,28 @@ def reset_password(user_id: str, payload: UserPasswordUpdate, current_user=Depen
 
     updated_snapshot = db["users"].find_one({"_id": user_id})
     return serialize_user(updated_snapshot)
+
+
+@router.patch("/{user_id}/activate", response_model=UserResponse)
+def activate_user(user_id: str, current_user=Depends(get_current_user)):
+    """Re-enable login and clear a failed-login ban without changing passwords."""
+    uid = current_user["uid"]
+    current_role = ensure_role(uid, ("office_coordinator", "superadmin"))
+    if user_id == uid and current_role != "superadmin":
+        raise HTTPException(status_code=400, detail="Cannot activate your own account")
+    snapshot = db["users"].find_one({"_id": user_id})
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    if snapshot.get("role") == "superadmin" and current_role != "superadmin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    db["users"].update_one(
+        {"_id": user_id},
+        {"$set": {"disabled": False, "banned": False, "failed_login_attempts": 0,
+                  "updated_at": utc_now(), "updated_by": uid},
+         "$unset": {"banned_at": "", "last_failed_login_at": ""}},
+    )
+    return serialize_user(db["users"].find_one({"_id": user_id}))
 
 
 @router.patch("/{user_id}/deactivate", response_model=UserResponse)

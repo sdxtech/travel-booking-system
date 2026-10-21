@@ -33,7 +33,7 @@ def create_user_notification(
 
     notification_id = uuid4().hex
     user_snapshot = db["users"].find_one(
-        {"_id": str(user_id)}, {"email": 1, "name": 1, "role": 1, "disabled": 1, "telegram_chat_id": 1},
+        {"_id": str(user_id)}, {"email": 1, "name": 1, "role": 1, "disabled": 1, "banned": 1, "telegram_chat_id": 1},
     ) or {}
     language = "id" if user_snapshot.get("role") == "driver" else "en"
     if language == "id":
@@ -43,7 +43,7 @@ def create_user_notification(
     should_send_email = bool(recipient_email and email_delivery_enabled())
     chat_id = user_snapshot.get("telegram_chat_id")
     should_send_telegram = bool(
-        user_snapshot.get("role") == "driver" and not user_snapshot.get("disabled")
+        user_snapshot.get("role") == "driver" and not user_snapshot.get("disabled") and not user_snapshot.get("banned")
         and chat_id and telegram_delivery_enabled()
     )
     db["notifications"].insert_one(
@@ -66,7 +66,7 @@ def create_user_notification(
 
     publish_notification(str(user_id), event)
 
-    if user_snapshot and not user_snapshot.get("disabled"):
+    if user_snapshot and not user_snapshot.get("disabled") and not user_snapshot.get("banned"):
         try:
             queue_notification_push(str(user_id), notification_id)
         except Exception:

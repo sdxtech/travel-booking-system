@@ -103,7 +103,7 @@ function OfficeDriverRequests() {
         const allUsers = Array.isArray(data) ? data : []
         setDrivers(
           allUsers.filter(
-            (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled))
+            (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled && !user.banned))
           )
         )
       } catch {
