@@ -344,7 +344,7 @@ function QuickViewScheduler({
                 return (
                   <section key={calendar.id} className="quick-scheduler-lane" aria-label={calendar.name}>
                     <div className="quick-scheduler-lane__title" style={{ color: calendar.color }}>
-                      <span>{calendar.name}{calendar.plateNumber ? ` - ${calendar.plateNumber}` : ''}</span>
+                      <span>{calendar.name}{calendar.plateNumber ? ` - ${calendar.plateLabel}` : ''}</span>
                     </div>
                     <div className="quick-scheduler-lane__days">
                       {weekDays.map((date, index) => (
