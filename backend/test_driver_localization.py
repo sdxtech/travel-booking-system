@@ -27,6 +27,8 @@ class DriverLocalizationTests(unittest.TestCase):
                         "u1", original, event="assigned", entity_type="booking", entity_id="b1",
                         email_details={"Requestor": "January", "Departure Date & Time": "19 October 2026, 08:00 WIB"},
                     )
+                    records.find_one_and_update.return_value = records.insert_one.call_args.args[0]
+                    notifications.deliver_next_notification()
                 stored = records.insert_one.call_args.args[0]
                 sent = email.call_args.kwargs
                 self.assertEqual(stored["message"], sent["message"])
@@ -127,6 +129,8 @@ class DriverLocalizationTests(unittest.TestCase):
             result = notifications.create_user_notification(
                 "d1", "Your password was changed successfully.", event="password_changed", entity_type="user", entity_id="d1",
             )
+            records.find_one_and_update.return_value = records.insert_one.call_args.args[0]
+            notifications.deliver_next_notification()
         self.assertTrue(result)
         self.assertEqual(records.insert_one.call_args.args[0]["message"], "Kata sandi Anda berhasil diubah.")
         self.assertNotIn("secret-token", str(records.update_one.call_args_list))

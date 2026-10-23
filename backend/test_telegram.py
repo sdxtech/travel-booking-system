@@ -122,6 +122,8 @@ class TelegramTests(unittest.TestCase):
                 patch.object(notifications, "send_notification_email", side_effect=RuntimeError("Email failed") if email_failure else None) as email, \
                 patch.object(notifications, "send_notification_telegram", side_effect=RuntimeError("secret-token") if telegram_failure else None) as send:
             result = notifications.create_user_notification("u1", "Same message", event="assigned", entity_type="booking", entity_id="b1")
+            records.find_one_and_update.return_value = records.insert_one.call_args.args[0]
+            notifications.deliver_next_notification()
         return records, email, send, result
 
     def test_channels_are_independent(self):

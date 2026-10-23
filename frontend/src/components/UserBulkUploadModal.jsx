@@ -112,20 +112,23 @@ function UserBulkUploadModal({ mode, isSuperadmin = false, onClose, onComplete }
             <i className="bi bi-x-lg" aria-hidden="true" />
           </button>
         </div>
-        {isUpdate ? (
-          <>
-            <p className="muted">Upload an Excel (.xlsx) or CSV (.csv) file to update existing accounts. Match each account by email and include only the profile columns you want to change.</p>
-            <p className="muted">Required: <code>email</code>. Optional: <code>name</code>, <code>department</code>, <code>job_position</code>, <code>role</code>, <code>nik</code>, <code>phone</code>, <code>plate_number</code>.</p>
-            <p className="muted">Blank profile cells keep saved values. Passwords stay unchanged. An email that does not match an existing account is reported as failed.</p>
-            <p className="muted">To change Telegram, add a <code>telegram_id</code> column. A blank Telegram ID disconnects it; omit the column to keep the current connection.</p>
-          </>
-        ) : (
-          <>
-            <p className="muted">Upload an Excel (.xlsx) or CSV (.csv) file to create new accounts. Existing email addresses are reported as failed.</p>
-            <p className="muted">Required: <code>name</code>, <code>department</code>, <code>phone</code>, <code>email</code>, <code>password</code>. Optional: <code>nik</code>, <code>job_position</code>, <code>role</code>, <code>telegram_id</code>. <code>plate_number</code> is required for Driver.</p>
-          </>
-        )}
-        <p className="muted">Allowed roles: <code>user</code>, <code>driver</code>{isSuperadmin ? <>, <code>office_coordinator</code>, <code>superadmin</code></> : null}.{!isUpdate ? <> If omitted, the role defaults to <code>user</code>.</> : null}</p>
+        <details className="user-bulk-upload-help" open={!isUpdate}>
+          <summary>File format &amp; instructions</summary>
+          {isUpdate ? (
+            <>
+              <p className="muted">Upload an Excel (.xlsx) or CSV (.csv) file to update existing accounts. Match each account by email and include only the profile columns you want to change.</p>
+              <p className="muted">Required: <code>email</code>. Optional: <code>name</code>, <code>department</code>, <code>job_position</code>, <code>role</code>, <code>nik</code>, <code>phone</code>, <code>plate_number</code>.</p>
+              <p className="muted">Blank profile cells keep saved values. Passwords stay unchanged. An email that does not match an existing account is reported as failed.</p>
+              <p className="muted">To change Telegram, add a <code>telegram_id</code> column. A blank Telegram ID disconnects it; omit the column to keep the current connection.</p>
+            </>
+          ) : (
+            <>
+              <p className="muted">Upload an Excel (.xlsx) or CSV (.csv) file to create new accounts. Existing email addresses are reported as failed.</p>
+              <p className="muted">Required: <code>name</code>, <code>department</code>, <code>phone</code>, <code>email</code>, <code>password</code>. Optional: <code>nik</code>, <code>job_position</code>, <code>role</code>, <code>telegram_id</code>. <code>plate_number</code> is required for Driver.</p>
+            </>
+          )}
+          <p className="muted">Allowed roles: <code>user</code>, <code>driver</code>{isSuperadmin ? <>, <code>office_coordinator</code>, <code>superadmin</code></> : null}.{!isUpdate ? <> If omitted, the role defaults to <code>user</code>.</> : null}</p>
+        </details>
         <label className="inline-label">
           <span>File</span>
           <input

@@ -344,7 +344,7 @@ function QuickViewScheduler({
                 return (
                   <section key={calendar.id} className="quick-scheduler-lane" aria-label={calendar.name}>
                     <div className="quick-scheduler-lane__title" style={{ color: calendar.color }}>
-                      <span>{calendar.name}</span>
+                      <span>{calendar.name}{calendar.plateNumber ? ` - ${calendar.plateNumber}` : ''}</span>
                     </div>
                     <div className="quick-scheduler-lane__days">
                       {weekDays.map((date, index) => (
@@ -448,7 +448,8 @@ function QuickViewScheduler({
           </div>
           <dl className="ticket-details-grid">
             {[
-              ...(selectedEvent.requesterName ? [['Requestor', selectedEvent.requesterName]] : []),
+              ['Requestor', selectedEvent.requesterName],
+              ['Total Passenger', selectedEvent.passengerCount],
               ['Driver', selectedEvent.driverName],
               ['Status', selectedEvent.statusLabel],
               ['Departure Date & Time', formatEventDateTime(selectedEvent.start)],

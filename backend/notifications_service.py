@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import asyncio
+import contextlib
+from pymongo import ReturnDocument
+from starlette.concurrency import run_in_threadpool
 from typing import Mapping, Optional
 from uuid import uuid4
 
@@ -61,6 +65,13 @@ def create_user_notification(
             "email_to": recipient_email or None,
             "email_status": "pending" if should_send_email else "skipped",
             "telegram_status": "pending" if should_send_telegram else "skipped",
+            "delivery_state": "pending",
+            "delivery_after": utc_now(),
+            "delivery_payload": {
+                "recipient_name": user_snapshot.get("name"),
+                "chat_id": chat_id, "language": language,
+                "details": dict(email_details or {}),
+            },
         }
     )
 
@@ -73,6 +84,38 @@ def create_user_notification(
             # Push problems must not block in-app, email, Telegram, or the booking itself.
             pass
 
+    return notification_id
+
+
+def deliver_next_notification():
+    """Claim a persisted delivery; expired leases recover after a process restart."""
+    now = utc_now()
+    notice = db["notifications"].find_one_and_update(
+        {"delivery_state": {"$in": ["pending", "processing"]}, "delivery_after": {"$lte": now}},
+        {"$set": {"delivery_state": "processing", "delivery_after": now + timedelta(minutes=5)}},
+        sort=[("created_at", 1)], return_document=ReturnDocument.AFTER,
+    )
+    if not notice:
+        return False
+    notification_id = notice["_id"]
+    payload = notice.get("delivery_payload") or {}
+    user_snapshot = {"name": payload.get("recipient_name")}
+    recipient_email = notice.get("email_to")
+    message = notice["message"]
+    event = notice["event"]
+    entity_type = notice["entity_type"]
+    email_details = payload.get("details")
+    language = payload.get("language", "en")
+    chat_id = payload.get("chat_id")
+    should_send_email = notice.get("email_status") == "pending"
+    current_user = db["users"].find_one({"_id": notice["user_id"]}) or {}
+    should_send_telegram = (
+        notice.get("telegram_status") == "pending" and current_user.get("role") == "driver"
+        and not current_user.get("disabled") and not current_user.get("banned")
+        and chat_id and current_user.get("telegram_chat_id") == chat_id
+    )
+    if notice.get("telegram_status") == "pending" and not should_send_telegram:
+        db["notifications"].update_one({"_id": notification_id}, {"$set": {"telegram_status": "skipped"}})
     if should_send_email:
         try:
             smtp_message_id = send_notification_email(
@@ -128,7 +171,38 @@ def create_user_notification(
             except Exception:
                 pass
             print(f"Telegram notification {notification_id} failed")
-    return notification_id
+
+
+    db["notifications"].update_one({"_id": notification_id}, {
+        "$set": {"delivery_state": "done"}, "$unset": {"delivery_payload": "", "delivery_after": ""},
+    })
+    return True
+
+
+class NotificationWorker:
+    task = None
+
+    async def run(self):
+        while True:
+            try:
+                worked = await run_in_threadpool(deliver_next_notification)
+            except Exception:
+                worked = False
+            await asyncio.sleep(0.1 if worked else 1)
+
+    async def start(self):
+        if self.task is None:
+            self.task = asyncio.create_task(self.run())
+
+    async def stop(self):
+        if self.task is not None:
+            self.task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.task
+            self.task = None
+
+
+notification_worker = NotificationWorker()
 
 
 def notify_roles(

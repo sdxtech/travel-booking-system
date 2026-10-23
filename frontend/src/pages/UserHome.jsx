@@ -48,7 +48,9 @@ function buildDriverBookingEvent(booking, calendarId, color) {
   return {
     id: `driver-calendar-${calendarId}-${booking.id}`,
     calendarId,
-    title: 'Busy',
+    title: booking.requester_name || 'Employee',
+    requesterName: booking.requester_name,
+    passengerCount: booking.passenger_count,
     meta: formatStatusLabel(booking.status),
     statusLabel: formatStatusLabel(booking.status),
     departurePoint: booking.pickup_location,
@@ -128,6 +130,7 @@ function UserHome() {
         id: driver.driver_id,
         name: driver.driver_name || driver.driver_email || `Driver ${index + 1}`,
         plateLabel: formatDriverPlate(driver.plate_number),
+        plateNumber: String(driver.plate_number || '').trim().toUpperCase(),
         color: driverCalendarColors[index % driverCalendarColors.length],
       }]),
     [driverSchedules]

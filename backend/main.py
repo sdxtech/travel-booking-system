@@ -135,11 +135,15 @@ async def start_realtime():
     await hub.start()
     from push_service import worker
     await worker.start()
+    from notifications_service import notification_worker
+    await notification_worker.start()
 
 
 @app.on_event("shutdown")
 async def stop_realtime():
     from push_service import worker
+    from notifications_service import notification_worker
+    await notification_worker.stop()
     await worker.stop()
     await hub.stop()
 

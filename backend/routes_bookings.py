@@ -83,6 +83,7 @@ class DriverCalendarBookingResponse(BaseModel):
     driver_id: str
     status: str
     requester_name: Optional[str] = None
+    passenger_count: Optional[int] = None
     pickup_location: Optional[str] = None
     destination: Optional[str] = None
     departure_time: datetime
@@ -592,7 +593,7 @@ def list_unavailable_drivers(
 
 @router.get("/driver-calendars", response_model=list[DriverCalendarResponse])
 def list_driver_calendars(current_user=Depends(get_current_user)):
-    """Return driver busy schedules for employee quick-view calendars."""
+    """Return driver schedules with requester names and passenger totals for quick view."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
     cache_identity = f"{uid}:{role}"
@@ -631,7 +632,8 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
                 DriverCalendarBookingResponse(
                     id=str(data.get("_id")),
                     driver_id=driver_id,
-                    requester_name=data.get("requester_name") if role in ("office_coordinator", "superadmin") else None,
+                    requester_name=data.get("requester_name"),
+                    passenger_count=data.get("passenger_count"),
                     status=data.get("status", "approved"),
                     pickup_location=data.get("pickup_location"),
                     destination=data.get("destination"),

@@ -24,7 +24,7 @@ def matches(document, query):
         elif isinstance(expected, dict):
             value = document.get(key)
             for operator, other in expected.items():
-                if value is None or not {"$lt": lambda: value < other, "$lte": lambda: value <= other,
+                if value is None or not {"$in": lambda: value in other, "$lt": lambda: value < other, "$lte": lambda: value <= other,
                                          "$gt": lambda: value > other, "$gte": lambda: value >= other}[operator]():
                     return False
         elif document.get(key) != expected: return False
@@ -50,6 +50,7 @@ class Collection:
             found = {**query, **update.get("$setOnInsert", {})}
             self.items[query["_id"]] = found
         found.update(copy.deepcopy(update.get("$set", {})))
+        for field in update.get("$unset", {}): found.pop(field, None)
         for field, amount in update.get("$inc", {}).items(): found[field] = found.get(field, 0) + amount
 
     def update_many(self, query, update):
@@ -191,6 +192,7 @@ class FirebasePushTests(unittest.TestCase):
                     patch.object(notifications, "telegram_delivery_enabled", return_value=False):
                 identifier = notifications.create_user_notification("u1", "You have been assigned a new driver task by the booking system.",
                     event="assigned", entity_type="booking", entity_id="b1")
+                notifications.deliver_next_notification()
             with patch.object(service, "send_push", return_value="message-id") as send: service.deliver_next_push()
             payload = send.call_args.args[1]
             self.assertEqual(payload["url"], expected)
@@ -256,6 +258,9 @@ class FirebasePushTests(unittest.TestCase):
                 patch.object(notifications, "send_notification_email", return_value="email-id") as email, \
                 patch.object(notifications, "send_notification_telegram", return_value="telegram-id") as telegram:
             identifier = notifications.create_user_notification("u1", "Message", event="assigned", entity_type="booking", entity_id="b1")
+            email.assert_not_called()
+            telegram.assert_not_called()
+            notifications.deliver_next_notification()
         self.assertIn(identifier, self.database["notifications"].items)
         email.assert_called_once()
         telegram.assert_called_once()

@@ -3289,6 +3289,25 @@ user-dropdown-toogle {
   margin: 0;
 }
 
+.user-bulk-upload-help > summary {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: #f1f5f9;
+  color: var(--brand-bold);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.user-bulk-upload-help > summary:focus-visible {
+  outline: 2px solid var(--brand-bold);
+  outline-offset: 2px;
+}
+
+.user-bulk-upload-help > p.muted {
+  margin-top: 8px;
+}
+
 .user-bulk-upload-errors {
   max-height: 220px;
   overflow-y: auto;
@@ -3450,6 +3469,22 @@ user-dropdown-toogle {
 
 .quick-driver-multiselect__option:hover {
   background-color: #eff6ff;
+}
+
+.employee-requester-name {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.employee-requester-name > input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.employee-requester-name .booking-form-select__option {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Booking form single-selects reuse the Quick View driver availability dropdown language. */
