@@ -13,7 +13,7 @@ from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import AliasChoices, BaseModel, Field, ValidationError, model_validator, field_validator
+from pydantic import AliasChoices, BaseModel, Field, HttpUrl, ValidationError, model_validator, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from auth_utils import hash_password
@@ -129,6 +129,21 @@ class UserImportResponse(BaseModel):
 class DistributeAccountRequest(BaseModel):
     emails: list[str] = Field(..., min_length=1, max_length=100)
     role: Role
+    account_guidebook_url: Optional[HttpUrl] = None
+    account_system_url: HttpUrl = HttpUrl("https://driver.pesan.biz")
+
+    @field_validator("account_guidebook_url", mode="before")
+    @classmethod
+    def blank_guidebook_url(cls, value):
+        return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("account_guidebook_url", "account_system_url")
+    @classmethod
+    def no_url_credentials(cls, value):
+        if value and (value.username or value.password):
+            raise ValueError("Use a sharing URL without embedded login credentials")
+        return value
+
 
 
 class DistributeAccountResult(BaseModel):
@@ -811,6 +826,8 @@ def distribute_accounts(payload: DistributeAccountRequest, current_user=Depends(
                 recipient_name=invitation_name(email),
                 reset_url=reset_url,
                 invitation=True,
+                account_guidebook_url=str(payload.account_guidebook_url or ""),
+                account_system_url=str(payload.account_system_url),
                 expires_in_minutes=60,
                 language="id" if payload.role == "driver" else "en",
             )

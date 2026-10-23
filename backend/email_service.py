@@ -15,6 +15,7 @@ EMAIL_LOGO_PATH = Path(__file__).resolve().parent / "assets" / "DR LOGO BLUE.png
 EMAIL_LOGO_SRC = "cid:booking-app-logo"
 
 
+
 class EmailDeliveryError(RuntimeError):
     """Raised when the configured SMTP server cannot accept an email."""
 
@@ -205,6 +206,8 @@ def send_password_reset_email(
     invitation: bool = False,
     expires_in_minutes: int = 30,
     language: str = "en",
+    account_guidebook_url: str = "",
+    account_system_url: str = "https://driver.pesan.biz",
 ) -> Optional[str]:
     if not (email_delivery_enabled() and to_email):
         return None
@@ -245,6 +248,22 @@ def send_password_reset_email(
         ignore_note = "Jika Anda tidak meminta pengaturan ulang kata sandi, abaikan email ini."
         safe_name = html.escape((recipient_name or "Pengemudi").strip() or "Pengemudi")
 
+    invitation_links_html = ""
+    invitation_links_text = ""
+    if is_invitation:
+        guidebook_url = account_guidebook_url.strip()
+        links = []
+        if guidebook_url:
+            links.append(("Panduan Penggunaan" if language == "id" else "Guidebook", guidebook_url))
+        links.append(("Akses Sistem" if language == "id" else "System Access", account_system_url))
+        for label, url in links:
+            invitation_links_html += (
+                '<p style="margin:12px 0 0;font-size:14px;line-height:22px;overflow-wrap:anywhere">'
+                f'{label}: <a href="{html.escape(url, quote=True)}" style="color:#273896">'
+                f'{html.escape(url)}</a></p>'
+            )
+            invitation_links_text += f"{label}: {url}\n\n"
+
     content = (
         '<h1 style="margin:0 0 16px;color:#273896;'
         'font-size:22px;line-height:30px">'
@@ -275,6 +294,8 @@ def send_password_reset_email(
         f'{expiry_note}'
         '</p>'
 
+        f'{invitation_links_html}'
+
         '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;'
         'padding-top:16px;color:#64748b;font-size:12px;'
         'line-height:18px">'
@@ -288,6 +309,7 @@ def send_password_reset_email(
         f"{intro}\n\n"
         f"{action_label}:\n{reset_url}\n\n"
         f"{expiry_note}\n\n"
+        f"{invitation_links_text}"
         f"{ignore_note}"
     )
 

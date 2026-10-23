@@ -1,4 +1,5 @@
 import unittest
+from pydantic import ValidationError
 from unittest.mock import MagicMock, patch
 
 import main  # noqa: F401
@@ -20,7 +21,9 @@ class DistributeAccountTests(unittest.TestCase):
             patch.dict("routes_users_admin.os.environ", {"APP_PUBLIC_URL": "https://booking.example.com"}),
         ):
             result = distribute_accounts(
-                DistributeAccountRequest(emails=["Employee@example.com"], role="user"),
+                DistributeAccountRequest(emails=["Employee@example.com"], role="user",
+                    account_guidebook_url="https://example.sharepoint.com/guide?a=1&b=2",
+                    account_system_url="https://driver.pesan.biz/login"),
                 current_user={"uid": "admin-id"},
             )
 
@@ -35,6 +38,16 @@ class DistributeAccountTests(unittest.TestCase):
         self.assertEqual(token["purpose"], "account_invitation")
         self.assertEqual((token["expires_at"] - token["created_at"]).total_seconds(), 3600)
         self.assertTrue(send_email.call_args.kwargs["reset_url"].startswith("https://booking.example.com/reset-password?token="))
+        self.assertEqual(send_email.call_args.kwargs["account_guidebook_url"], "https://example.sharepoint.com/guide?a=1&b=2")
+        self.assertEqual(send_email.call_args.kwargs["account_system_url"], "https://driver.pesan.biz/login")
+
+    def test_link_validation_and_optional_guide(self):
+        payload = DistributeAccountRequest(emails=["test@example.com"], role="user", account_guidebook_url="  ")
+        self.assertIsNone(payload.account_guidebook_url)
+        for field in ("account_guidebook_url", "account_system_url"):
+            for value in ("javascript:alert(1)", "not-a-url", "https://user:password@example.com"):
+                with self.subTest(field=field, value=value), self.assertRaises(ValidationError):
+                    DistributeAccountRequest(emails=["test@example.com"], role="user", **{field: value})
 
 
 if __name__ == "__main__":

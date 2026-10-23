@@ -20,6 +20,8 @@ function AdminDistributeLogin() {
   const [emailText, setEmailText] = useState('')
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const [role, setRole] = useState('')
+  const [guidebookUrl, setGuidebookUrl] = useState('')
+  const [systemUrl, setSystemUrl] = useState('https://driver.pesan.biz')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
@@ -48,10 +50,10 @@ function AdminDistributeLogin() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails, role }),
+        body: JSON.stringify({ emails, role, account_guidebook_url: guidebookUrl.trim(), account_system_url: systemUrl.trim() }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data?.detail || 'Failed to distribute account invitations.')
+      if (!response.ok) throw new Error(Array.isArray(data?.detail) ? data.detail.map((item) => item.msg).join('; ') : data?.detail || 'Failed to distribute account invitations.')
       setResult(data)
       if (data.failed === 0) setEmailText('')
     } catch (requestError) {
@@ -114,6 +116,16 @@ function AdminDistributeLogin() {
                 <option value="office_coordinator">Office Coordinator</option>
                 <option value="superadmin">Super Admin</option>
               </select>
+            </label>
+            <label className="form-field">
+              <span>Account Guidebook URL (optional)</span>
+              <input type="url" value={guidebookUrl} onChange={(event) => setGuidebookUrl(event.target.value)} placeholder="https://drive.google.com/... or https://your-company.sharepoint.com/..." pattern="https?://.+" maxLength={2083} disabled={sending} />
+              <small className="muted">Use a Google Drive or SharePoint sharing link accessible to recipients. Leave blank to omit the guidebook from this batch of invitations.</small>
+            </label>
+            <label className="form-field">
+              <span>Account System URL</span>
+              <input type="url" value={systemUrl} onChange={(event) => setSystemUrl(event.target.value)} placeholder="https://driver.pesan.biz" pattern="https?://.+" maxLength={2083} disabled={sending} required />
+              <small className="muted">These links will be included in every invitation sent with this form.</small>
             </label>
             <label className="form-field">
               <span>Email addresses</span>
