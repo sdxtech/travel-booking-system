@@ -271,13 +271,13 @@ def send_password_reset_email(
         f'{heading}'
         '</h1>'
 
-        f'<p style="margin:0 0 12px;font-size:14px;'
-        f'line-height:22px">'
+        f'<p style="margin:0 0 12px;font-size:16px;'
+        f'line-height:24px">'
         f'{greeting} {safe_name},'
         f'</p>'
 
-        '<p style="margin:0 0 16px;font-size:14px;'
-        'line-height:22px">'
+        '<p style="margin:0 0 16px;font-size:16px;'
+        'line-height:24px">'
         f'{intro}'
         '</p>'
 
@@ -285,21 +285,21 @@ def send_password_reset_email(
         f'<a href="{safe_url}" '
         'style="display:inline-block;padding:10px 16px;'
         'border-radius:6px;background:#273896;'
-        'color:#ffffff;text-decoration:none;font-weight:600">'
+        'color:#ffffff;text-decoration:none;font-size:16px;font-weight:600">'
         f'{action_label}'
         '</a>'
         '</p>'
 
-        '<p style="margin:0;font-size:13px;'
-        'line-height:20px;color:#64748b">'
+        '<p style="margin:0;font-size:16px;'
+        'line-height:24px;color:#dc2626">'
         f'{expiry_note}'
         '</p>'
 
         f'{invitation_links_html}'
 
         '<p style="margin:24px 0 0;border-top:1px solid #e5e7eb;'
-        'padding-top:16px;color:#64748b;font-size:12px;'
-        'line-height:18px">'
+        'padding-top:16px;color:#64748b;font-size:16px;'
+        'line-height:24px">'
         f'{ignore_note}'
         '</p>'
     )
