@@ -452,7 +452,7 @@ function QuickViewScheduler({
           <div className="quick-scheduler-event-dialog__body">
             <div className="ticket-details-summary">
               <span>Submitted {parseApiDate(selectedEvent.submittedAt) ? formatEventDateTime(parseApiDate(selectedEvent.submittedAt)) : '-'}</span>
-              <span>{selectedEvent.statusLabel}</span>
+              {selectedEvent.statusLabel ? <span>{selectedEvent.statusLabel}</span> : null}
             </div>
             {[
               ['Employee Information', [

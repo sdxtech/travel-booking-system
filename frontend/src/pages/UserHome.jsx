@@ -8,7 +8,6 @@ import QuickBookingModal from '../components/QuickBookingModal'
 import { formatDriverPlate } from '../components/driverPlate'
 import {
   addMinutes,
-  formatStatusLabel,
   getBookingEventColor,
   parseApiDate,
 } from '../components/quickViewSchedulerUtils'
@@ -56,8 +55,6 @@ function buildDriverBookingEvent(booking, calendarId, color) {
     requesterDepartment: booking.requester_department,
     requesterPosition: booking.requester_job_position,
     passengerCount: booking.passenger_count,
-    meta: formatStatusLabel(booking.status),
-    statusLabel: formatStatusLabel(booking.status),
     departurePoint: booking.pickup_location,
     destinationPoint: booking.destination,
     start,
