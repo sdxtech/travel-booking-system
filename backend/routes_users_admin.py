@@ -23,6 +23,7 @@ from email_service import EmailDeliveryError, send_password_reset_email
 from main import get_current_user
 from mongo_client import db
 from profile_fields import department_value
+from booking_link_service import link_employee_bookings
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -833,6 +834,7 @@ def distribute_accounts(payload: DistributeAccountRequest, current_user=Depends(
             )
             if email_id is None:
                 raise EmailDeliveryError("Invitation email service is not configured")
+            link_employee_bookings(db, user_id)
             results.append(DistributeAccountResult(email=email, status="invited"))
             record_audit_event(action="Account invitation", status="sent", actor=current_user, target=email, details={"email": email, "role": payload.role, "delivery": "sent", "expires_in_minutes": 60})
         except Exception as exc:
@@ -884,6 +886,7 @@ def create_user(payload: UserCreate, current_user=Depends(get_current_user)):
     )
 
     snapshot = db["users"].find_one({"_id": user_id})
+    link_employee_bookings(db, user_id)
     return serialize_user(snapshot)
 
 

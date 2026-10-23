@@ -14,6 +14,7 @@ from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
 from settings_service import get_booking_cancellation_deadline, get_booking_cancellation_policy
 from cache_service import get_cached_json, set_cached_json
+from booking_link_service import link_employee_bookings
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -531,6 +532,8 @@ def list_my_bookings(current_user=Depends(get_current_user)):
     uid = current_user["uid"]
     ensure_role(uid, ("user",))
     enforce_employee_page_permission(uid, "booking_history")
+
+    link_employee_bookings(db, uid)
 
     snapshots = db["bookings"].find({"user_id": uid}).sort("created_at", -1)
     return [serialize_booking(doc) for doc in snapshots]
@@ -1254,6 +1257,9 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
     role = ensure_role(uid, ("user", "office_coordinator", "superadmin"))
     enforce_employee_page_permission(uid, "booking_history")
 
+    if role == "user":
+        link_employee_bookings(db, uid)
+
     snapshot = db["bookings"].find_one({"_id": booking_id})
     if not snapshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
@@ -1276,8 +1282,11 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
     completed_at = data.get("driver_finished_at") or validated_at
     validator = db["users"].find_one({"_id": uid}, {"name": 1, "email": 1}) or {}
     validated_by_name = validator.get("name") or validator.get("email") or uid
-    db["bookings"].update_one(
-        {"_id": booking_id},
+    validation_filter = {"_id": booking_id}
+    if role != "superadmin":
+        validation_filter.update(status="awaiting_validation", user_id=linked_user_id)
+    result = db["bookings"].update_one(
+        validation_filter,
         {
             "$set": {
                 "status": "completed",
@@ -1289,6 +1298,8 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
             }
         },
     )
+    if not result.modified_count:
+        raise HTTPException(status_code=409, detail="Booking changed. Please refresh.")
     publish_document_change("bookings", booking_id, data)
 
     driver_id = data.get("driver_id")
