@@ -258,8 +258,9 @@ def send_password_reset_email(
         links.append(("🌐 Akses Sistem" if language == "id" else "🌐 System Access", account_system_url))
         for label, url in links:
             invitation_links_html += (
-                '<p style="margin:12px 0 0;font-size:14px;line-height:22px;overflow-wrap:anywhere">'
-                f'{label}: <a href="{html.escape(url, quote=True)}" style="color:#273896">'
+                '<p style="margin:12px 0 0;font-size:18px;line-height:28px;overflow-wrap:anywhere">'
+                f'<strong style="font-size:18px;font-weight:700">{label}:</strong> '
+                f'<a href="{html.escape(url, quote=True)}" style="color:#273896;font-size:18px;font-weight:400">'
                 f'{html.escape(url)}</a></p>'
             )
             invitation_links_text += f"{label}: {url}\n\n"
