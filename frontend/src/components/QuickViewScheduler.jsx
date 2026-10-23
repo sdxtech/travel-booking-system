@@ -156,8 +156,8 @@ function QuickViewScheduler({
   const selectedEvent = useMemo(() => {
     const event = normalizedEvents.find((item) => item.id === selectedEventId)
     if (!event) return null
-    const driverName = calendars.find((calendar) => String(calendar.id) === String(event.calendarId))?.name
-    return { ...event, driverName }
+    const driver = calendars.find((calendar) => String(calendar.id) === String(event.calendarId))
+    return { ...event, driverName: driver?.name, driverPhone: driver?.driverPhone, plateNumber: driver?.plateNumber }
   }, [selectedEventId, normalizedEvents, calendars])
   const selectedEventKey = selectedEvent?.id
   useEffect(() => {
@@ -439,30 +439,54 @@ function QuickViewScheduler({
             if (event.target === event.currentTarget) setSelectedEventId(null)
           }}
         >
-          <div ref={eventDialogRef} className="modal quick-scheduler-event-dialog">
+          <div ref={eventDialogRef} className="modal ticket-details-modal quick-scheduler-event-dialog">
           <div className="modal-header">
-            <h2 id="scheduler-event-details-title">Booking Driver Details</h2>
+            <div>
+              <p className="eyebrow">Booking Driver Details</p>
+              <h2 id="scheduler-event-details-title">{selectedEvent.requestId || 'Driver Booking'}</h2>
+            </div>
             <button type="button" className="modal-close" aria-label="Close details" onClick={() => setSelectedEventId(null)}>
               <i className="bi bi-x-lg" aria-hidden="true" />
             </button>
           </div>
-          <dl className="ticket-details-grid">
+          <div className="quick-scheduler-event-dialog__body">
+            <div className="ticket-details-summary">
+              <span>Submitted {parseApiDate(selectedEvent.submittedAt) ? formatEventDateTime(parseApiDate(selectedEvent.submittedAt)) : '-'}</span>
+              <span>{selectedEvent.statusLabel}</span>
+            </div>
             {[
-              ['Requestor', selectedEvent.requesterName],
-              ['Total Passenger', selectedEvent.passengerCount],
-              ['Driver', selectedEvent.driverName],
-              ['Status', selectedEvent.statusLabel],
-              ['Departure Date & Time', formatEventDateTime(selectedEvent.start)],
-              ['Estimated Arrival Date & Time', formatEventDateTime(selectedEvent.end)],
-              ['DEPARTURE POINT', selectedEvent.departurePoint],
-              ['DESTINATION POINT', selectedEvent.destinationPoint],
-            ].map(([label, value]) => (
-              <div key={label} className="ticket-details-item ticket-details-item--full">
-                <dt>{label}</dt>
-                <dd>{value || '-'}</dd>
-              </div>
+              ['Employee Information', [
+                ['Name', selectedEvent.requesterName],
+                ['Phone / WA', selectedEvent.requesterPhone],
+                ['Department', selectedEvent.requesterDepartment],
+                ['Title/Position', selectedEvent.requesterPosition],
+              ]],
+              ['Schedule & Route', [
+                ['Departure', formatEventDateTime(selectedEvent.start)],
+                ['Estimated Arrival', formatEventDateTime(selectedEvent.end)],
+                ['Pickup Location', selectedEvent.departurePoint],
+                ['Destination', selectedEvent.destinationPoint],
+              ]],
+              ['Trip & Driver', [
+                ['Total Passenger', selectedEvent.passengerCount],
+                ['Driver', selectedEvent.driverName],
+                ['Plat No', selectedEvent.plateNumber],
+                ['Driver Phone / WA', selectedEvent.driverPhone],
+              ]],
+            ].map(([heading, fields]) => (
+              <section key={heading} className="ticket-details-section">
+                <h3>{heading}</h3>
+                <dl className="ticket-details-grid">
+                  {fields.map(([label, value]) => (
+                    <div key={label} className="ticket-details-item">
+                      <dt>{label}</dt>
+                      <dd>{value ?? '-'}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
             ))}
-          </dl>
+          </div>
           </div>
         </div>,
         document.body

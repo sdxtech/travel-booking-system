@@ -3242,7 +3242,27 @@ user-dropdown-toogle {
 .modal.quick-scheduler-event-dialog {
   margin: auto;
   width: calc(100% - 32px);
+  max-width: 760px;
   box-sizing: border-box;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
+.quick-scheduler-event-dialog > .modal-header {
+  flex-shrink: 0;
+}
+
+.quick-scheduler-event-dialog__body {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quick-scheduler-event-dialog__body > * {
+  flex-shrink: 0;
 }
 
 .modal.quick-booking-modal {

@@ -50,8 +50,9 @@ class DriverCalendarTests(unittest.TestCase):
                     result = self.calendar()[0].bookings[0].model_dump()
                     self.assertEqual(result["requester_name"], "Budi Santoso")
                     self.assertEqual(result["passenger_count"], 4)
+                    self.assertEqual(result["requester_phone"], "08123456789")
                     self.assertEqual(result["destination"], "Airport")
-                    for private_field in ("user_id", "requester_email", "requester_phone", "requester_nik"):
+                    for private_field in ("user_id", "requester_email", "requester_nik"):
                         self.assertNotIn(private_field, result)
 
     def test_legacy_booking_without_requester_or_passenger_total_still_loads(self):

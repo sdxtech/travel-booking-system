@@ -83,6 +83,11 @@ class DriverCalendarBookingResponse(BaseModel):
     driver_id: str
     status: str
     requester_name: Optional[str] = None
+    request_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    requester_phone: Optional[str] = None
+    requester_department: Optional[str] = None
+    requester_job_position: Optional[str] = None
     passenger_count: Optional[int] = None
     pickup_location: Optional[str] = None
     destination: Optional[str] = None
@@ -99,6 +104,7 @@ class DriverCalendarResponse(BaseModel):
     plate_number: Optional[str] = None
     driver_id: str
     driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
     driver_email: Optional[str] = None
     booking_enabled: bool = True
     bookings: list[DriverCalendarBookingResponse] = Field(default_factory=list)
@@ -633,6 +639,11 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
                     id=str(data.get("_id")),
                     driver_id=driver_id,
                     requester_name=data.get("requester_name"),
+                    request_id=data.get("request_id"),
+                    created_at=data.get("created_at"),
+                    requester_phone=data.get("requester_phone"),
+                    requester_department=data.get("requester_department") or data.get("requester_dept_job_position"),
+                    requester_job_position=data.get("requester_job_position"),
                     passenger_count=data.get("passenger_count"),
                     status=data.get("status", "approved"),
                     pickup_location=data.get("pickup_location"),
@@ -657,6 +668,7 @@ def list_driver_calendars(current_user=Depends(get_current_user)):
                 driver_id=driver_id,
                 driver_name=data.get("name") or data.get("email") or "Driver",
                 driver_email=data.get("email"),
+                driver_phone=data.get("phone_number") or data.get("phone"),
                 booking_enabled=data.get("booking_enabled", True) is not False,
                 bookings=driver_bookings,
             )
