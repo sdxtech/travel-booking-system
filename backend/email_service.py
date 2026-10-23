@@ -254,8 +254,8 @@ def send_password_reset_email(
         guidebook_url = account_guidebook_url.strip()
         links = []
         if guidebook_url:
-            links.append(("Panduan Penggunaan" if language == "id" else "Guidebook", guidebook_url))
-        links.append(("Akses Sistem" if language == "id" else "System Access", account_system_url))
+            links.append(("📖 Panduan Penggunaan" if language == "id" else "📖 Guidebook", guidebook_url))
+        links.append(("🌐 Akses Sistem" if language == "id" else "🌐 System Access", account_system_url))
         for label, url in links:
             invitation_links_html += (
                 '<p style="margin:12px 0 0;font-size:14px;line-height:22px;overflow-wrap:anywhere">'
