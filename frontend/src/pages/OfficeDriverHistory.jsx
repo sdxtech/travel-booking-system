@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
+import BookingRequesterEditModal from '../components/BookingRequesterEditModal'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
@@ -52,6 +53,7 @@ function OfficeDriverHistory() {
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const { user } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
+  const canEditRequester = isSuperadmin || user?.role === 'office_coordinator'
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -68,6 +70,7 @@ function OfficeDriverHistory() {
   const [selectedDriverId, setSelectedDriverId] = useState('')
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(null)
+  const [requesterEditTarget, setRequesterEditTarget] = useState(null)
   const { locations, locationsLoading, locationsError } = useBookingLocations()
   const [pickupLocationOther, setPickupLocationOther] = useState(false)
   const [destinationOther, setDestinationOther] = useState(false)
@@ -289,7 +292,7 @@ function OfficeDriverHistory() {
     const trigger = event.currentTarget
     const triggerRect = trigger.getBoundingClientRect()
     const menuWidth = 190
-    const menuHeight = booking.cancellation_status === 'pending' ? 260 : 188
+    const menuHeight = (booking.cancellation_status === 'pending' ? 260 : 188) + (canEditRequester ? 36 : 0)
     const viewportGap = 8
     const controlGap = 5
     const hasMoreRoomAbove = triggerRect.top > window.innerHeight - triggerRect.bottom
@@ -1452,6 +1455,22 @@ function OfficeDriverHistory() {
                       Edit
                     </button>
                   ) : null}
+                  {canEditRequester ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        const booking = actionMenu.booking
+                        closeActionMenu()
+                        setActionError('')
+                        setActionMessage('')
+                        setRequesterEditTarget(booking)
+                      }}
+                    >
+                      <i className="bi bi-person-lines-fill" aria-hidden="true" />
+                      Edit User Data
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     role="menuitem"
@@ -1536,6 +1555,23 @@ function OfficeDriverHistory() {
                 document.body,
               )
             : null}
+
+          {canEditRequester && requesterEditTarget ? (
+            <BookingRequesterEditModal
+              key={requesterEditTarget.id}
+              booking={requesterEditTarget}
+              onClose={() => {
+                setRequesterEditTarget(null)
+                actionMenuTriggerRef.current?.focus()
+              }}
+              onSaved={(updated) => {
+                setBookings((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
+                setActionMessage('Booking user data updated.')
+                setRequesterEditTarget(null)
+                actionMenuTriggerRef.current?.focus()
+              }}
+            />
+          ) : null}
 
           {editTarget && editForm ? (
             <div

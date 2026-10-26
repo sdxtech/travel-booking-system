@@ -55,6 +55,7 @@ function describeActivity(action, path) {
     [/PATCH \/bookings\/[^/]+\/start/, 'Start Booking Driver Trip'],
     [/PATCH \/bookings\/[^/]+\/complete/, 'Finish Booking Driver Trip'],
     [/PATCH \/bookings\/[^/]+\/validate-completion/, 'Validate Booking Driver Completion'],
+    [/PATCH \/bookings\/[^/]+\/requester$/, 'Edit Booking User Data'],
     [/PATCH \/bookings\/[^/]+$/, 'Edit Booking Driver Request'],
     [/POST \/tickets\/accommodation/, 'Create Travel Request'],
     [/POST \/tickets$/, 'Submit Travel Request'],

@@ -4310,6 +4310,48 @@ user-dropdown-toogle {
   flex-wrap: wrap;
 }
 
+.modal.booking-requester-edit-modal {
+  max-width: 680px;
+  max-height: calc(100dvh - 48px);
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 12px;
+  gap: 12px;
+}
+
+.booking-requester-edit-modal > .modal-header,
+.booking-requester-edit-modal > .modal-actions {
+  flex-shrink: 0;
+}
+
+.booking-requester-edit-modal p {
+  margin: 0;
+}
+
+.booking-requester-edit-modal__body {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.booking-requester-edit-modal__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.booking-requester-edit-modal__fields .inline-label {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .booking-requester-edit-modal__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .btn-brand {
   background-color: var(--brand-bold);
   color: #ffffff;

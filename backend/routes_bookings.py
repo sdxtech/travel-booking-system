@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from main import get_current_user
 from mongo_client import db
@@ -41,6 +41,17 @@ class BookingAssignCreate(BaseModel):
     departure_time: datetime
     estimated_arrival_time: datetime
     passenger_count: int = Field(..., ge=1)
+
+
+class BookingRequesterUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    requester_name: str = Field(..., min_length=1)
+    requester_department: str = ""
+    requester_job_position: str = ""
+    requester_nik: str = ""
+    requester_phone: str = Field(..., min_length=1)
+    requester_email: str = Field(..., pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 class BookingResponse(BaseModel):
@@ -791,6 +802,28 @@ def update_booking_status(
 
     updated_snapshot = db["bookings"].find_one({"_id": booking_id})
     return serialize_booking(updated_snapshot)
+
+
+@router.patch("/{booking_id}/requester", response_model=BookingResponse)
+def update_booking_requester(
+    booking_id: str, payload: BookingRequesterUpdate, current_user=Depends(get_current_user),
+):
+    """Correct a booking's requester snapshot without changing its account or workflow."""
+    uid = current_user["uid"]
+    ensure_role(uid, ("office_coordinator", "superadmin"))
+    snapshot = db["bookings"].find_one({"_id": booking_id})
+    if not snapshot:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    updates["requester_email"] = normalize_email(payload.requester_email)
+    updates.update(updated_at=utc_now(), updated_by=uid)
+    # Account ownership, trip details, and status are deliberately outside this schema.
+    result = db["bookings"].update_one({"_id": booking_id}, {"$set": updates})
+    if not result.matched_count:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    publish_document_change("bookings", booking_id, snapshot)
+    return serialize_booking(db["bookings"].find_one({"_id": booking_id}))
 
 
 @router.patch("/{booking_id}", response_model=BookingResponse)
