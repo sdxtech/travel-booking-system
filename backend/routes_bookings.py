@@ -50,7 +50,7 @@ class BookingRequesterUpdate(BaseModel):
     requester_department: str = ""
     requester_job_position: str = ""
     requester_nik: str = ""
-    requester_phone: str = Field(..., min_length=1)
+    requester_phone: str = ""
     requester_email: str = Field(..., pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 

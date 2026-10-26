@@ -674,8 +674,8 @@ function AdminManageUser() {
                     <input placeholder="National ID" value={editForm.nik} onChange={handleEditChange('nik')} />
                   </label>
                   <label className="inline-label">
-                    <span>Phone</span>
-                    <input placeholder="Phone" value={editForm.phone} onChange={handleEditChange('phone')} required />
+                    <span>Phone (optional)</span>
+                    <input type="tel" placeholder="Phone" value={editForm.phone} onChange={handleEditChange('phone')} />
                   </label>
                   <TelegramIdField value={editForm.telegram_chat_id} onChange={handleEditChange('telegram_chat_id')} />
                   <label className="inline-label">

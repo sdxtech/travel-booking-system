@@ -7,7 +7,7 @@ const fields = [
   { key: 'requester_department', label: 'Department' },
   { key: 'requester_job_position', label: 'Title/Position' },
   { key: 'requester_nik', label: 'NIK / National ID (optional)' },
-  { key: 'requester_phone', label: 'Phone/WA', type: 'tel', required: true },
+  { key: 'requester_phone', label: 'Phone/WA (optional)', type: 'tel' },
   { key: 'requester_email', label: 'Email', type: 'email', required: true },
 ]
 
@@ -38,7 +38,7 @@ export default function BookingRequesterEditModal({ booking, onClose, onSaved })
     if (requestInFlight.current) return
     const payload = Object.fromEntries(fields.map(({ key }) => [key, form[key].trim()]))
     if (fields.some(({ key, required }) => required && !payload[key])) {
-      setError('Name, Phone/WA, and Email are required.')
+      setError('Name and Email are required.')
       return
     }
     requestInFlight.current = true

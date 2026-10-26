@@ -75,8 +75,13 @@ class UserUpdate(TelegramUserFields):
     job_position: Optional[str] = None
     role: Optional[Role] = None
     nik: Optional[str] = None
-    phone: Optional[str] = Field(default=None, min_length=1)
+    phone: Optional[str] = None
     email: Optional[str] = Field(default=None, min_length=3)
+
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, value):
+        return value.strip() if value is not None else None
 
 
 class UserPasswordUpdate(BaseModel):
@@ -945,6 +950,8 @@ def update_user(user_id: str, payload: UserUpdate, current_user=Depends(get_curr
 
     updates["updated_at"] = utc_now()
     updates["updated_by"] = uid
+    if "phone" in updates and "phone_number" in target_data:
+        updates["phone_number"] = updates["phone"]
     update_user_profile(user_id, updates)
 
     updated_snapshot = db["users"].find_one({"_id": user_id})

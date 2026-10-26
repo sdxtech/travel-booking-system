@@ -62,6 +62,38 @@ class ProfileFieldsTests(unittest.TestCase):
             result = users.update_user("employee", users.UserUpdate(nik=""), {"uid": "admin"})
             self.assertEqual(result.nik, "")
 
+    def test_office_roles_can_edit_one_profile_without_a_phone(self):
+        for role in ("office_coordinator", "superadmin"):
+            for existing in ({}, {"phone": ""}, {"phone": "08123"}, {"phone_number": "08123"}):
+                for phone in ("", "  ", " 08999 "):
+                    with self.subTest(role=role, existing=existing, phone=phone):
+                        document = {"_id": "employee", "role": "user", "name": "Before", **existing}
+                        collection = Mock()
+                        collection.find_one.side_effect = lambda *args, **kwargs: document.copy()
+                        collection.update_one.side_effect = lambda query, change: document.update(change["$set"])
+                        with patch.object(users, "db", {"users": collection}), \
+                                patch.object(users, "ensure_role", return_value=role):
+                            result = users.update_user("employee", users.UserUpdate(name="After", phone=phone), {"uid": "office"})
+                        self.assertEqual(result.name, "After")
+                        self.assertEqual(document["phone"], phone.strip())
+                        self.assertEqual(result.phone or "", phone.strip())
+                        if "phone_number" in existing:
+                            self.assertEqual(document["phone_number"], phone.strip())
+
+    def test_profile_update_preserves_phone_when_omitted(self):
+        for existing in ({"phone": "08123"}, {"phone_number": "08123"}):
+            document = {"_id": "employee", "role": "user", "name": "Before", **existing}
+            collection = Mock()
+            collection.find_one.side_effect = lambda *args, **kwargs: document.copy()
+            collection.update_one.side_effect = lambda query, change: document.update(change["$set"])
+            with patch.object(users, "db", {"users": collection}), \
+                    patch.object(users, "ensure_role", return_value="superadmin"):
+                result = users.update_user("employee", users.UserUpdate(name="After"), {"uid": "office"})
+            self.assertEqual(result.phone, "08123")
+            updates = collection.update_one.call_args.args[1]["$set"]
+            self.assertNotIn("phone", updates)
+            self.assertNotIn("phone_number", updates)
+
     def test_legacy_api_payload_is_department_only_and_canonical_value_wins(self):
         payload = self.profile()
         payload.pop("department")

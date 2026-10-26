@@ -110,7 +110,7 @@ class BookingRequesterTests(unittest.TestCase):
         self.collection.update_one.assert_not_called()
 
     def test_blank_required_fields_and_malformed_email_are_rejected(self):
-        for field in ("requester_name", "requester_phone", "requester_email"):
+        for field in ("requester_name", "requester_email"):
             for value in ("", "  ", None):
                 with self.subTest(field=field, value=value):
                     self.assertEqual(self.submit({**self.payload, field: value}).status_code, 422)
@@ -119,12 +119,23 @@ class BookingRequesterTests(unittest.TestCase):
         self.collection.update_one.assert_not_called()
 
     def test_omitted_optional_fields_are_preserved(self):
-        payload = {key: self.payload[key] for key in ("requester_name", "requester_phone", "requester_email")}
+        payload = {key: self.payload[key] for key in ("requester_name", "requester_email")}
         response = self.submit(payload)
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["requester_nik"], "123")
         self.assertEqual(response.json()["requester_department"], "Finance")
         self.assertEqual(response.json()["requester_job_position"], "Analyst")
+        self.assertEqual(response.json()["requester_phone"], "08123")
+
+    def test_office_roles_can_save_requester_with_blank_phone(self):
+        for role in ("office_coordinator", "superadmin"):
+            for phone in ("", "  "):
+                with self.subTest(role=role, phone=phone):
+                    self.role = role
+                    response = self.submit({**self.payload, "requester_phone": phone})
+                    self.assertEqual(response.status_code, 200, response.text)
+                    self.assertEqual(response.json()["requester_phone"], "")
+                    self.assertEqual(response.json()["user_id"], "original-employee")
 
     def test_optional_fields_can_be_cleared_including_legacy_department(self):
         self.document.pop("requester_department")
