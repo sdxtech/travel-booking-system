@@ -28,12 +28,15 @@ const errors = {
 
 export function indonesianError(detail, fallback = 'Terjadi kendala. Silakan coba lagi.') {
   if (Array.isArray(detail)) {
+    const mileageMessage = detail[0]?.msg?.replace(/^Value error, /, '')
+    if (mileageMessage?.startsWith('Kilometer ')) return mileageMessage
     const fields = { starting_mileage: 'Angka kilometer awal', ending_mileage: 'Angka kilometer akhir', new_password: 'Kata sandi baru', current_password: 'Kata sandi saat ini', confirm_password: 'Konfirmasi kata sandi', email: 'Alamat email' }
     const field = fields[detail[0]?.loc?.at(-1)]
     if (field) return `${field} belum sesuai. Periksa kembali isian Anda.`
     return fallback
   }
   if (typeof detail !== 'string') return fallback
+  if (detail.startsWith('Kilometer ')) return detail
   if (errors[detail]) return errors[detail]
   const resetWait = detail.match(/Please try again in approximately (\d+) hours and (\d+) minutes/)
   if (resetWait) return `Pengaturan ulang kata sandi sudah diminta hari ini. Silakan coba lagi sekitar ${resetWait[1]} jam ${resetWait[2]} menit lagi.`

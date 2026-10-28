@@ -2,6 +2,7 @@ import { useLatestRequest } from '../hooks/useLatestRequest'
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { indonesianError } from '../utils/indonesian'
+import { validateDriverMileage } from '../utils/driverMileage'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
 
@@ -127,11 +128,12 @@ function DriverHome() {
   const handleStart = async () => {
     if (!activeBooking?.id) return
 
-    const mileageValue = Number(startingMileage)
-    if (!Number.isFinite(mileageValue) || mileageValue < 0) {
-      setActionError('Masukkan angka kilometer awal yang valid.')
+    const mileageError = validateDriverMileage(startingMileage, 'awal')
+    if (mileageError) {
+      setActionError(mileageError)
       return
     }
+    const mileageValue = Number(startingMileage)
 
 
 
@@ -181,9 +183,14 @@ function DriverHome() {
   const handleFinish = async () => {
     if (!activeBooking?.id) return
 
+    const mileageError = validateDriverMileage(endingMileage, 'akhir')
+    if (mileageError) {
+      setActionError(mileageError)
+      return
+    }
     const endingValue = Number(endingMileage)
-    if (!Number.isFinite(endingValue) || endingValue < 0) {
-      setActionError('Masukkan angka kilometer akhir yang valid.')
+    if (activeBooking.starting_mileage == null || endingValue < activeBooking.starting_mileage) {
+      setActionError('Kilometer akhir tidak boleh lebih kecil dari kilometer awal.')
       return
     }
 
@@ -622,7 +629,7 @@ function DriverHome() {
 
               <div className="field-grid">
                 <label className="inline-label">
-                  <span>Kilometer Awal</span>
+                  <span>Kilometer Awal *</span>
                   <input
                     type="number"
                     min="0"
@@ -674,7 +681,7 @@ function DriverHome() {
                   <input type="number" value={activeBooking?.starting_mileage ?? ''} disabled readOnly />
                 </label>
                 <label className="inline-label">
-                  <span>Kilometer Akhir</span>
+                  <span>Kilometer Akhir *</span>
                   <input
                     type="number"
                     min="0"

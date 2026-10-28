@@ -39,6 +39,8 @@ def driver_notification_message(message: str, event: Optional[str], status: Opti
         if message == "You have been assigned a new driver task. Please check Driver Tasks for details.":
             return "Anda mendapat tugas perjalanan baru yang telah disetujui. Silakan lihat menu Tugas Saya."
     if event == "assignment_updated":
+        if message.startswith("Penugasan perjalanan Anda diperbarui"):
+            return message
         return "Penugasan perjalanan Anda diperbarui oleh Super Admin. Silakan lihat menu Tugas Saya."
     if event == "completion_validated":
         return "Penyelesaian perjalanan Anda telah dikonfirmasi. Perjalanan dinyatakan selesai."

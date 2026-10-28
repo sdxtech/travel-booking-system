@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from main import get_current_user
 from mongo_client import db
@@ -52,6 +52,17 @@ class BookingRequesterUpdate(BaseModel):
     requester_nik: str = ""
     requester_phone: str = ""
     requester_email: str = Field(..., pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+
+
+class BookingOfficeUpdate(BookingCreate, BookingRequesterUpdate):
+    starting_mileage: Optional[int] = Field(default=None, ge=0, strict=True)
+    ending_mileage: Optional[int] = Field(default=None, ge=0, strict=True)
+    started_at: Optional[datetime] = None
+    driver_finished_at: Optional[datetime] = None
+    validated_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    validated_by_name: Optional[str] = None
+    status: Literal["pending", "approved", "rejected", "in_progress", "awaiting_validation", "completed", "cancelled"]
 
 
 class BookingResponse(BaseModel):
@@ -127,12 +138,25 @@ class BookingStatusUpdate(BaseModel):
     driver_id: Optional[str] = None
 
 
-class BookingStart(BaseModel):
-    starting_mileage: int = Field(..., ge=0)
+class BookingMileageInput(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def validate_mileage(cls, data):
+        field, label = ("starting_mileage", "awal") if cls.__name__ == "BookingStart" else ("ending_mileage", "akhir")
+        value = data.get(field) if isinstance(data, dict) else None
+        if value is None or (isinstance(value, str) and not value.strip()):
+            raise ValueError(f"Kilometer {label} wajib diisi.")
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"Kilometer {label} harus berupa angka bulat nol atau lebih.")
+        return data
 
 
-class BookingComplete(BaseModel):
-    ending_mileage: int = Field(..., ge=0)
+class BookingStart(BookingMileageInput):
+    starting_mileage: int = Field(..., ge=0, strict=True)
+
+
+class BookingComplete(BookingMileageInput):
+    ending_mileage: int = Field(..., ge=0, strict=True)
 
 
 def serialize_booking(doc_snapshot) -> BookingResponse:
@@ -826,6 +850,69 @@ def update_booking_requester(
     return serialize_booking(db["bookings"].find_one({"_id": booking_id}))
 
 
+@router.patch("/{booking_id}/office-details", response_model=BookingResponse)
+def update_office_booking(booking_id: str, payload: BookingOfficeUpdate, current_user=Depends(get_current_user)):
+    """Correct operational history while retaining request identity and account ownership."""
+    uid = current_user["uid"]
+    role = ensure_role(uid, ("office_coordinator", "superadmin"))
+    snapshot = db["bookings"].find_one({"_id": booking_id})
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    updates = payload.model_dump(exclude_unset=True)
+    validate_booking_interval(payload.departure_time, payload.estimated_arrival_time)
+    schedule_changed = any(
+        normalize_datetime(snapshot.get(field)) != normalize_datetime(updates[field])
+        for field in ("departure_time", "estimated_arrival_time")
+    ) or payload.driver_id != snapshot.get("driver_id")
+    active_statuses = ("pending", "approved", "in_progress")
+    if schedule_changed or (payload.status in active_statuses and snapshot.get("status") not in active_statuses):
+        driver = resolve_driver(payload.driver_id, allow_unavailable=role == "superadmin")
+        if role != "superadmin" and payload.status in active_statuses and is_driver_busy(
+            payload.driver_id, payload.departure_time, payload.estimated_arrival_time,
+            exclude_booking_id=booking_id, blocking_statuses=active_statuses,
+        ):
+            raise HTTPException(status_code=409, detail="The selected driver is unavailable for this schedule.")
+        updates["driver_name"] = driver.get("name") or driver.get("email") or "Driver"
+    merged = {**snapshot, **updates}
+    start, end = merged.get("starting_mileage"), merged.get("ending_mileage")
+    if end is not None and (start is None or end < start):
+        raise HTTPException(status_code=400, detail="Ending kilometer requires a starting kilometer and must be greater than or equal to it.")
+    if payload.status in ("in_progress", "awaiting_validation", "completed") and (start is None or not merged.get("started_at")):
+        raise HTTPException(status_code=400, detail="Starting kilometer and Starting Time are required for a started trip.")
+    if payload.status in ("awaiting_validation", "completed") and (end is None or not merged.get("driver_finished_at")):
+        raise HTTPException(status_code=400, detail="Ending kilometer and Finish Time are required for a finished trip.")
+    if payload.status == "completed" and not merged.get("validated_at"):
+        raise HTTPException(status_code=400, detail="Ending Time is required for a completed trip.")
+    times = [normalize_datetime(merged.get(field)) for field in ("started_at", "driver_finished_at", "validated_at")]
+    present_times = [value for value in times if value is not None]
+    if present_times != sorted(present_times):
+        raise HTTPException(status_code=400, detail="Starting Time, Finish Time, and Ending Time must be in chronological order.")
+    updates["requester_email"] = normalize_email(payload.requester_email)
+    updates.update(updated_at=utc_now(), updated_by=uid)
+    result = db["bookings"].update_one({"_id": booking_id, "updated_at": snapshot.get("updated_at")}, {"$set": updates})
+    if not result.matched_count:
+        raise HTTPException(status_code=409, detail="Booking changed. Please reopen it before saving.")
+    publish_document_change("bookings", booking_id, snapshot)
+    trip_changed = schedule_changed or any(snapshot.get(field) != updates.get(field) for field in (
+        "pickup_location", "destination", "passenger_count",
+    ))
+    if trip_changed:
+        actor_label = "Super Admin" if role == "superadmin" else "Office Coordinator"
+        if snapshot.get("user_id"):
+            create_user_notification(
+                snapshot["user_id"], f"Your driver booking details were updated by {actor_label}.",
+                event="updated_by_superadmin" if role == "superadmin" else "updated_by_office",
+                entity_type="booking", entity_id=booking_id, status=payload.status, actor_id=uid,
+            )
+        create_user_notification(
+            payload.driver_id,
+            f"Penugasan perjalanan Anda diperbarui oleh {'Super Admin' if role == 'superadmin' else 'Koordinator'}. Silakan lihat menu Tugas Saya.",
+            event="assignment_updated", entity_type="booking", entity_id=booking_id,
+            status=payload.status, actor_id=uid,
+        )
+    return serialize_booking(db["bookings"].find_one({"_id": booking_id}))
+
+
 @router.patch("/{booking_id}", response_model=BookingResponse)
 def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends(get_current_user)):
     """Edit an Employee pending request or allow Super Admin to overwrite any booking."""
@@ -1233,7 +1320,7 @@ def complete_booking(booking_id: str, payload: BookingComplete, current_user=Dep
     if isinstance(starting, int) and payload.ending_mileage < starting:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ending mileage must be greater than or equal to starting mileage",
+            detail="Kilometer akhir tidak boleh lebih kecil dari kilometer awal.",
         )
 
     finished_at = utc_now()

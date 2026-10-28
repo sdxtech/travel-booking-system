@@ -1,6 +1,18 @@
 import { Children, cloneElement, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+function TableActionItem({ child, onAction }) {
+  return cloneElement(child, {
+    role: 'menuitem',
+    tabIndex: -1,
+    onClick: (event) => {
+      // Run the action before closing, so Details can update its parent.
+      child.props.onClick?.(event)
+      if (!event.defaultPrevented && !event.currentTarget.disabled) onAction()
+    },
+  })
+}
+
 function TableActionDropdown({ label, disabled = false, children }) {
   const [position, setPosition] = useState(null)
   const triggerRef = useRef(null)
@@ -109,18 +121,9 @@ function TableActionDropdown({ label, disabled = false, children }) {
           style={position}
           onKeyDown={handleMenuKeyDown}
         >
-          {Children.map(children, (child) => cloneElement(child, {
-            role: 'menuitem',
-            tabIndex: -1,
-            onClick: (event) => {
-              // Run the action first. Closing on click-capture can unmount the
-              // button before callbacks such as Details update their parent.
-              child.props.onClick?.(event)
-              if (!event.defaultPrevented && !event.currentTarget.disabled) {
-                closeAndFocusTrigger()
-              }
-            },
-          }))}
+          {Children.map(children, (child) => (
+            <TableActionItem child={child} onAction={closeAndFocusTrigger} />
+          ))}
         </div>,
         document.body,
       ) : null}

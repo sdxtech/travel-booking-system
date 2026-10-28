@@ -15,6 +15,22 @@ import { getNightOvertimeMinutes } from '../components/bookingOvertime'
 import useBookingLocations from '../hooks/useBookingLocations'
 
 const OTHER_LOCATION_VALUE = '__other_location__'
+const correctionFields = [
+  ['requester_name', 'Name', 'text', true],
+  ['requester_department', 'Department'],
+  ['requester_job_position', 'Title/Position'],
+  ['requester_nik', 'NIK / National ID (optional)'],
+  ['requester_phone', 'Phone/WA (optional)', 'tel'],
+  ['requester_email', 'Email', 'email', true],
+  ['starting_mileage', 'Starting Kilometer', 'number'],
+  ['ending_mileage', 'Ending Kilometer', 'number'],
+  ['created_at', 'Submission Date', 'datetime-local', true],
+  ['started_at', 'Starting Time', 'datetime-local'],
+  ['driver_finished_at', 'Finish Time', 'datetime-local'],
+  ['validated_at', 'Ending Time (Validation)', 'datetime-local'],
+  ['validated_by_name', 'Validated By'],
+]
+const correctionDates = correctionFields.filter(([, , type]) => type === 'datetime-local').map(([key]) => key)
 
 const menuItems = [
   { label: 'Quick View', icon: 'bi-speedometer2' },
@@ -365,10 +381,10 @@ function OfficeDriverHistory() {
                 ? 'unavailable'
                 : 'neutral',
           color: DRIVER_SELECT_COLORS[index % DRIVER_SELECT_COLORS.length],
-          disabled: !isSuperadmin && isUnavailable,
+          disabled: !isSuperadmin && !editTarget && isUnavailable,
         }
       }),
-    [availabilityError, drivers, isSuperadmin, unavailableDriverIds]
+    [availabilityError, drivers, editTarget, isSuperadmin, unavailableDriverIds]
   )
 
   // Build the label shown beside the active date range selector.
@@ -649,7 +665,7 @@ function OfficeDriverHistory() {
     const date = toDate(value)
     if (!date) return ''
     const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000)
-    return localDate.toISOString().slice(0, 16)
+    return localDate.toISOString().slice(0, 19)
   }
 
   const openEditModal = (booking) => {
@@ -663,6 +679,12 @@ function OfficeDriverHistory() {
       departure_time: toLocalDateTimeInput(booking.departure_time),
       estimated_arrival_time: toLocalDateTimeInput(booking.estimated_arrival_time),
       passenger_count: booking.passenger_count ?? 1,
+      status: booking.status || 'pending',
+      ...Object.fromEntries(correctionFields.map(([key, , type]) => [key,
+        type === 'datetime-local' ? toLocalDateTimeInput(booking[key])
+          : key === 'requester_department' ? booking.requester_department ?? booking.requester_dept_job_position ?? ''
+            : booking[key] ?? '',
+      ])),
     })
     setActionError('')
     loadUnavailableDrivers(booking)
@@ -686,10 +708,10 @@ function OfficeDriverHistory() {
     if (editTarget && editForm) return loadUnavailableDrivers({ ...editTarget, ...editForm })
   })
 
-  // Save a Super Admin booking edit without changing its current workflow status.
+  // Correct booking history for both office roles.
   const handleSaveEdit = async (event) => {
     event.preventDefault()
-    if (!isSuperadmin || !editTarget?.id || !editForm) return
+    if (!canEditRequester || !editTarget?.id || !editForm) return
 
     if (!editForm.driver_id || !editForm.pickup_location.trim() || !editForm.destination.trim()) {
       setActionError('Driver, pickup location, and destination are required.')
@@ -712,8 +734,13 @@ function OfficeDriverHistory() {
     setActionLoadingId(editTarget.id)
     setActionError('')
     setActionMessage('')
+    const serializeEditDate = (key) => {
+      if (!editForm[key]) return null
+      if (editForm[key] === toLocalDateTimeInput(editTarget[key])) return editTarget[key]
+      return new Date(editForm[key]).toISOString()
+    }
     try {
-      const res = await fetch(`${API_BASE_URL}/bookings/${editTarget.id}`, {
+      const res = await fetch(`${API_BASE_URL}/bookings/${editTarget.id}/office-details`, {
         method: 'PATCH',
         headers: {
 
@@ -724,20 +751,23 @@ function OfficeDriverHistory() {
           ...editForm,
           pickup_location: editForm.pickup_location.trim(),
           destination: editForm.destination.trim(),
-          departure_time: departureTime.toISOString(),
-          estimated_arrival_time: estimatedArrivalTime.toISOString(),
+          departure_time: serializeEditDate('departure_time'),
+          estimated_arrival_time: serializeEditDate('estimated_arrival_time'),
           passenger_count: Number(editForm.passenger_count),
+          starting_mileage: editForm.starting_mileage === '' ? null : Number(editForm.starting_mileage),
+          ending_mileage: editForm.ending_mileage === '' ? null : Number(editForm.ending_mileage),
+          ...Object.fromEntries(correctionDates.map((key) => [key, serializeEditDate(key)])),
         }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setActionError(data?.detail || 'Failed to update booking.')
+        setActionError(Array.isArray(data?.detail) ? data.detail.map((item) => item.msg).join('; ') : data?.detail || 'Failed to update booking.')
         return
       }
 
       const updated = await res.json()
       setBookings((current) => current.map((item) => (item.id === editTarget.id ? { ...item, ...updated } : item)))
-      setActionMessage('Booking updated by Super Admin.')
+      setActionMessage('Booking updated successfully.')
       closeEditModal()
       window.dispatchEvent(new Event('notifications:refresh'))
     } catch {
@@ -1441,7 +1471,7 @@ function OfficeDriverHistory() {
                       </button>
                     </>
                   ) : null}
-                  {isSuperadmin ? (
+                  {canEditRequester ? (
                     <button
                       type="button"
                       role="menuitem"
@@ -1586,7 +1616,7 @@ function OfficeDriverHistory() {
               <form className="modal ticket-details-modal" onSubmit={handleSaveEdit} onClick={(event) => event.stopPropagation()}>
                 <div className="modal-header">
                   <div>
-                    <p className="eyebrow">Super Admin Override</p>
+                    <p className="eyebrow">Booking Driver Request & History</p>
                     <h2 id="superadmin-booking-edit-title">Edit {editTarget.request_id || 'Booking'}</h2>
                   </div>
                   <button
@@ -1601,10 +1631,28 @@ function OfficeDriverHistory() {
                 </div>
 
                 <div className="field-grid">
+                  <p className="muted" style={{ gridColumn: '1 / -1' }}>Changes apply to this booking. Request ID and linked Employee are retained. Distance, duration, and overtime are calculated automatically.</p>
+                  {correctionFields.map(([key, label, type = 'text', required = false]) => (
+                    <label className="inline-label" key={key}>
+                      <span>{label}{required ? ' *' : ''}</span>
+                      <input type={type} value={editForm[key]} onChange={handleEditFormChange(key)}
+                        min={type === 'number' ? '0' : undefined} step={['number', 'datetime-local'].includes(type) ? '1' : undefined}
+                        required={required} disabled={Boolean(actionLoadingId)} />
+                    </label>
+                  ))}
+                  <label className="inline-label">
+                    <span>Status</span>
+                    <select value={editForm.status} onChange={handleEditFormChange('status')} disabled={Boolean(actionLoadingId)}>
+                      {['pending', 'approved', 'in_progress', 'awaiting_validation', 'completed', 'cancelled', 'rejected'].map((value) => (
+                        <option key={value} value={value}>{value.replace(/_/g, ' ')}</option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="inline-label">
                     <span>Departure Date & Time</span>
                     <input
                       type="datetime-local"
+                      step="1"
                       value={editForm.departure_time}
                       onChange={handleEditFormChange('departure_time')}
                       disabled={Boolean(actionLoadingId)}
@@ -1615,6 +1663,7 @@ function OfficeDriverHistory() {
                     <span>Estimated Arrival Date & Time</span>
                     <input
                       type="datetime-local"
+                      step="1"
                       value={editForm.estimated_arrival_time}
                       onChange={handleEditFormChange('estimated_arrival_time')}
                       disabled={Boolean(actionLoadingId)}

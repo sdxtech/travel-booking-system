@@ -105,7 +105,7 @@ def audit_snapshot(path: str):
     """Read the affected document before/after a mutation for field-level audit diffs."""
     patterns = (
         (r"^/users/([^/]+)(?:/(?:password|deactivate|activate))?$", "users"),
-        (r"^/bookings/([^/]+)(?:/(?:status|cancel|cancellation-review|start|complete|validate-completion|requester))?$", "bookings"),
+        (r"^/bookings/([^/]+)(?:/(?:status|cancel|cancellation-review|start|complete|validate-completion|requester|office-details))?$", "bookings"),
         (r"^/tickets/([^/]+)(?:/(?:status|cancel))?$", "tickets"),
         (r"^/locations/([^/]+)$", "booking_locations"),
         (r"^/settings/drivers/([^/]+)$", "users"),
