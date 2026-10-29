@@ -1568,7 +1568,7 @@ function OfficeDriverHistory() {
 
           {editTarget && editForm ? (
             <div
-              className="modal-overlay"
+              className="modal-overlay booking-history-edit-overlay"
               role="dialog"
               aria-modal="true"
               aria-labelledby="superadmin-booking-edit-title"
@@ -1576,7 +1576,7 @@ function OfficeDriverHistory() {
                 if (!actionLoadingId) closeEditModal()
               }}
             >
-              <form className="modal ticket-details-modal" onSubmit={handleSaveEdit} onClick={(event) => event.stopPropagation()}>
+              <form className="modal ticket-details-modal booking-history-edit-modal" onSubmit={handleSaveEdit} onClick={(event) => event.stopPropagation()}>
                 <div className="modal-header">
                   <div>
                     <p className="eyebrow">Booking Driver Request & History</p>
@@ -1593,7 +1593,8 @@ function OfficeDriverHistory() {
                   </button>
                 </div>
 
-                <div className="field-grid">
+                <div className="booking-history-edit-modal__body">
+                <div className="field-grid booking-history-edit-modal__fields">
                   <label className="inline-label" style={{ gridColumn: '1 / -1' }}>
                     <span>Request ID</span>
                     <input value={editTarget.request_id || '-'} readOnly />
@@ -1699,6 +1700,7 @@ function OfficeDriverHistory() {
                 {locationsError ? <p className="error-text">{locationsError}</p> : null}
                 {availabilityError ? <p className="error-text">{availabilityError}</p> : null}
                 {actionError ? <p className="error-text">{actionError}</p> : null}
+                </div>
 
                 <div className="modal-actions">
                   <button type="submit" className="btn btn-primary" disabled={Boolean(actionLoadingId)}>
