@@ -86,6 +86,38 @@ class BookingCorrectionTests(unittest.TestCase):
         self.collection.update_one.return_value = Mock(matched_count=0)
         self.assertEqual(self.submit_correction().status_code, 409)
 
+    def test_office_metric_corrections_round_trip_and_can_be_cleared(self):
+        self.prepare()
+        values = dict(total_duration_minutes_override=120, overtime_hours_override=2,
+                      overtime_minutes_override=15, total_distance_override=30.5)
+        for role in ('office_coordinator', 'superadmin'):
+            self.role = role
+            response = self.submit_correction(**values)
+            self.assertEqual(response.status_code, 200, response.text)
+            for key, value in values.items():
+                self.assertEqual(response.json()[key], value)
+                self.assertEqual(bookings.serialize_booking(self.document).model_dump()[key], value)
+            self.assertEqual(response.json()['request_id'], 'SDX-BD-26102026-001')
+            response = self.submit_correction(**{key: None for key in values})
+            self.assertEqual(response.status_code, 200, response.text)
+            for key in values:
+                self.assertIsNone(response.json()[key])
+
+    def test_invalid_metric_corrections_are_rejected(self):
+        self.prepare()
+        for change in ({'total_duration_minutes_override': -1}, {'overtime_hours_override': 1.5},
+                       {'overtime_minutes_override': 60}, {'overtime_minutes_override': -1},
+                       {'total_distance_override': -1}, {'total_distance_override': 'Infinity'}):
+            self.assertEqual(self.submit_correction(**change).status_code, 422)
+        self.collection.update_one.assert_not_called()
+
+    def test_validator_name_can_be_cleared_without_changing_linked_validator(self):
+        self.prepare()
+        response = self.submit_correction(validated_by_name='')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['validated_by_name'], '')
+        self.assertEqual(response.json()['validated_by'], 'original-employee')
+
     def test_driver_blank_and_invalid_mileage_never_writes(self):
         self.role = 'driver'
         self.document['driver_id'] = 'actor'

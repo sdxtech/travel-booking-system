@@ -5,13 +5,12 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
-import BookingRequesterEditModal from '../components/BookingRequesterEditModal'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
-import { getNightOvertimeMinutes } from '../components/bookingOvertime'
+import { getHistoryDistance, getHistoryDurationMinutes, getHistoryOvertimeMinutes } from '../components/bookingHistoryMetrics'
 import useBookingLocations from '../hooks/useBookingLocations'
 
 const OTHER_LOCATION_VALUE = '__other_location__'
@@ -24,6 +23,10 @@ const correctionFields = [
   ['requester_email', 'Email', 'email', true],
   ['starting_mileage', 'Starting Kilometer', 'number'],
   ['ending_mileage', 'Ending Kilometer', 'number'],
+  ['total_distance_override', 'Total Distance (km) — correction', 'number'],
+  ['total_duration_minutes_override', 'Total Duration (minutes) — correction', 'number'],
+  ['overtime_hours_override', 'OT hour — correction', 'number'],
+  ['overtime_minutes_override', 'OT minutes — correction', 'number'],
   ['created_at', 'Submission Date', 'datetime-local', true],
   ['started_at', 'Starting Time', 'datetime-local'],
   ['driver_finished_at', 'Finish Time', 'datetime-local'],
@@ -69,7 +72,7 @@ function OfficeDriverHistory() {
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const { user } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
-  const canEditRequester = isSuperadmin || user?.role === 'office_coordinator'
+  const canEditBooking = isSuperadmin || user?.role === 'office_coordinator'
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -86,7 +89,6 @@ function OfficeDriverHistory() {
   const [selectedDriverId, setSelectedDriverId] = useState('')
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(null)
-  const [requesterEditTarget, setRequesterEditTarget] = useState(null)
   const { locations, locationsLoading, locationsError } = useBookingLocations()
   const [pickupLocationOther, setPickupLocationOther] = useState(false)
   const [destinationOther, setDestinationOther] = useState(false)
@@ -121,11 +123,7 @@ function OfficeDriverHistory() {
 
   // Compute total kilometers based on starting/ending mileage.
   const getDistanceNumber = (booking) => {
-    const starting = Number(booking?.starting_mileage)
-    const ending = Number(booking?.ending_mileage)
-    if (!Number.isFinite(starting) || !Number.isFinite(ending)) return null
-    if (ending < starting) return null
-    return ending - starting
+    return getHistoryDistance(booking)
   }
 
   // Provide a stable sort value per table column.
@@ -196,7 +194,7 @@ function OfficeDriverHistory() {
       case 'status':
         return getBookingStatus(booking)
       case 'validated_by':
-        return booking.validated_by_name || booking.validated_by || ''
+        return booking.validated_by_name ?? booking.validated_by ?? ''
       default:
         return ''
     }
@@ -308,7 +306,7 @@ function OfficeDriverHistory() {
     const trigger = event.currentTarget
     const triggerRect = trigger.getBoundingClientRect()
     const menuWidth = 190
-    const menuHeight = (booking.cancellation_status === 'pending' ? 260 : 188) + (canEditRequester ? 36 : 0)
+    const menuHeight = booking.cancellation_status === 'pending' ? 260 : 188
     const viewportGap = 8
     const controlGap = 5
     const hasMoreRoomAbove = triggerRect.top > window.innerHeight - triggerRect.bottom
@@ -711,7 +709,7 @@ function OfficeDriverHistory() {
   // Correct booking history for both office roles.
   const handleSaveEdit = async (event) => {
     event.preventDefault()
-    if (!canEditRequester || !editTarget?.id || !editForm) return
+    if (!canEditBooking || !editTarget?.id || !editForm) return
 
     if (!editForm.driver_id || !editForm.pickup_location.trim() || !editForm.destination.trim()) {
       setActionError('Driver, pickup location, and destination are required.')
@@ -756,6 +754,9 @@ function OfficeDriverHistory() {
           passenger_count: Number(editForm.passenger_count),
           starting_mileage: editForm.starting_mileage === '' ? null : Number(editForm.starting_mileage),
           ending_mileage: editForm.ending_mileage === '' ? null : Number(editForm.ending_mileage),
+          ...Object.fromEntries(correctionFields.filter(([key]) => key.endsWith('_override')).map(([key]) => [
+            key, editForm[key] === '' ? null : Number(editForm[key]),
+          ])),
           ...Object.fromEntries(correctionDates.map((key) => [key, serializeEditDate(key)])),
         }),
       })
@@ -914,12 +915,7 @@ function OfficeDriverHistory() {
 
   // Compute trip duration from the driver's Finish time minus Start time.
   function getDurationMinutes(booking) {
-    const startedAt = toDate(booking?.started_at)
-    const finishedAt = toDate(booking?.driver_finished_at)
-    if (!startedAt || !finishedAt) return null
-    const diffMs = finishedAt.getTime() - startedAt.getTime()
-    if (diffMs < 0) return null
-    return Math.floor(diffMs / 60000)
+    return getHistoryDurationMinutes(booking)
   }
 
   // Format duration into "Xh YYm".
@@ -933,7 +929,7 @@ function OfficeDriverHistory() {
 
   // Count worked time between 17:00 and 08:00 WIB once it reaches 30 minutes.
   function getOvertimeMinutes(booking) {
-    return getNightOvertimeMinutes(toDate(booking?.started_at), toDate(booking?.driver_finished_at))
+    return getHistoryOvertimeMinutes(booking)
   }
 
   // Format overtime hours for exports/table.
@@ -1058,7 +1054,7 @@ function OfficeDriverHistory() {
       booking.ending_mileage ?? '',
       formatDistance(booking),
       formatStatusText(getBookingStatus(booking)),
-      booking.validated_by_name || booking.validated_by || '',
+      booking.validated_by_name ?? booking.validated_by ?? '',
     ])
 
     const headerHtml = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>`
@@ -1401,7 +1397,7 @@ function OfficeDriverHistory() {
                         {booking.cancellation_status === 'pending' ? <div className="muted">Cancellation awaiting approval</div> : null}
                         {booking.cancellation_status === 'rejected' ? <div className="muted">Cancellation rejected</div> : null}
                       </td>
-                      <td>{booking.validated_by_name || booking.validated_by || '-'}</td>
+                      <td>{(booking.validated_by_name ?? booking.validated_by) || '-'}</td>
                       <td>
                         <button
                           type="button"
@@ -1471,7 +1467,7 @@ function OfficeDriverHistory() {
                       </button>
                     </>
                   ) : null}
-                  {canEditRequester ? (
+                  {canEditBooking ? (
                     <button
                       type="button"
                       role="menuitem"
@@ -1483,22 +1479,6 @@ function OfficeDriverHistory() {
                     >
                       <i className="bi bi-pencil" aria-hidden="true" />
                       Edit
-                    </button>
-                  ) : null}
-                  {canEditRequester ? (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        const booking = actionMenu.booking
-                        closeActionMenu()
-                        setActionError('')
-                        setActionMessage('')
-                        setRequesterEditTarget(booking)
-                      }}
-                    >
-                      <i className="bi bi-person-lines-fill" aria-hidden="true" />
-                      Edit User Data
                     </button>
                   ) : null}
                   <button
@@ -1586,23 +1566,6 @@ function OfficeDriverHistory() {
               )
             : null}
 
-          {canEditRequester && requesterEditTarget ? (
-            <BookingRequesterEditModal
-              key={requesterEditTarget.id}
-              booking={requesterEditTarget}
-              onClose={() => {
-                setRequesterEditTarget(null)
-                actionMenuTriggerRef.current?.focus()
-              }}
-              onSaved={(updated) => {
-                setBookings((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
-                setActionMessage('Booking user data updated.')
-                setRequesterEditTarget(null)
-                actionMenuTriggerRef.current?.focus()
-              }}
-            />
-          ) : null}
-
           {editTarget && editForm ? (
             <div
               className="modal-overlay"
@@ -1631,12 +1594,18 @@ function OfficeDriverHistory() {
                 </div>
 
                 <div className="field-grid">
-                  <p className="muted" style={{ gridColumn: '1 / -1' }}>Changes apply to this booking. Request ID and linked Employee are retained. Distance, duration, and overtime are calculated automatically.</p>
+                  <label className="inline-label" style={{ gridColumn: '1 / -1' }}>
+                    <span>Request ID</span>
+                    <input value={editTarget.request_id || '-'} readOnly />
+                  </label>
+                  <p className="muted" style={{ gridColumn: '1 / -1' }}>Changes apply to this booking. Leave distance, duration, and overtime corrections blank to calculate them automatically from the trip times and kilometers.</p>
                   {correctionFields.map(([key, label, type = 'text', required = false]) => (
                     <label className="inline-label" key={key}>
                       <span>{label}{required ? ' *' : ''}</span>
                       <input type={type} value={editForm[key]} onChange={handleEditFormChange(key)}
-                        min={type === 'number' ? '0' : undefined} step={['number', 'datetime-local'].includes(type) ? '1' : undefined}
+                        min={type === 'number' ? '0' : undefined} max={key === 'overtime_minutes_override' ? '59' : undefined}
+                        step={key === 'total_distance_override' ? 'any' : ['number', 'datetime-local'].includes(type) ? '1' : undefined}
+                        placeholder={key.endsWith('_override') ? 'Automatic when blank' : undefined}
                         required={required} disabled={Boolean(actionLoadingId)} />
                     </label>
                   ))}

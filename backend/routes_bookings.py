@@ -55,6 +55,10 @@ class BookingRequesterUpdate(BaseModel):
 
 
 class BookingOfficeUpdate(BookingCreate, BookingRequesterUpdate):
+    total_duration_minutes_override: Optional[int] = Field(default=None, ge=0, strict=True)
+    overtime_hours_override: Optional[int] = Field(default=None, ge=0, strict=True)
+    overtime_minutes_override: Optional[int] = Field(default=None, ge=0, le=59, strict=True)
+    total_distance_override: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     starting_mileage: Optional[int] = Field(default=None, ge=0, strict=True)
     ending_mileage: Optional[int] = Field(default=None, ge=0, strict=True)
     started_at: Optional[datetime] = None
@@ -66,6 +70,10 @@ class BookingOfficeUpdate(BookingCreate, BookingRequesterUpdate):
 
 
 class BookingResponse(BaseModel):
+    total_duration_minutes_override: Optional[int] = None
+    overtime_hours_override: Optional[int] = None
+    overtime_minutes_override: Optional[int] = None
+    total_distance_override: Optional[float] = None
     cancellation_status: Optional[str] = None
     id: str
     request_id: Optional[str] = None
@@ -164,12 +172,16 @@ def serialize_booking(doc_snapshot) -> BookingResponse:
     data = doc_snapshot or {}
     validated_by = data.get("validated_by")
     validated_by_name = data.get("validated_by_name")
-    if validated_by and not validated_by_name:
+    if validated_by and validated_by_name is None:
         validator = db["users"].find_one({"_id": validated_by}, {"name": 1, "email": 1})
         if validator:
             validated_by_name = validator.get("name") or validator.get("email")
 
     return BookingResponse(
+        total_duration_minutes_override=data.get("total_duration_minutes_override"),
+        overtime_hours_override=data.get("overtime_hours_override"),
+        overtime_minutes_override=data.get("overtime_minutes_override"),
+        total_distance_override=data.get("total_distance_override"),
         id=str(data.get("_id")),
         request_id=data.get("request_id"),
         user_id=data.get("user_id"),
