@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getHistoryDistance, getHistoryDurationMinutes, getHistoryOvertimeMinutes } from '../src/components/bookingHistoryMetrics.js'
+import { getHistoryDistance, getHistoryDurationMinutes, getHistoryOvertimeMinutes, getHistoryMetricFormValues } from '../src/components/bookingHistoryMetrics.js'
 
 const trip = {
   started_at: '2026-10-29T10:00:00Z',
@@ -34,4 +34,20 @@ test('incomplete trip data stays empty unless a correction is provided', () => {
   assert.equal(getHistoryDistance({ starting_mileage: null, ending_mileage: 100 }), null)
   assert.equal(getHistoryOvertimeMinutes({ overtime_hours_override: 2 }), 120)
   assert.equal(getHistoryOvertimeMinutes({ ...trip, overtime_minutes_override: 5 }), 65)
+})
+
+test('edit inputs show calculated values, saved corrections, and zeros without saving automatic values as corrections', () => {
+  const form = { ...trip, total_distance_override: '', total_duration_minutes_override: '', overtime_hours_override: '', overtime_minutes_override: '' }
+  assert.deepEqual(getHistoryMetricFormValues(form), {
+    total_distance_override: 27, total_duration_minutes_override: 91,
+    overtime_hours_override: 1, overtime_minutes_override: 31,
+  })
+  assert.equal(form.total_distance_override, '')
+  assert.equal(getHistoryMetricFormValues({ ...form, ending_mileage: '140' }).total_distance_override, 40)
+  assert.equal(getHistoryMetricFormValues({ ...form, total_distance_override: '0' }).total_distance_override, 0)
+  assert.equal(getHistoryMetricFormValues({ ...form, total_duration_minutes_override: '120' }).total_duration_minutes_override, 120)
+  assert.deepEqual(getHistoryMetricFormValues({}), {
+    total_distance_override: 0, total_duration_minutes_override: 0,
+    overtime_hours_override: 0, overtime_minutes_override: 0,
+  })
 })

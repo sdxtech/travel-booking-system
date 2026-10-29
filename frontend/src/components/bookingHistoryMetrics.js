@@ -29,3 +29,17 @@ export function getHistoryDistance(booking) {
   const end = Number(booking.ending_mileage)
   return Number.isFinite(start) && Number.isFinite(end) && end >= start ? end - start : null
 }
+
+export function getHistoryMetricFormValues(booking) {
+  const values = { ...booking }
+  for (const key of ['total_distance_override', 'total_duration_minutes_override', 'overtime_hours_override', 'overtime_minutes_override']) {
+    values[key] = booking[key] === '' || booking[key] == null ? null : Number(booking[key])
+  }
+  const overtime = getHistoryOvertimeMinutes(values) ?? 0
+  return {
+    total_distance_override: getHistoryDistance(values) ?? 0,
+    total_duration_minutes_override: getHistoryDurationMinutes(values) ?? 0,
+    overtime_hours_override: Math.floor(overtime / 60),
+    overtime_minutes_override: overtime % 60,
+  }
+}

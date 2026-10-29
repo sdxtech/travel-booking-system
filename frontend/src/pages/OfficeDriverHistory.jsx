@@ -10,7 +10,7 @@ import useOfficeSidebar from '../hooks/useOfficeSidebar'
 import useFrozenHistoryColumns from '../hooks/useFrozenHistoryColumns'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
-import { getHistoryDistance, getHistoryDurationMinutes, getHistoryOvertimeMinutes } from '../components/bookingHistoryMetrics'
+import { getHistoryDistance, getHistoryDurationMinutes, getHistoryOvertimeMinutes, getHistoryMetricFormValues } from '../components/bookingHistoryMetrics'
 import useBookingLocations from '../hooks/useBookingLocations'
 
 const OTHER_LOCATION_VALUE = '__other_location__'
@@ -89,6 +89,7 @@ function OfficeDriverHistory() {
   const [selectedDriverId, setSelectedDriverId] = useState('')
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState(null)
+  const editMetricValues = editForm ? getHistoryMetricFormValues(editForm) : {}
   const { locations, locationsLoading, locationsError } = useBookingLocations()
   const [pickupLocationOther, setPickupLocationOther] = useState(false)
   const [destinationOther, setDestinationOther] = useState(false)
@@ -1599,14 +1600,13 @@ function OfficeDriverHistory() {
                     <span>Request ID</span>
                     <input value={editTarget.request_id || '-'} readOnly />
                   </label>
-                  <p className="muted" style={{ gridColumn: '1 / -1' }}>Changes apply to this booking. Leave distance, duration, and overtime corrections blank to calculate them automatically from the trip times and kilometers.</p>
+                  <p className="muted" style={{ gridColumn: '1 / -1' }}>Changes apply to this booking. Distance, duration, and overtime show their current values and can be corrected.</p>
                   {correctionFields.map(([key, label, type = 'text', required = false]) => (
                     <label className="inline-label" key={key}>
                       <span>{label}{required ? ' *' : ''}</span>
-                      <input type={type} value={editForm[key]} onChange={handleEditFormChange(key)}
+                      <input type={type} value={key.endsWith('_override') && editForm[key] === '' ? editMetricValues[key] : editForm[key]} onChange={handleEditFormChange(key)}
                         min={type === 'number' ? '0' : undefined} max={key === 'overtime_minutes_override' ? '59' : undefined}
                         step={key === 'total_distance_override' ? 'any' : ['number', 'datetime-local'].includes(type) ? '1' : undefined}
-                        placeholder={key.endsWith('_override') ? 'Automatic when blank' : undefined}
                         required={required} disabled={Boolean(actionLoadingId)} />
                     </label>
                   ))}
