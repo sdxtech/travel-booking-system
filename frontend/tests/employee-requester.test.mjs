@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { employeeSuggestion, updateRequesterName } from '../src/components/employeeRequester.js'
+import { employeeSuggestion, isBookingRequester, updateRequesterName } from '../src/components/employeeRequester.js'
 
 const budi = {
   uid: 'employee-1', role: 'user', name: 'Budi', email: 'budi@example.com',
@@ -64,10 +64,36 @@ test('switching Employees replaces all profile fields, including missing and opt
   }
 })
 
-test('manual requester entry remains available and non-Employee roles are not matched', () => {
+test('manual requester entry remains available and Drivers are not matched', () => {
   const manual = { ...form, requester_name: 'Guest', requester_phone: '08111', requester_email: 'guest@example.com' }
   assert.deepEqual(updateRequesterName(manual, 'Guest Updated', [budi]), { ...manual, requester_name: 'Guest Updated' })
   assert.equal(updateRequesterName(form, 'Driver', [{ ...budi, name: 'Driver', role: 'driver' }]).requester_email, '')
+})
+
+test('Office Coordinators are eligible and selecting themselves autofills the complete profile', () => {
+  const coordinator = { ...budi, uid: 'oc-1', role: 'office_coordinator', name: 'Coordinator', email: 'oc@example.com' }
+  assert.equal(isBookingRequester(coordinator), true)
+  const result = updateRequesterName(form, employeeSuggestion(coordinator), [budi, coordinator])
+  assert.equal(result.requester_name, coordinator.name)
+  assert.equal(result.requester_email, coordinator.email)
+  assert.equal(result.requester_department, coordinator.department)
+  assert.equal(result.requester_job_position, coordinator.job_position)
+  assert.equal(result.requester_phone, coordinator.phone)
+  assert.equal(result.requester_nik, '')
+  assert.equal(result.driver_email, form.driver_email)
+  const changed = updateRequesterName(result, 'Another Requester', [budi, coordinator])
+  assert.equal(changed.requester_email, '')
+  assert.equal(changed.requester_phone, '')
+  assert.equal(isBookingRequester({ ...coordinator, role: 'driver' }), false)
+  assert.equal(isBookingRequester({ ...coordinator, role: 'superadmin' }), false)
+})
+
+test('duplicate names across Employee and Coordinator roles require explicit selection', () => {
+  const coordinator = { ...budi, uid: 'oc-1', role: 'office_coordinator', email: 'oc@example.com' }
+  const candidates = [budi, coordinator]
+  assert.equal(updateRequesterName(form, budi.name, candidates).requester_email, '')
+  assert.equal(updateRequesterName(form, employeeSuggestion(coordinator), candidates).requester_email, coordinator.email)
+  assert.equal(updateRequesterName(form, employeeSuggestion(budi), candidates).requester_email, budi.email)
 })
 
 test('matching a short name does not prevent typing a longer name', () => {

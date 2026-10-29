@@ -10,6 +10,32 @@ from fastapi import HTTPException
 
 
 class BookingLinkTests(unittest.TestCase):
+    def test_coordinator_can_validate_own_booking_but_not_another_linked_requester(self):
+        document = {"_id": "own", "user_id": "coordinator", "status": "awaiting_validation"}
+        collection = Mock()
+        collection.find_one.side_effect = lambda query: dict(document)
+        def update(query, change):
+            self.assertEqual(query["user_id"], "coordinator")
+            document.update(change["$set"])
+            return Mock(modified_count=1)
+        collection.update_one.side_effect = update
+        users = Mock()
+        users.find_one.return_value = {"name": "Coordinator"}
+        with patch.object(routes, "db", {"bookings": collection, "users": users}), \
+                patch.object(routes, "ensure_role", return_value="office_coordinator"), \
+                patch.object(routes, "enforce_employee_page_permission"), \
+                patch.object(routes, "publish_document_change"), \
+                patch.object(routes, "create_user_notification"), \
+                patch.object(routes, "serialize_booking", side_effect=lambda doc: doc):
+            result = routes.validate_booking_completion("own", {"uid": "coordinator"})
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(result["validated_by"], "coordinator")
+            document.update(user_id="another-employee", status="awaiting_validation")
+            collection.update_one.reset_mock()
+            with self.assertRaises(HTTPException):
+                routes.validate_booking_completion("own", {"uid": "coordinator"})
+            collection.update_one.assert_not_called()
+
     def setUp(self):
         self.user = {"_id": "employee", "role": "user", "email": "Employee+one@example.com"}
         self.docs = [

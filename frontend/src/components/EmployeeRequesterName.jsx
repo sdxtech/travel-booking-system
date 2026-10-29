@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react'
 import useBookingEmployees from '../hooks/useBookingEmployees'
-import { employeeSuggestion, updateRequesterName } from './employeeRequester'
+import { employeeSuggestion, isBookingRequester, updateRequesterName } from './employeeRequester'
 
 // Use the already-loaded office user list when available; Quick View loads its own.
 export default function EmployeeRequesterName({ form, setForm, employees: providedEmployees, disabled = false }) {
@@ -12,7 +12,7 @@ export default function EmployeeRequesterName({ form, setForm, employees: provid
   const employees = providedEmployees ?? fetchedEmployees
   const query = form.requester_name.trim().toLowerCase()
   const suggestions = employees.filter((employee) => (
-    employee.role === 'user' && employee.name && employee.email &&
+    isBookingRequester(employee) &&
     (!query || employee.name.toLowerCase().includes(query) || employee.email.toLowerCase().includes(query))
   ))
   const showSuggestions = open && !disabled && suggestions.length > 0
@@ -66,7 +66,7 @@ export default function EmployeeRequesterName({ form, setForm, employees: provid
           aria-controls={showSuggestions ? listId : undefined}
           aria-activedescendant={showSuggestions && suggestions[activeIndex] ? `${listId}-${activeIndex}` : undefined}
           autoComplete="off"
-          placeholder="Type a name or select an Employee"
+          placeholder="Type a name or select a requester"
           value={form.requester_name}
           onChange={updateName}
           onFocus={() => setOpen(true)}
@@ -81,7 +81,7 @@ export default function EmployeeRequesterName({ form, setForm, employees: provid
             id={listId}
             className="quick-driver-multiselect__menu booking-form-select__menu"
             role="listbox"
-            aria-label="Employees"
+            aria-label="Employees and Office Coordinators"
           >
             {suggestions.map((employee, index) => (
               <button

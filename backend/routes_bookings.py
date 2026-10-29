@@ -1408,7 +1408,7 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
     if role == "user":
         if linked_user_id != uid:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    elif role == "office_coordinator" and linked_user_id:
+    elif role == "office_coordinator" and linked_user_id and linked_user_id != uid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This booking must be validated by the linked Employee",

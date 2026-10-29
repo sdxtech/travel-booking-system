@@ -1,5 +1,9 @@
 const normalize = (value) => String(value || '').trim().toLowerCase()
 
+export function isBookingRequester(account) {
+  return ['user', 'office_coordinator'].includes(account?.role) && Boolean(account.name && account.email)
+}
+
 export function employeeSuggestion(employee) {
   return `${employee.name} (${employee.email})`
 }
@@ -17,7 +21,7 @@ function requesterDetails(employee) {
 
 export function updateRequesterName(current, value, employees) {
   const query = normalize(value)
-  const candidates = employees.filter((employee) => employee.role === 'user' && employee.name && employee.email)
+  const candidates = employees.filter(isBookingRequester)
   // Explicit name + email selections disambiguate employees sharing the same name.
   const exact = query && candidates.filter((employee) => (
     normalize(employeeSuggestion(employee)) === query || normalize(employee.email) === query

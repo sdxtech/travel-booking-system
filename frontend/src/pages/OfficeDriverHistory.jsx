@@ -851,9 +851,9 @@ function OfficeDriverHistory() {
     }
   }
 
-  // Validate trips created without a linked Employee account.
+  // Validate eligible trips, including the Coordinator's own bookings.
   const handleValidateCompletion = async (booking) => {
-    const confirmed = window.confirm('Confirm that this unlinked trip has been completed?')
+    const confirmed = window.confirm('Confirm that this trip has been completed?')
     if (!confirmed) return
 
 
@@ -1519,13 +1519,13 @@ function OfficeDriverHistory() {
                     disabled={
                       !isSuperadmin &&
                       (getBookingStatus(actionMenu.booking) !== 'awaiting_validation' ||
-                        Boolean(actionMenu.booking.user_id))
+                        Boolean(actionMenu.booking.user_id && actionMenu.booking.user_id !== user?.uid))
                     }
                     title={
                       !isSuperadmin &&
                       (getBookingStatus(actionMenu.booking) !== 'awaiting_validation' ||
-                        Boolean(actionMenu.booking.user_id))
-                        ? 'Validate tersedia saat menunggu validasi dan tidak terhubung ke Employee.'
+                        Boolean(actionMenu.booking.user_id && actionMenu.booking.user_id !== user?.uid))
+                        ? 'Validate tersedia saat menunggu validasi untuk booking sendiri atau tanpa akun pemohon.'
                         : undefined
                     }
                     onClick={() => {

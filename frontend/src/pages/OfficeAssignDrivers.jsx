@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import BookingFormSelect from '../components/BookingFormSelect'
 import EmployeeRequesterName from '../components/EmployeeRequesterName'
+import { isBookingRequester } from '../components/employeeRequester'
 import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import useBookingLocations from '../hooks/useBookingLocations'
 import useOfficeSidebar from '../hooks/useOfficeSidebar'
@@ -99,7 +100,7 @@ const isSuperadmin =
       const data = await res.json()
       if (signal.aborted) return
       const allUsers = Array.isArray(data) ? data : []
-      setEmployees(allUsers.filter((user) => user.role === 'user'))
+      setEmployees(allUsers.filter(isBookingRequester))
       setDrivers(
         allUsers.filter(
           (user) => user.role === 'driver' && (isSuperadmin || (user.booking_enabled !== false && !user.disabled && !user.banned))
@@ -411,7 +412,7 @@ const isSuperadmin =
                 </div>
                 <div>
                   <h2>Requestor</h2>
-                  <p className="muted">Select an Employee to fill their details, or enter requester details manually.</p>
+                  <p className="muted">Select an Employee or Office Coordinator to fill their details, or enter requester details manually.</p>
                 </div>
               </div>
               <div className="field-grid">
