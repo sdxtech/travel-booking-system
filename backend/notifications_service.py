@@ -87,6 +87,53 @@ def create_user_notification(
     return notification_id
 
 
+def queue_email_only_notification(
+    to_email: Optional[str],
+    recipient_name: Optional[str],
+    message: str,
+    *,
+    event: str,
+    entity_type: str,
+    entity_id: str,
+    status: Optional[str] = None,
+    actor_id: Optional[str] = None,
+    email_details: Optional[Mapping[str, object]] = None,
+) -> Optional[str]:
+    """Queue an email notification for a booking requester without a registered user account."""
+    normalized_email = str(to_email or "").strip().lower()
+    if not normalized_email:
+        return None
+
+    notification_id = uuid4().hex
+    should_send_email = bool(email_delivery_enabled())
+    db["notifications"].insert_one(
+        {
+            "_id": notification_id,
+            "user_id": None,
+            "message": message,
+            "read": True,
+            "event": event,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "status": status,
+            "actor_id": actor_id,
+            "created_at": utc_now(),
+            "email_to": normalized_email,
+            "email_status": "pending" if should_send_email else "skipped",
+            "telegram_status": "skipped",
+            "delivery_state": "pending" if should_send_email else "done",
+            "delivery_after": utc_now(),
+            "delivery_payload": {
+                "recipient_name": recipient_name,
+                "chat_id": None,
+                "language": "en",
+                "details": dict(email_details or {}),
+            },
+        }
+    )
+    return notification_id
+
+
 def deliver_next_notification():
     """Claim a persisted delivery; expired leases recover after a process restart."""
     now = utc_now()
@@ -108,7 +155,7 @@ def deliver_next_notification():
     language = payload.get("language", "en")
     chat_id = payload.get("chat_id")
     should_send_email = notice.get("email_status") == "pending"
-    current_user = db["users"].find_one({"_id": notice["user_id"]}) or {}
+    current_user = (db["users"].find_one({"_id": notice["user_id"]}) or {}) if notice.get("user_id") else {}
     should_send_telegram = (
         notice.get("telegram_status") == "pending" and current_user.get("role") == "driver"
         and not current_user.get("disabled") and not current_user.get("banned")

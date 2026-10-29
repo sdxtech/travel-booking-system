@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 from uuid import uuid4
@@ -9,7 +10,7 @@ from main import get_current_user
 from mongo_client import db
 from profile_fields import department_value
 from realtime_service import publish_document_change
-from notifications_service import create_user_notification, notify_roles
+from notifications_service import create_user_notification, notify_roles, queue_email_only_notification
 from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
 from settings_service import get_booking_cancellation_deadline, get_booking_cancellation_policy
@@ -76,6 +77,9 @@ class BookingResponse(BaseModel):
     overtime_minutes_override: Optional[int] = None
     total_distance_override: Optional[float] = None
     cancellation_status: Optional[str] = None
+    validation_reminder_id: Optional[str] = None
+    validation_reminder_sent_at: Optional[datetime] = None
+    validation_reminder_expires_at: Optional[datetime] = None
     id: str
     request_id: Optional[str] = None
     user_id: Optional[str] = None
@@ -104,6 +108,37 @@ class BookingResponse(BaseModel):
     validated_by_name: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+class ValidationReminderSendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    booking_ids: list[str] = Field(..., min_length=1, max_length=500)
+    duration_value: int = Field(..., ge=1, le=8760, strict=True)
+    duration_unit: Literal["hours", "days"] = "hours"
+
+    @model_validator(mode="after")
+    def validate_window_and_ids(self):
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw_id in self.booking_ids:
+            bid = str(raw_id or "").strip()
+            if bid and bid not in seen:
+                seen.add(bid)
+                cleaned.append(bid)
+        if not cleaned:
+            raise ValueError("At least one booking ID is required")
+        if self.duration_unit == "days" and self.duration_value > 365:
+            raise ValueError("Maximum popup duration in days is 365")
+        self.booking_ids = cleaned
+        return self
+
+
+class ValidationReminderSendResponse(BaseModel):
+    reminded_bookings: int
+    notified_recipients: int
+    in_app_recipients: int
+    skipped_bookings: int
+    expires_at: datetime
 
 
 class BookingOfficeHistoryResponse(BookingResponse):
@@ -210,6 +245,9 @@ def serialize_booking(doc_snapshot) -> BookingResponse:
         validated_at=data.get("validated_at"),
         validated_by=validated_by,
         validated_by_name=validated_by_name,
+        validation_reminder_id=data.get("validation_reminder_id"),
+        validation_reminder_sent_at=data.get("validation_reminder_sent_at"),
+        validation_reminder_expires_at=data.get("validation_reminder_expires_at"),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),
     )
@@ -587,6 +625,238 @@ def list_my_bookings(current_user=Depends(get_current_user)):
     return [serialize_booking(doc) for doc in snapshots]
 
 
+def _build_validation_reminder_email_payload(bookings: list[dict]) -> tuple[str, dict[str, str], str]:
+    """Compose anti-spam single or grouped reminder message and email details per recipient."""
+    if len(bookings) == 1:
+        booking = bookings[0]
+        request_id = str(booking.get("request_id") or booking.get("_id") or "-")
+        driver_id = booking.get("driver_id")
+        driver_doc = db["users"].find_one({"_id": driver_id}) if driver_id else None
+        message = (
+            f"Reminder: Please validate your completed driver booking ({request_id}) "
+            "in Booking Driver Status & History."
+        )
+        details = {
+            "Request ID": request_id,
+            **driver_email_details(booking, driver_doc),
+            "Status": "Awaiting Validation",
+        }
+        return message, details, str(booking.get("_id"))
+
+    count = len(bookings)
+    request_ids = [str(item.get("request_id") or item.get("_id") or "-") for item in bookings]
+    preview = ", ".join(request_ids[:5]) + (f", +{count - 5} more" if count > 5 else "")
+    latest = bookings[0]
+    message = (
+        f"Reminder: You have {count} completed driver bookings awaiting validation ({preview}). "
+        "Please validate them in Booking Driver Status & History."
+    )
+    details = {
+        "Pending Validations": f"{count} bookings",
+        "Request IDs": ", ".join(request_ids),
+        "Latest Trip": (
+            f"{latest.get('pickup_location') or '-'} to {latest.get('destination') or '-'} "
+            f"({format_booking_email_datetime(latest.get('departure_time'))})"
+        ),
+        "Status": "Awaiting Validation",
+    }
+    return message, details, str(latest.get("_id"))
+
+
+@router.get("/validation-reminders/my", response_model=list[BookingResponse])
+def list_my_validation_reminders(current_user=Depends(get_current_user)):
+    """Return active, non-expired validation reminders for bookings still awaiting validation."""
+    uid = current_user["uid"]
+    role = ensure_role(uid, ("user", "driver", "office_coordinator", "superadmin"))
+    if role == "driver":
+        return []
+    if role == "user":
+        link_employee_bookings(db, uid)
+
+    now = utc_now()
+    snapshots = list(
+        db["bookings"].find(
+            {
+                "user_id": uid,
+                "status": "awaiting_validation",
+                "validation_reminder_expires_at": {"$gt": now},
+            }
+        )
+    )
+
+    def sort_key(doc):
+        return (
+            normalize_datetime((doc or {}).get("departure_time"))
+            or normalize_datetime((doc or {}).get("created_at"))
+            or datetime.min.replace(tzinfo=timezone.utc)
+        )
+
+    sorted_docs = sorted(snapshots, key=sort_key, reverse=True)
+    driver_cache: dict[str, Optional[str]] = {}
+
+    def resolve_driver_name(driver_id: Optional[str]) -> Optional[str]:
+        if not driver_id:
+            return None
+        if driver_id in driver_cache:
+            return driver_cache[driver_id]
+        doc = db["users"].find_one({"_id": driver_id}) or {}
+        driver_cache[driver_id] = doc.get("name") or doc.get("email")
+        return driver_cache[driver_id]
+
+    results: list[BookingResponse] = []
+    for doc in sorted_docs:
+        enriched = dict(doc)
+        if not enriched.get("driver_name"):
+            enriched["driver_name"] = resolve_driver_name(enriched.get("driver_id"))
+        results.append(serialize_booking(enriched))
+    return results
+
+
+@router.post("/validation-reminders", response_model=ValidationReminderSendResponse)
+def send_validation_reminders(
+    payload: ValidationReminderSendRequest,
+    current_user=Depends(get_current_user),
+):
+    """Send email + one-time push reminder and activate an expiring in-app popup for awaiting-validation bookings."""
+    uid = current_user["uid"]
+    ensure_role(uid, ("office_coordinator", "superadmin"))
+
+    now = utc_now()
+    delta = (
+        timedelta(days=payload.duration_value)
+        if payload.duration_unit == "days"
+        else timedelta(hours=payload.duration_value)
+    )
+    expires_at = now + delta
+    reminder_id = uuid4().hex
+    single_mode = len(payload.booking_ids) == 1
+
+    recipient_groups: dict[tuple[str, str], dict] = {}
+    reminded_count = 0
+    skipped_count = 0
+
+    for booking_id in payload.booking_ids:
+        snapshot = db["bookings"].find_one({"_id": booking_id})
+        if not snapshot:
+            if single_mode:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+            skipped_count += 1
+            continue
+
+        if snapshot.get("status") != "awaiting_validation":
+            if single_mode:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Booking is not waiting for validation")
+            skipped_count += 1
+            continue
+
+        linked_uid = snapshot.get("user_id")
+        req_email = normalize_email(snapshot.get("requester_email"))
+        newly_linked_uid = None
+
+        target_user = db["users"].find_one({"_id": linked_uid}) if linked_uid else None
+        if not target_user and req_email:
+            candidate = db["users"].find_one({"email": req_email}) or db["users"].find_one(
+                {"email": {"$regex": r"^\s*" + re.escape(req_email) + r"\s*$", "$options": "i"}}
+            )
+            if candidate and candidate.get("role") in ("user", "office_coordinator", "superadmin"):
+                target_user = candidate
+                if not linked_uid and candidate.get("role") in ("user", "office_coordinator"):
+                    newly_linked_uid = str(candidate["_id"])
+
+        active_uid = (
+            str(target_user["_id"])
+            if (
+                target_user
+                and target_user.get("role") in ("user", "office_coordinator", "superadmin")
+                and not target_user.get("disabled")
+                and not target_user.get("banned")
+            )
+            else None
+        )
+
+        if not active_uid and not req_email:
+            if single_mode:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Booking has no recipient account or email")
+            skipped_count += 1
+            continue
+
+        update_fields: dict[str, object] = {
+            "validation_reminder_id": reminder_id,
+            "validation_reminder_sent_at": now,
+            "validation_reminder_expires_at": expires_at,
+            "validation_reminder_sent_by": uid,
+            "updated_at": now,
+        }
+        if newly_linked_uid:
+            update_fields["user_id"] = newly_linked_uid
+
+        result = db["bookings"].update_one(
+            {"_id": booking_id, "status": "awaiting_validation"},
+            {"$set": update_fields},
+        )
+        if not result.modified_count:
+            if single_mode:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking changed. Please refresh.")
+            skipped_count += 1
+            continue
+
+        updated_doc = {**snapshot, **update_fields}
+        publish_document_change("bookings", booking_id, snapshot)
+        reminded_count += 1
+
+        group_key = ("user", active_uid) if active_uid else ("email", req_email or "")
+        if group_key not in recipient_groups:
+            recipient_groups[group_key] = {
+                "user_id": active_uid,
+                "email": req_email,
+                "name": (target_user or {}).get("name") or snapshot.get("requester_name"),
+                "bookings": [],
+            }
+        recipient_groups[group_key]["bookings"].append(updated_doc)
+
+    if reminded_count == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No bookings are waiting for validation")
+
+    notified_recipients = 0
+    in_app_recipients = 0
+    for (kind, _), group in recipient_groups.items():
+        message, details, primary_booking_id = _build_validation_reminder_email_payload(group["bookings"])
+        if kind == "user" and group["user_id"]:
+            create_user_notification(
+                group["user_id"],
+                message,
+                event="validation_reminder",
+                entity_type="booking",
+                entity_id=primary_booking_id,
+                status="awaiting_validation",
+                actor_id=uid,
+                email_details=details,
+            )
+            notified_recipients += 1
+            in_app_recipients += 1
+        elif group["email"]:
+            queue_email_only_notification(
+                group["email"],
+                group["name"],
+                message,
+                event="validation_reminder",
+                entity_type="booking",
+                entity_id=primary_booking_id,
+                status="awaiting_validation",
+                actor_id=uid,
+                email_details=details,
+            )
+            notified_recipients += 1
+
+    return ValidationReminderSendResponse(
+        reminded_bookings=reminded_count,
+        notified_recipients=notified_recipients,
+        in_app_recipients=in_app_recipients,
+        skipped_bookings=skipped_count,
+        expires_at=expires_at,
+    )
+
+
 @router.get("/pending", response_model=list[BookingResponse])
 def list_pending_bookings(current_user=Depends(get_current_user)):
     """List pending booking requests for office coordinators and superadmins."""
@@ -904,6 +1174,8 @@ def update_office_booking(booking_id: str, payload: BookingOfficeUpdate, current
         raise HTTPException(status_code=400, detail="Starting Time, Finish Time, and Ending Time must be in chronological order.")
     updates["requester_email"] = normalize_email(payload.requester_email)
     updates.update(updated_at=utc_now(), updated_by=uid)
+    if payload.status != "awaiting_validation" and snapshot.get("validation_reminder_expires_at") is not None:
+        updates["validation_reminder_expires_at"] = None
     result = db["bookings"].update_one({"_id": booking_id, "updated_at": snapshot.get("updated_at")}, {"$set": updates})
     if not result.matched_count:
         raise HTTPException(status_code=409, detail="Booking changed. Please reopen it before saving.")
@@ -1430,6 +1702,7 @@ def validate_booking_completion(booking_id: str, current_user=Depends(get_curren
                 "validated_at": validated_at,
                 "validated_by": uid,
                 "validated_by_name": validated_by_name,
+                "validation_reminder_expires_at": None,
                 "updated_at": validated_at,
             }
         },

@@ -116,6 +116,11 @@ function OfficeDriverHistory() {
   const pageSize = 10
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [remindModal, setRemindModal] = useState(null)
+  const [remindDurationValue, setRemindDurationValue] = useState('24')
+  const [remindDurationUnit, setRemindDurationUnit] = useState('hours')
+  const [remindSending, setRemindSending] = useState(false)
+  const [remindError, setRemindError] = useState('')
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -310,7 +315,7 @@ function OfficeDriverHistory() {
     const trigger = event.currentTarget
     const triggerRect = trigger.getBoundingClientRect()
     const menuWidth = 190
-    const menuHeight = booking.cancellation_status === 'pending' ? 260 : 188
+    const menuHeight = booking.cancellation_status === 'pending' ? 296 : 224
     const viewportGap = 8
     const controlGap = 5
     const hasMoreRoomAbove = triggerRect.top > window.innerHeight - triggerRect.bottom
@@ -986,6 +991,122 @@ function OfficeDriverHistory() {
   }
 
   // Export the filtered/sorted view as a native Excel workbook.
+  const awaitingValidationBookings = useMemo(
+    () => sortedBookings.filter((booking) => getBookingStatus(booking) === 'awaiting_validation'),
+    [sortedBookings],
+  )
+
+  const remindRecipientSummary = useMemo(() => {
+    const items = remindModal?.bookings || []
+    const groups = new Map()
+    items.forEach((booking) => {
+      const normalizedEmail = String(booking.requester_email || '').trim().toLowerCase()
+      const key = booking.user_id
+        ? `uid:${booking.user_id}`
+        : normalizedEmail
+          ? `email:${normalizedEmail}`
+          : `booking:${booking.id}`
+      const existing = groups.get(key)
+      if (existing) {
+        existing.requestIds.push(booking.request_id || booking.id)
+      } else {
+        groups.set(key, {
+          key,
+          name: booking.requester_name || normalizedEmail || 'Requester',
+          email: booking.requester_email || '-',
+          requestIds: [booking.request_id || booking.id],
+        })
+      }
+    })
+    return Array.from(groups.values())
+  }, [remindModal])
+
+  const remindExpiryPreview = useMemo(() => {
+    const parsed = Number.parseInt(String(remindDurationValue).trim(), 10)
+    if (!Number.isFinite(parsed) || parsed < 1) return '-'
+    const hours = remindDurationUnit === 'days' ? parsed * 24 : parsed
+    const expiresDate = new Date(Date.now() + hours * 3600 * 1000)
+    if (Number.isNaN(expiresDate.getTime())) return '-'
+    return expiresDate.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }, [remindDurationValue, remindDurationUnit])
+
+  const openRemindModal = (targetBookings, mode = 'single') => {
+    const eligible = (Array.isArray(targetBookings) ? targetBookings : []).filter(
+      (booking) => booking?.id && getBookingStatus(booking) === 'awaiting_validation',
+    )
+    if (!eligible.length) {
+      setActionError('No bookings with status Awaiting Validation are available to remind.')
+      return
+    }
+    setRemindError('')
+    setActionError('')
+    setActionMessage('')
+    setRemindModal({ mode, bookings: eligible })
+  }
+
+  const closeRemindModal = () => {
+    if (remindSending) return
+    setRemindModal(null)
+    setRemindError('')
+  }
+
+  const handleSendReminder = async (event) => {
+    event.preventDefault()
+    if (!remindModal?.bookings?.length || remindSending) return
+
+    const parsedValue = Number.parseInt(String(remindDurationValue).trim(), 10)
+    const maxAllowed = remindDurationUnit === 'days' ? 365 : 8760
+    if (!Number.isFinite(parsedValue) || parsedValue < 1 || parsedValue > maxAllowed) {
+      setRemindError(
+        remindDurationUnit === 'days'
+          ? 'Popup duration must be between 1 and 365 days.'
+          : 'Popup duration must be between 1 and 8760 hours.',
+      )
+      return
+    }
+
+    setRemindSending(true)
+    setRemindError('')
+    setActionError('')
+    setActionMessage('')
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/validation-reminders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          booking_ids: remindModal.bookings.map((booking) => booking.id),
+          duration_value: parsedValue,
+          duration_unit: remindDurationUnit,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setRemindError(data?.detail || 'Failed to send validation reminder.')
+        return
+      }
+
+      const remindedCount = Number(data?.reminded_bookings ?? remindModal.bookings.length)
+      const recipientCount = Number(data?.notified_recipients ?? remindRecipientSummary.length)
+      setRemindModal(null)
+      setActionMessage(
+        `Validation reminder sent for ${remindedCount} booking${remindedCount === 1 ? '' : 's'} (${recipientCount} recipient${recipientCount === 1 ? '' : 's'}).`,
+      )
+      await loadBookings(activeRange, true)
+      window.dispatchEvent(new Event('notifications:refresh'))
+    } catch {
+      setRemindError('Network error. Please try again.')
+    } finally {
+      setRemindSending(false)
+    }
+  }
+
   const handleExport = () => {
     if (!sortedBookings.length) return
 
@@ -1138,6 +1259,22 @@ function OfficeDriverHistory() {
             >
               <i className="bi bi-file-earmark-excel" />
               Export Excel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => openRemindModal(awaitingValidationBookings, 'bulk')}
+              disabled={!hasLoaded || loading || !awaitingValidationBookings.length}
+              title={
+                awaitingValidationBookings.length
+                  ? `Send validation reminder for ${awaitingValidationBookings.length} awaiting-validation booking(s)`
+                  : 'No awaiting-validation bookings in current view'
+              }
+            >
+              <i className="bi bi-bell" aria-hidden="true" />
+              {hasLoaded && awaitingValidationBookings.length > 0
+                ? `Remind Validate (${awaitingValidationBookings.length})`
+                : 'Remind Validate'}
             </button>
           </div>
 
@@ -1537,10 +1674,136 @@ function OfficeDriverHistory() {
                     <i className="bi bi-person-check" aria-hidden="true" />
                     Validate
                   </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={getBookingStatus(actionMenu.booking) !== 'awaiting_validation'}
+                    title={
+                      getBookingStatus(actionMenu.booking) !== 'awaiting_validation'
+                        ? 'Available only when booking status is Awaiting Validation.'
+                        : undefined
+                    }
+                    onClick={() => {
+                      const booking = actionMenu.booking
+                      closeActionMenu()
+                      openRemindModal([booking], 'single')
+                    }}
+                  >
+                    <i className="bi bi-bell" aria-hidden="true" />
+                    Remind Validate
+                  </button>
                 </div>,
                 document.body,
               )
             : null}
+
+          {remindModal ? (
+            <div
+              className="modal-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="validation-remind-modal-title"
+              onClick={closeRemindModal}
+            >
+              <form
+                className="modal validation-remind-modal"
+                onSubmit={handleSendReminder}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="modal-header">
+                  <div>
+                    <p className="eyebrow">Booking Driver Request & History</p>
+                    <h2 id="validation-remind-modal-title">
+                      {remindModal.mode === 'bulk'
+                        ? `Bulk Remind Validate (${remindModal.bookings.length})`
+                        : `Remind Validate — ${remindModal.bookings[0]?.request_id || 'Booking'}`}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="modal-close"
+                    onClick={closeRemindModal}
+                    disabled={remindSending}
+                    aria-label="Close"
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                {remindError ? <p className="error-text" role="alert">{remindError}</p> : null}
+
+                <div className="admin-settings__preview">
+                  <i className="bi bi-bell" aria-hidden="true" />
+                  <span>
+                    Sends <strong>1 email + 1 push notification</strong> per recipient right now (no duplicate spam), and displays an in-app validation popup each time the user opens the app until{' '}
+                    <strong>{remindExpiryPreview}</strong> or until validated.
+                  </span>
+                </div>
+
+                <div className="validation-remind-modal__duration">
+                  <label className="form-field">
+                    <span>In-App Popup Active Duration</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max={remindDurationUnit === 'days' ? '365' : '8760'}
+                      step="1"
+                      value={remindDurationValue}
+                      onChange={(event) => setRemindDurationValue(event.target.value)}
+                      disabled={remindSending}
+                      required
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>Unit</span>
+                    <select
+                      value={remindDurationUnit}
+                      onChange={(event) => setRemindDurationUnit(event.target.value)}
+                      disabled={remindSending}
+                    >
+                      <option value="hours">Hour(s)</option>
+                      <option value="days">Day(s)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="validation-remind-modal__summary">
+                  <strong>
+                    Recipients ({remindRecipientSummary.length} user{remindRecipientSummary.length === 1 ? '' : 's'} &bull;{' '}
+                    {remindModal.bookings.length} booking{remindModal.bookings.length === 1 ? '' : 's'})
+                  </strong>
+                  <div className="validation-remind-modal__recipients">
+                    {remindRecipientSummary.map((recipient) => (
+                      <div key={recipient.key} className="validation-remind-modal__recipient">
+                        <div>
+                          <strong>{recipient.name}</strong>
+                          <span className="muted">{recipient.email}</span>
+                        </div>
+                        <span className="validation-remind-modal__ids">
+                          {recipient.requestIds.join(', ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="modal-actions">
+                  <button type="submit" className="btn btn-primary" disabled={remindSending}>
+                    <i className="bi bi-send" aria-hidden="true" />
+                    {remindSending ? 'Sending...' : 'Send Reminder'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger"
+                    onClick={closeRemindModal}
+                    disabled={remindSending}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
 
           {editTarget && editForm ? (
             <div

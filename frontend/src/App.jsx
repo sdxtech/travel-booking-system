@@ -27,12 +27,14 @@ import AdminAuditLog from './pages/AdminAuditLog'
 import ForgotPassword from './pages/ForgotPassword'
 import AccountSettings from './pages/AccountSettings'
 import ResetPassword from './pages/ResetPassword'
+import ValidationReminderPopup from './components/ValidationReminderPopup'
 
 
 // Main router for all app pages.
 function App() {
   return (
     <Router>
+      <ValidationReminderPopup />
       <div className="app-shell">
         <Routes>
           <Route path="/login" element={<Login />} />

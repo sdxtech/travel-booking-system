@@ -75,6 +75,7 @@ def init_mongo():
         database["bookings"].create_index([("user_id", ASCENDING)])
         database["bookings"].create_index([("driver_id", ASCENDING)])
         database["bookings"].create_index([("status", ASCENDING)])
+        database["bookings"].create_index([("user_id", ASCENDING), ("status", ASCENDING), ("validation_reminder_expires_at", ASCENDING)])
         database["bookings"].create_index([("created_at", ASCENDING)])
         database["tickets"].create_index([("user_id", ASCENDING)])
         database["tickets"].create_index([("status", ASCENDING)])
