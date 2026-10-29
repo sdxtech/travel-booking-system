@@ -1,6 +1,7 @@
 import { useState } from "react";
 import MainLayout from "../components/MainLayout";
 import PushNotificationControl from "../components/PushNotificationControl";
+import RequestEditPermissions from "../components/RequestEditPermissions";
 import { API_BASE_URL } from "../config";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -249,6 +250,7 @@ function AccountSettings() {
           </div>
           {user && <PushNotificationControl key={user.uid} user={user} />}
         </section>
+        {user?.role === 'superadmin' ? <RequestEditPermissions key={user.uid} /> : null}
       </section>
     </MainLayout>
   );

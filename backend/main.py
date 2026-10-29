@@ -118,6 +118,9 @@ def audit_snapshot(path: str):
     if path == "/settings/booking-cancellation":
         target = "booking_cancellation_policy"
         return db["app_settings"].find_one({"_id": target}), target
+    if path == "/settings/request-edit-permissions":
+        target = "request_edit_permissions"
+        return db["app_settings"].find_one({"_id": target}), target
     return None, None
 
 security = HTTPBearer(auto_error=False)

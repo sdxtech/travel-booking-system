@@ -1,3 +1,4 @@
+import { downloadExcel } from '../utils/excelExport'
 import { useLatestRequest } from '../hooks/useLatestRequest'
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -12,6 +13,7 @@ import { API_BASE_URL } from '../config'
 import { useAuth } from '../hooks/useAuth'
 import { getHistoryDistance, getHistoryDurationMinutes, getHistoryOvertimeMinutes, getHistoryMetricFormValues } from '../components/bookingHistoryMetrics'
 import useBookingLocations from '../hooks/useBookingLocations'
+import useRequestEditPermissions from '../hooks/useRequestEditPermissions'
 
 const OTHER_LOCATION_VALUE = '__other_location__'
 const correctionFields = [
@@ -72,7 +74,8 @@ function OfficeDriverHistory() {
   const { collapsed: isSidebarCollapsed, toggle: toggleSidebar } = useOfficeSidebar()
   const { user } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
-  const canEditBooking = isSuperadmin || user?.role === 'office_coordinator'
+  const { canEdit, error: editPermissionError } = useRequestEditPermissions()
+  const canEditBooking = canEdit && (isSuperadmin || user?.role === 'office_coordinator')
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -710,7 +713,11 @@ function OfficeDriverHistory() {
   // Correct booking history for both office roles.
   const handleSaveEdit = async (event) => {
     event.preventDefault()
-    if (!canEditBooking || !editTarget?.id || !editForm) return
+    if (!editTarget?.id || !editForm) return
+    if (!canEditBooking) {
+      setActionError(editPermissionError || 'Editing is disabled for your role by Super Admin.')
+      return
+    }
 
     if (!editForm.driver_id || !editForm.pickup_location.trim() || !editForm.destination.trim()) {
       setActionError('Driver, pickup location, and destination are required.')
@@ -978,18 +985,7 @@ function OfficeDriverHistory() {
     )
   }
 
-  // Escape values for the HTML-based Excel export.
-  const escapeHtml = (value) => {
-    if (value === null || value === undefined) return ''
-    return String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-  }
-
-  // Export the current filtered/sorted view as an Excel-readable HTML table.
+  // Export the filtered/sorted view as a native Excel workbook.
   const handleExport = () => {
     if (!sortedBookings.length) return
 
@@ -1048,44 +1044,21 @@ function OfficeDriverHistory() {
       formatTime(booking.driver_finished_at),
       formatTime(booking.validated_at),
       formatDuration(booking),
-      formatOvertimeHours(booking),
-      formatOvertimeMinutes(booking),
+      getOvertimeMinutes(booking) === null ? '-' : Math.floor(getOvertimeMinutes(booking) / 60),
+      getOvertimeMinutes(booking) === null ? '-' : getOvertimeMinutes(booking) % 60,
       booking.driver_name || booking.driver_id || '',
       booking.starting_mileage ?? '',
       booking.ending_mileage ?? '',
-      formatDistance(booking),
+      getDistanceNumber(booking) ?? '-',
       formatStatusText(getBookingStatus(booking)),
       booking.validated_by_name ?? booking.validated_by ?? '',
     ])
 
-    const headerHtml = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>`
-    const bodyHtml = rows
-      .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
-      .join('')
-
-    const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-  </head>
-  <body>
-    <table border="1">
-      <thead>${headerHtml}</thead>
-      <tbody>${bodyHtml}</tbody>
-    </table>
-  </body>
-</html>`
-
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `driver_history_${rangeLabel}_${new Date().toISOString().slice(0, 10)}.xls`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    try {
+      downloadExcel(headers, rows, `driver_history_${rangeLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Driver History')
+    } catch (error) {
+      setActionError(error.message || 'Failed to export Excel. Please try again.')
+    }
   }
 
   return (
@@ -1161,7 +1134,7 @@ function OfficeDriverHistory() {
               className="btn btn-outline-brand"
               onClick={handleExport}
               disabled={!hasLoaded || loading || !sortedBookings.length}
-              title={sortedBookings.length ? 'Export to Excel (.xls)' : 'No data to export'}
+              title={sortedBookings.length ? 'Export to Excel (.xlsx)' : 'No data to export'}
             >
               <i className="bi bi-file-earmark-excel" />
               Export Excel
@@ -1468,10 +1441,12 @@ function OfficeDriverHistory() {
                       </button>
                     </>
                   ) : null}
-                  {canEditBooking ? (
+                  {isSuperadmin || user?.role === 'office_coordinator' ? (
                     <button
                       type="button"
                       role="menuitem"
+                      disabled={!canEditBooking}
+                      title={!canEditBooking ? 'Editing is disabled or edit permissions are not available.' : undefined}
                       onClick={() => {
                         const booking = actionMenu.booking
                         closeActionMenu()
@@ -1703,7 +1678,7 @@ function OfficeDriverHistory() {
                 </div>
 
                 <div className="modal-actions">
-                  <button type="submit" className="btn btn-primary" disabled={Boolean(actionLoadingId)}>
+                  <button type="submit" className="btn btn-primary" disabled={!canEditBooking || Boolean(actionLoadingId)}>
                     Save Changes
                   </button>
                   <button

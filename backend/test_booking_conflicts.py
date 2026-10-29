@@ -22,6 +22,7 @@ class BookingConflictTests(unittest.TestCase):
             patch.object(bookings, "ensure_role", return_value="office_coordinator"),
             patch.object(bookings, "resolve_driver", return_value={"name": "Driver 1"}),
             patch.object(bookings, "create_user_notification"),
+            patch.object(bookings, "enforce_request_edit_permission"),
         ]
         for patcher in patches:
             patcher.start()

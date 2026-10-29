@@ -12,6 +12,7 @@ from realtime_service import publish_document_change
 from notifications_service import create_user_notification, notify_roles
 from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
+from settings_service import enforce_request_edit_permission
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -331,6 +332,7 @@ def update_ticket(ticket_id: str, payload: TicketUserCreate, current_user=Depend
     """Allow a user to edit their own pending travel request."""
     uid = current_user["uid"]
     ensure_user_role(uid)
+    enforce_request_edit_permission("user")
     enforce_employee_page_permission(uid, "ticket_history")
 
     snapshot = db["tickets"].find_one({"_id": ticket_id})

@@ -12,6 +12,7 @@ function DataCard({
   formatDateTime,
   formatStatusText,
   onEdit,
+  canEdit,
   onCancel,
   onValidate,
   onDetails,
@@ -53,6 +54,7 @@ function DataCard({
           cancellationPolicyLabel={cancellationPolicyLabel}
           actionLoadingId={actionLoadingId}
           onEdit={onEdit}
+          canEdit={canEdit}
           onCancel={onCancel}
           onValidate={onValidate}
           onDetails={onDetails}

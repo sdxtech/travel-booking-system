@@ -1,3 +1,4 @@
+import { downloadExcel } from '../utils/excelExport'
 import { useEffect, useMemo, useState } from 'react'
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh'
 import { useLatestRequest } from '../hooks/useLatestRequest'
@@ -354,18 +355,7 @@ const isSuperadmin =
     )
   }
 
-  // Escape values for the HTML-based Excel export.
-  const escapeHtml = (value) => {
-    if (value === null || value === undefined) return ''
-    return String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-  }
-
-  // Export the current filtered/sorted view as an Excel-readable HTML table.
+  // Export the filtered/sorted view as a native Excel workbook.
   const handleExport = () => {
     if (!sortedTickets.length) return
 
@@ -419,34 +409,11 @@ const isSuperadmin =
       ticket.status || '',
     ])
 
-    const headerHtml = `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>`
-    const bodyHtml = rows
-      .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`)
-      .join('')
-
-    const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-  </head>
-  <body>
-    <table border="1">
-      <thead>${headerHtml}</thead>
-      <tbody>${bodyHtml}</tbody>
-    </table>
-  </body>
-</html>`
-
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `ticket_history_${rangeLabel}_${new Date().toISOString().slice(0, 10)}.xls`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
+    try {
+      downloadExcel(headers, rows, `ticket_history_${rangeLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Travel History')
+    } catch (error) {
+      setActionError(error.message || 'Failed to export Excel. Please try again.')
+    }
   }
 
   // Handle sidebar navigation clicks.
@@ -523,7 +490,7 @@ const isSuperadmin =
               className="btn btn-outline-brand"
               onClick={handleExport}
               disabled={!hasLoaded || loading || !sortedTickets.length}
-              title={sortedTickets.length ? 'Export to Excel (.xls)' : 'No data to export'}
+              title={sortedTickets.length ? 'Export to Excel (.xlsx)' : 'No data to export'}
             >
               <i className="bi bi-file-earmark-excel" />
               Export Excel

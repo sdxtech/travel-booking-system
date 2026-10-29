@@ -975,6 +975,19 @@ user-dropdown-toogle {
   line-height: 1;
 }
 
+.request-edit-permissions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.request-edit-permissions__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .driver-availability-toggle.is-on {
   color: #166534;
 }

@@ -7,10 +7,12 @@ import { API_BASE_URL } from "../config";
 
 import TicketCard from "../components/TicketCard";
 import TicketTable from "../components/TicketTable";
+import useRequestEditPermissions from "../hooks/useRequestEditPermissions";
 import ViewModeToggle from "../components/ViewModeToogle";
 
 // List the signed-in user's travel requests and their statuses.
 function TicketHistory() {
+  const { canEdit } = useRequestEditPermissions();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +218,7 @@ function TicketHistory() {
 
   // Open the travel request form with the selected request for editing.
   const handleEdit = (ticket) => {
+    if (!canEdit) return;
     navigate("/user/ticket-request", { state: { ticket } });
   };
 
@@ -357,6 +360,7 @@ function TicketHistory() {
                 renderSortIcon={renderSortIcon}
                 formatDate={formatDate}
                 actionLoadingId={actionLoadingId}
+                canEdit={canEdit}
                 onEdit={handleEdit}
                 onCancel={handleCancel}
                 onDetails={setSelectedTicket}
@@ -373,6 +377,7 @@ function TicketHistory() {
                       actionLoadingId={actionLoadingId}
                       formatDate={formatDate}
                       formatDateTime={formatDateTime}
+                      canEdit={canEdit}
                       onEdit={handleEdit}
                       onCancel={handleCancel}
                       onDetails={setSelectedTicket}

@@ -2,16 +2,46 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from main import get_current_user
 from mongo_client import db
 from notifications_service import create_user_notification
 from settings_service import BOOKING_CANCELLATION_POLICY_ID, get_booking_cancellation_policy
+from settings_service import REQUEST_EDIT_PERMISSIONS_ID, get_request_edit_permissions
 from cache_service import get_cached_json, set_cached_json
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+class RequestEditPermissions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    user: StrictBool
+    office_coordinator: StrictBool
+    superadmin: StrictBool
+
+
+@router.get("/request-edit-permissions", response_model=RequestEditPermissions)
+def read_request_edit_permissions(current_user=Depends(get_current_user)):
+    return get_request_edit_permissions()
+
+
+class RequestEditPermissionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["user", "office_coordinator", "superadmin"]
+    enabled: StrictBool
+
+
+@router.patch("/request-edit-permissions", response_model=RequestEditPermissions)
+def update_request_edit_permissions(payload: RequestEditPermissionUpdate, current_user=Depends(get_current_user)):
+    require_superadmin(current_user)
+    db["app_settings"].update_one(
+        {"_id": REQUEST_EDIT_PERMISSIONS_ID},
+        {"$set": {payload.role: payload.enabled, "updated_at": datetime.now(timezone.utc), "updated_by": current_user["uid"]}},
+        upsert=True,
+    )
+    return get_request_edit_permissions()
 
 
 class BookingCancellationPolicyUpdate(BaseModel):

@@ -10,6 +10,7 @@ function TicketTable({
   formatDate,
   actionLoadingId,
   onEdit,
+  canEdit,
   onCancel,
   onDetails,
 }) {
@@ -68,8 +69,8 @@ function TicketTable({
                       <button
                         type="button"
                         onClick={() => onEdit(ticket)}
-                        disabled={!isPending || isLoading}
-                        title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
+                        disabled={!canEdit || !isPending || isLoading}
+                        title={!canEdit ? 'Editing is disabled or edit permissions are not available.' : isPending ? 'Edit this request' : 'Only pending requests can be edited'}
                       >
                         Edit
                       </button>

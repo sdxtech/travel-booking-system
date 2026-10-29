@@ -7,6 +7,7 @@ function TicketCard({
   formatDate,
   formatDateTime,
   onEdit,
+  canEdit,
   onCancel,
   onDetails,
 }) {
@@ -58,8 +59,8 @@ function TicketCard({
             type="button"
             className="dropdown-item"
             onClick={() => onEdit(ticket)}
-            disabled={!isPending || isLoading}
-            title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
+            disabled={!canEdit || !isPending || isLoading}
+            title={!canEdit ? 'Editing is disabled or edit permissions are not available.' : isPending ? 'Edit this request' : 'Only pending requests can be edited'}
           >
             <i className="bi bi-pencil" aria-hidden="true" />
             <span>Edit</span>

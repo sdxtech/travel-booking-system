@@ -8,6 +8,7 @@ function BookingActions({
   cancellationPolicyLabel,
   actionLoadingId,
   onEdit,
+  canEdit,
   onCancel,
   onValidate,
   onDetails,
@@ -24,8 +25,8 @@ function BookingActions({
       <button
         type="button"
         onClick={() => onEdit(booking)}
-        disabled={!isPending || booking.cancellation_status === 'pending' || actionLoadingId === booking.id}
-        title={isPending ? 'Edit this request' : 'Only pending requests can be edited'}
+        disabled={!canEdit || !isPending || booking.cancellation_status === 'pending' || actionLoadingId === booking.id}
+        title={!canEdit ? 'Editing is disabled or edit permissions are not available.' : isPending ? 'Edit this request' : 'Only pending requests can be edited'}
       >
         Edit
       </button>

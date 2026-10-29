@@ -7,6 +7,7 @@ import { DRIVER_SELECT_COLORS } from '../components/driverSelectColors'
 import { formatDriverPlate } from '../components/driverPlate'
 import useBookingLocations from '../hooks/useBookingLocations'
 import { API_BASE_URL } from '../config'
+import useRequestEditPermissions from '../hooks/useRequestEditPermissions'
 
 const OTHER_LOCATION_VALUE = '__other_location__'
 
@@ -23,6 +24,7 @@ const initialForm = {
 
 // Create/edit a driver booking request.
 function BookingDriver() {
+  const { canEdit, error: editPermissionError } = useRequestEditPermissions()
   const [availabilityRevision, setAvailabilityRevision] = useState(0)
   useRealtimeRefresh(['availability', 'calendars', 'users'], () => setAvailabilityRevision((value) => value + 1))
   const navigate = useNavigate()
@@ -49,7 +51,7 @@ function BookingDriver() {
     unavailableDriverIds.has(String(form.driver_id)) ||
     !drivers.some((driver) => String(driver.driver_id) === String(form.driver_id))
   )
-  const submitBlocked = loading || driversLoading || availabilityLoading || locationsLoading || !form.pickup_location || !form.destination || !availabilityChecked || selectedDriverUnavailable
+  const submitBlocked = Boolean(editingBookingId && !canEdit) || loading || driversLoading || availabilityLoading || locationsLoading || !form.pickup_location || !form.destination || !availabilityChecked || selectedDriverUnavailable
 
   // Convert API timestamps into a Date instance.
   const toDate = (value) => {
@@ -193,6 +195,10 @@ function BookingDriver() {
   // Submit a new booking or save changes to an existing one.
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (editingBookingId && !canEdit) {
+      setErrorMessage(editPermissionError || 'Editing is disabled for your role by Super Admin.')
+      return
+    }
     if (submitBlocked) {
       setErrorMessage(selectedDriverUnavailable
         ? 'The selected driver is unavailable. Please choose another driver or time.'

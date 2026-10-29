@@ -2,9 +2,24 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Literal, Optional, TypedDict
 
 from mongo_client import db
+from fastapi import HTTPException
 
 
 BOOKING_CANCELLATION_POLICY_ID = "booking_cancellation_policy"
+REQUEST_EDIT_PERMISSIONS_ID = "request_edit_permissions"
+REQUEST_EDIT_ROLES = ("user", "office_coordinator", "superadmin")
+
+
+def get_request_edit_permissions() -> dict[str, bool]:
+    document = db["app_settings"].find_one({"_id": REQUEST_EDIT_PERMISSIONS_ID}) or {}
+    return {role: document.get(role, True) is not False for role in REQUEST_EDIT_ROLES}
+
+
+def enforce_request_edit_permission(role: str) -> None:
+    if role not in REQUEST_EDIT_ROLES or not get_request_edit_permissions()[role]:
+        raise HTTPException(status_code=403, detail="Editing Booking Driver and Travel Requests is disabled for your role by Super Admin.")
+
+
 DEFAULT_CANCELLATION_VALUE = 1
 DEFAULT_CANCELLATION_UNIT = "days"
 DEFAULT_CANCELLATION_TIME = "17:00"

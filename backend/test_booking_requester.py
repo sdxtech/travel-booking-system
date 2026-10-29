@@ -44,6 +44,7 @@ class BookingRequesterTests(unittest.TestCase):
             patch.object(bookings, "db", database),
             patch.object(main, "db", database),
             patch.object(bookings, "publish_document_change"),
+            patch.object(bookings, "enforce_request_edit_permission"),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)

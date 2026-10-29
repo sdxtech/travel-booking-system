@@ -13,6 +13,7 @@ from notifications_service import create_user_notification, notify_roles
 from page_permissions_service import enforce_employee_page_permission
 from request_id_service import generate_request_id
 from settings_service import get_booking_cancellation_deadline, get_booking_cancellation_policy
+from settings_service import enforce_request_edit_permission
 from cache_service import get_cached_json, set_cached_json
 from booking_link_service import link_employee_bookings
 
@@ -846,7 +847,8 @@ def update_booking_requester(
 ):
     """Correct a booking's requester snapshot without changing its account or workflow."""
     uid = current_user["uid"]
-    ensure_role(uid, ("office_coordinator", "superadmin"))
+    role = ensure_role(uid, ("office_coordinator", "superadmin"))
+    enforce_request_edit_permission(role)
     snapshot = db["bookings"].find_one({"_id": booking_id})
     if not snapshot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
@@ -867,6 +869,7 @@ def update_office_booking(booking_id: str, payload: BookingOfficeUpdate, current
     """Correct operational history while retaining request identity and account ownership."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("office_coordinator", "superadmin"))
+    enforce_request_edit_permission(role)
     snapshot = db["bookings"].find_one({"_id": booking_id})
     if not snapshot:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -930,6 +933,7 @@ def update_booking(booking_id: str, payload: BookingCreate, current_user=Depends
     """Edit an Employee pending request or allow Super Admin to overwrite any booking."""
     uid = current_user["uid"]
     role = ensure_role(uid, ("user", "superadmin"))
+    enforce_request_edit_permission(role)
     enforce_employee_page_permission(uid, "booking_history")
 
     snapshot = db["bookings"].find_one({"_id": booking_id})

@@ -7,10 +7,12 @@ import { API_BASE_URL } from '../config'
 import ViewModeToggle from '../components/ViewModeToogle'
 import DataCard from '../components/DataCard'
 import DataTable from '../components/DataTable'
+import useRequestEditPermissions from '../hooks/useRequestEditPermissions'
 
 
 // List the signed-in user's driver bookings and their statuses.
 function BookingHistory() {
+  const { canEdit } = useRequestEditPermissions()
   const navigate = useNavigate()
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -261,6 +263,7 @@ function BookingHistory() {
   useEffect(() => { fetchBookings() }, [fetchBookings])
 
   const handleEdit = (booking) => {
+    if (!canEdit) return
     navigate('/user/booking-driver', { state: { booking } })
   }
 
@@ -422,6 +425,7 @@ function BookingHistory() {
                 formatDateOnly={formatDateOnly}
                 formatStatusText={formatStatusText}
                 actionLoadingId={actionLoadingId}
+                canEdit={canEdit}
                 onEdit={handleEdit}
                 onCancel={handleCancel}
                 onValidate={handleValidateCompletion}
@@ -446,6 +450,7 @@ function BookingHistory() {
                       formatDateOnly={formatDateOnly}
                       formatDateTime={formatDateTime}
                       formatStatusText={formatStatusText}
+                      canEdit={canEdit}
                       onEdit={handleEdit}
                       onCancel={handleCancel}
                       onValidate={handleValidateCompletion}

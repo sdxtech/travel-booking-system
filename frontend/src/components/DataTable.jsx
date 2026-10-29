@@ -14,6 +14,7 @@ function DataTable({
   formatStatusText,
   actionLoadingId,
   onEdit,
+  canEdit,
   onCancel,
   onValidate,
   onDetails,
@@ -86,6 +87,7 @@ function DataTable({
                       cancellationPolicyLabel={getCancellationPolicyLabel()}
                       actionLoadingId={actionLoadingId}
                       onEdit={onEdit}
+                      canEdit={canEdit}
                       onCancel={onCancel}
                       onValidate={onValidate}
                       onDetails={onDetails}

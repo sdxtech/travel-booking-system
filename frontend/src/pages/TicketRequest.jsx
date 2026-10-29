@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import MainLayout from '../components/MainLayout'
 import { API_BASE_URL } from '../config'
+import useRequestEditPermissions from '../hooks/useRequestEditPermissions'
 
 const initialForm = {
   destination: '',
@@ -21,6 +22,7 @@ const initialForm = {
 
 // Create/edit travel accommodation requests.
 function TicketRequest() {
+  const { canEdit, error: editPermissionError } = useRequestEditPermissions()
   const navigate = useNavigate()
   const location = useLocation()
   const [form, setForm] = useState(initialForm)
@@ -82,6 +84,10 @@ function TicketRequest() {
   // Submit a new request or update an existing ticket.
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (editingTicketId && !canEdit) {
+      setErrorMessage(editPermissionError || 'Editing is disabled for your role by Super Admin.')
+      return
+    }
     setLoading(true)
     setErrorMessage('')
 
@@ -341,7 +347,7 @@ function TicketRequest() {
           {errorMessage ? <p className="error-text">{errorMessage}</p> : null}
 
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            <button type="submit" className="btn btn-primary" disabled={loading || Boolean(editingTicketId && !canEdit)}>
               {loading ? 'Submitting...' : editingTicketId ? 'Save Changes' : 'Submit Request'}
             </button>
             <button type="button" className="btn btn-outline-danger" onClick={() => navigate('/user/home')}>
