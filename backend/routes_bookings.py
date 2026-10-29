@@ -1,10 +1,12 @@
 import re
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pymongo.errors import DuplicateKeyError
 
 from main import get_current_user
 from mongo_client import db
@@ -110,11 +112,15 @@ class BookingResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+MAX_VALIDATION_REMINDER_BOOKINGS = 5000
+
+
 class ValidationReminderSendRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    booking_ids: list[str] = Field(..., min_length=1, max_length=500)
+    booking_ids: list[str] = Field(..., min_length=1, max_length=MAX_VALIDATION_REMINDER_BOOKINGS)
     duration_value: int = Field(..., ge=1, le=8760, strict=True)
     duration_unit: Literal["hours", "days"] = "hours"
+    request_key: Optional[str] = Field(default=None, min_length=32, max_length=64, pattern=r"^[a-zA-Z0-9-]+$")
 
     @model_validator(mode="after")
     def validate_window_and_ids(self):
@@ -134,11 +140,15 @@ class ValidationReminderSendRequest(BaseModel):
 
 
 class ValidationReminderSendResponse(BaseModel):
-    reminded_bookings: int
-    notified_recipients: int
-    in_app_recipients: int
-    skipped_bookings: int
+    operation_id: str
+    state: str
+    reminded_bookings: int = 0
+    notified_recipients: int = 0
+    in_app_recipients: int = 0
+    skipped_bookings: int = 0
+    skipped_details: list[dict[str, str]] = Field(default_factory=list)
     expires_at: datetime
+    error: Optional[str] = None
 
 
 class BookingOfficeHistoryResponse(BookingResponse):
@@ -712,149 +722,55 @@ def list_my_validation_reminders(current_user=Depends(get_current_user)):
     return results
 
 
+from validation_reminder_service import process_next_validation_reminder
+
+
+def _reminder_response(operation):
+    return ValidationReminderSendResponse(**operation, operation_id=operation["_id"])
+
+
 @router.post("/validation-reminders", response_model=ValidationReminderSendResponse)
-def send_validation_reminders(
-    payload: ValidationReminderSendRequest,
-    current_user=Depends(get_current_user),
-):
-    """Send email + one-time push reminder and activate an expiring in-app popup for awaiting-validation bookings."""
+def send_validation_reminders(payload: ValidationReminderSendRequest, current_user=Depends(get_current_user)):
     uid = current_user["uid"]
     ensure_role(uid, ("office_coordinator", "superadmin"))
-
+    key = payload.request_key or uuid4().hex
+    operation_id = hashlib.sha256(f"{uid}:{key}".encode()).hexdigest()
     now = utc_now()
-    delta = (
-        timedelta(days=payload.duration_value)
-        if payload.duration_unit == "days"
-        else timedelta(hours=payload.duration_value)
-    )
-    expires_at = now + delta
-    reminder_id = uuid4().hex
-    single_mode = len(payload.booking_ids) == 1
+    delta = timedelta(days=payload.duration_value) if payload.duration_unit == "days" else timedelta(hours=payload.duration_value)
+    operation = {
+        "_id": operation_id, "actor_id": uid, "request_key": key,
+        "booking_ids": payload.booking_ids, "duration_value": payload.duration_value,
+        "duration_unit": payload.duration_unit, "created_at": now, "expires_at": now + delta,
+        "state": "pending", "items": [{"booking_id": bid} for bid in payload.booking_ids],
+    }
+    try:
+        db["validation_reminder_operations"].insert_one(operation)
+    except DuplicateKeyError:
+        operation = db["validation_reminder_operations"].find_one({"_id": operation_id, "actor_id": uid})
+        if not operation or any(operation.get(key) != value for key, value in (
+            ("booking_ids", payload.booking_ids), ("duration_value", payload.duration_value),
+            ("duration_unit", payload.duration_unit),
+        )):
+            raise HTTPException(status_code=409, detail="Reminder request key already used for different bookings")
+    # Larger requests are handled by the durable worker to avoid HTTP timeouts.
+    if operation["state"] in ("pending", "processing") and len(operation["booking_ids"]) <= 500:
+        try:
+            process_next_validation_reminder(operation_id)
+        except Exception:
+            # The durable worker will resume the same operation.
+            pass
+        operation = db["validation_reminder_operations"].find_one({"_id": operation_id, "actor_id": uid})
+    return _reminder_response(operation)
 
-    recipient_groups: dict[tuple[str, str], dict] = {}
-    reminded_count = 0
-    skipped_count = 0
 
-    for booking_id in payload.booking_ids:
-        snapshot = db["bookings"].find_one({"_id": booking_id})
-        if not snapshot:
-            if single_mode:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
-            skipped_count += 1
-            continue
-
-        if snapshot.get("status") != "awaiting_validation":
-            if single_mode:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Booking is not waiting for validation")
-            skipped_count += 1
-            continue
-
-        linked_uid = snapshot.get("user_id")
-        req_email = normalize_email(snapshot.get("requester_email"))
-        newly_linked_uid = None
-
-        target_user = db["users"].find_one({"_id": linked_uid}) if linked_uid else None
-        if not target_user and req_email:
-            candidate = db["users"].find_one({"email": req_email}) or db["users"].find_one(
-                {"email": {"$regex": r"^\s*" + re.escape(req_email) + r"\s*$", "$options": "i"}}
-            )
-            if candidate and candidate.get("role") in ("user", "office_coordinator", "superadmin"):
-                target_user = candidate
-                if not linked_uid and candidate.get("role") in ("user", "office_coordinator"):
-                    newly_linked_uid = str(candidate["_id"])
-
-        active_uid = (
-            str(target_user["_id"])
-            if (
-                target_user
-                and target_user.get("role") in ("user", "office_coordinator", "superadmin")
-                and not target_user.get("disabled")
-                and not target_user.get("banned")
-            )
-            else None
-        )
-
-        if not active_uid and not req_email:
-            if single_mode:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Booking has no recipient account or email")
-            skipped_count += 1
-            continue
-
-        update_fields: dict[str, object] = {
-            "validation_reminder_id": reminder_id,
-            "validation_reminder_sent_at": now,
-            "validation_reminder_expires_at": expires_at,
-            "validation_reminder_sent_by": uid,
-            "updated_at": now,
-        }
-        if newly_linked_uid:
-            update_fields["user_id"] = newly_linked_uid
-
-        result = db["bookings"].update_one(
-            {"_id": booking_id, "status": "awaiting_validation"},
-            {"$set": update_fields},
-        )
-        if not result.modified_count:
-            if single_mode:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Booking changed. Please refresh.")
-            skipped_count += 1
-            continue
-
-        updated_doc = {**snapshot, **update_fields}
-        publish_document_change("bookings", booking_id, snapshot)
-        reminded_count += 1
-
-        group_key = ("user", active_uid) if active_uid else ("email", req_email or "")
-        if group_key not in recipient_groups:
-            recipient_groups[group_key] = {
-                "user_id": active_uid,
-                "email": req_email,
-                "name": (target_user or {}).get("name") or snapshot.get("requester_name"),
-                "bookings": [],
-            }
-        recipient_groups[group_key]["bookings"].append(updated_doc)
-
-    if reminded_count == 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No bookings are waiting for validation")
-
-    notified_recipients = 0
-    in_app_recipients = 0
-    for (kind, _), group in recipient_groups.items():
-        message, details, primary_booking_id = _build_validation_reminder_email_payload(group["bookings"])
-        if kind == "user" and group["user_id"]:
-            create_user_notification(
-                group["user_id"],
-                message,
-                event="validation_reminder",
-                entity_type="booking",
-                entity_id=primary_booking_id,
-                status="awaiting_validation",
-                actor_id=uid,
-                email_details=details,
-            )
-            notified_recipients += 1
-            in_app_recipients += 1
-        elif group["email"]:
-            queue_email_only_notification(
-                group["email"],
-                group["name"],
-                message,
-                event="validation_reminder",
-                entity_type="booking",
-                entity_id=primary_booking_id,
-                status="awaiting_validation",
-                actor_id=uid,
-                email_details=details,
-            )
-            notified_recipients += 1
-
-    return ValidationReminderSendResponse(
-        reminded_bookings=reminded_count,
-        notified_recipients=notified_recipients,
-        in_app_recipients=in_app_recipients,
-        skipped_bookings=skipped_count,
-        expires_at=expires_at,
-    )
+@router.get("/validation-reminders/operations/{operation_id}", response_model=ValidationReminderSendResponse)
+def get_validation_reminder_operation(operation_id: str, current_user=Depends(get_current_user)):
+    uid = current_user["uid"]
+    ensure_role(uid, ("office_coordinator", "superadmin"))
+    operation = db["validation_reminder_operations"].find_one({"_id": operation_id, "actor_id": uid})
+    if not operation:
+        raise HTTPException(status_code=404, detail="Reminder operation not found")
+    return _reminder_response(operation)
 
 
 @router.get("/pending", response_model=list[BookingResponse])

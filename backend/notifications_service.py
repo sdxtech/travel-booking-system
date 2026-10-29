@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import asyncio
 import contextlib
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from starlette.concurrency import run_in_threadpool
 from typing import Mapping, Optional
 from uuid import uuid4
@@ -30,12 +31,14 @@ def create_user_notification(
     status: Optional[str] = None,
     actor_id: Optional[str] = None,
     email_details: Optional[Mapping[str, object]] = None,
+    notification_id: Optional[str] = None,
 ) -> Optional[str]:
     """Create a notification entry under a user document and return the new notification id."""
     if not user_id:
         return None
 
-    notification_id = uuid4().hex
+    stable_id = notification_id is not None
+    notification_id = notification_id or uuid4().hex
     user_snapshot = db["users"].find_one(
         {"_id": str(user_id)}, {"email": 1, "name": 1, "role": 1, "disabled": 1, "banned": 1, "telegram_chat_id": 1},
     ) or {}
@@ -50,7 +53,8 @@ def create_user_notification(
         user_snapshot.get("role") == "driver" and not user_snapshot.get("disabled") and not user_snapshot.get("banned")
         and chat_id and telegram_delivery_enabled()
     )
-    db["notifications"].insert_one(
+    try:
+        db["notifications"].insert_one(
         {
             "_id": notification_id,
             "user_id": str(user_id),
@@ -73,7 +77,10 @@ def create_user_notification(
                 "details": dict(email_details or {}),
             },
         }
-    )
+        )
+    except DuplicateKeyError:
+        if not stable_id:
+            raise
 
     publish_notification(str(user_id), event)
 
@@ -81,6 +88,8 @@ def create_user_notification(
         try:
             queue_notification_push(str(user_id), notification_id)
         except Exception:
+            if stable_id:
+                raise
             # Push problems must not block in-app, email, Telegram, or the booking itself.
             pass
 
@@ -98,15 +107,18 @@ def queue_email_only_notification(
     status: Optional[str] = None,
     actor_id: Optional[str] = None,
     email_details: Optional[Mapping[str, object]] = None,
+    notification_id: Optional[str] = None,
 ) -> Optional[str]:
     """Queue an email notification for a booking requester without a registered user account."""
     normalized_email = str(to_email or "").strip().lower()
     if not normalized_email:
         return None
 
-    notification_id = uuid4().hex
+    stable_id = notification_id is not None
+    notification_id = notification_id or uuid4().hex
     should_send_email = bool(email_delivery_enabled())
-    db["notifications"].insert_one(
+    try:
+        db["notifications"].insert_one(
         {
             "_id": notification_id,
             "user_id": None,
@@ -130,7 +142,10 @@ def queue_email_only_notification(
                 "details": dict(email_details or {}),
             },
         }
-    )
+        )
+    except DuplicateKeyError:
+        if not stable_id:
+            raise
     return notification_id
 
 
@@ -228,6 +243,7 @@ def deliver_next_notification():
 
 class NotificationWorker:
     task = None
+    reminder_task = None
 
     async def run(self):
         while True:
@@ -237,11 +253,27 @@ class NotificationWorker:
                 worked = False
             await asyncio.sleep(0.1 if worked else 1)
 
+    async def run_reminders(self):
+        while True:
+            try:
+                from routes_bookings import process_next_validation_reminder
+                worked = await run_in_threadpool(process_next_validation_reminder)
+            except Exception:
+                worked = False
+            await asyncio.sleep(0.1 if worked else 1)
+
     async def start(self):
         if self.task is None:
             self.task = asyncio.create_task(self.run())
+        if self.reminder_task is None:
+            self.reminder_task = asyncio.create_task(self.run_reminders())
 
     async def stop(self):
+        if self.reminder_task is not None:
+            self.reminder_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.reminder_task
+            self.reminder_task = None
         if self.task is not None:
             self.task.cancel()
             with contextlib.suppress(asyncio.CancelledError):

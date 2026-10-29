@@ -58,6 +58,8 @@ def init_mongo():
     database = db.get_db()
 
     database["notifications"].create_index([("delivery_state", ASCENDING), ("delivery_after", ASCENDING), ("created_at", ASCENDING)])
+    database["validation_reminder_operations"].create_index([("state", ASCENDING), ("lease_until", ASCENDING), ("created_at", ASCENDING)])
+    database["validation_reminder_operations"].create_index("finished_at", expireAfterSeconds=2592000)
 
     database["push_subscriptions"].create_index([("user_id", ASCENDING)])
     database["push_jobs"].create_index([("status", ASCENDING), ("next_attempt_at", ASCENDING)])

@@ -55,7 +55,7 @@ export default function ValidationReminderPopup() {
   const loadReminders = useCallback(async () => {
     if (!uid || !isEligibleRole) {
       setReminders([])
-      return
+      return true
     }
     const signal = beginLoad()
     try {
@@ -63,19 +63,31 @@ export default function ValidationReminderPopup() {
         credentials: 'include',
         signal,
       })
-      if (!response.ok || signal.aborted) return
+      if (signal.aborted) return true
+      if (!response.ok) return false
       const data = await response.json()
-      if (signal.aborted) return
+      if (signal.aborted) return true
       setNowMs(Date.now())
       setReminders(Array.isArray(data) ? data : [])
+      return true
     } catch {
-      // Silent background check; do not block normal navigation.
+      return signal.aborted
     }
   }, [uid, isEligibleRole, beginLoad])
 
   useEffect(() => {
-    if (authLoading || !uid || !isEligibleRole) return
-    void loadReminders()
+    if (authLoading || !uid || !isEligibleRole) return undefined
+    let cancelled = false
+    let retryTimer
+    const load = async () => {
+      const loaded = await loadReminders()
+      if (!cancelled && !loaded) retryTimer = window.setTimeout(load, 5000)
+    }
+    void load()
+    return () => {
+      cancelled = true
+      window.clearTimeout(retryTimer)
+    }
   }, [authLoading, uid, isEligibleRole, loadReminders])
 
   useRealtimeRefresh(['bookings'], () => {

@@ -28,13 +28,15 @@ import ForgotPassword from './pages/ForgotPassword'
 import AccountSettings from './pages/AccountSettings'
 import ResetPassword from './pages/ResetPassword'
 import ValidationReminderPopup from './components/ValidationReminderPopup'
+import { useAuth } from './hooks/useAuth'
 
 
 // Main router for all app pages.
 function App() {
+  const { user } = useAuth()
   return (
     <Router>
-      <ValidationReminderPopup />
+      {user?.uid ? <ValidationReminderPopup key={user.uid} /> : null}
       <div className="app-shell">
         <Routes>
           <Route path="/login" element={<Login />} />

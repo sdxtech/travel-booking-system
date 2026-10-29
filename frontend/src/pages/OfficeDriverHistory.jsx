@@ -16,6 +16,7 @@ import useBookingLocations from '../hooks/useBookingLocations'
 import useRequestEditPermissions from '../hooks/useRequestEditPermissions'
 
 const OTHER_LOCATION_VALUE = '__other_location__'
+const MAX_REMINDER_BOOKINGS = 5000
 const correctionFields = [
   ['requester_name', 'Name', 'text', true],
   ['requester_department', 'Department'],
@@ -1059,6 +1060,10 @@ function OfficeDriverHistory() {
   const handleSendReminder = async (event) => {
     event.preventDefault()
     if (!remindModal?.bookings?.length || remindSending) return
+    if (remindModal.bookings.length > MAX_REMINDER_BOOKINGS) {
+      setRemindError(`Select at most ${MAX_REMINDER_BOOKINGS.toLocaleString()} bookings by adjusting the filters.`)
+      return
+    }
 
     const parsedValue = Number.parseInt(String(remindDurationValue).trim(), 10)
     const maxAllowed = remindDurationUnit === 'days' ? 365 : 8760
@@ -1076,27 +1081,53 @@ function OfficeDriverHistory() {
     setActionError('')
     setActionMessage('')
     try {
+      const bookingIds = remindModal.bookings.map((booking) => booking.id).sort()
+      const storageKey = `validation-reminder:${user?.uid}:${JSON.stringify([bookingIds, parsedValue, remindDurationUnit])}`
+      let requestKey = sessionStorage.getItem(storageKey)
+      if (!requestKey) {
+        requestKey = crypto.randomUUID()
+        sessionStorage.setItem(storageKey, requestKey)
+      }
       const response = await fetch(`${API_BASE_URL}/bookings/validation-reminders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          booking_ids: remindModal.bookings.map((booking) => booking.id),
+          booking_ids: bookingIds,
           duration_value: parsedValue,
           duration_unit: remindDurationUnit,
+          request_key: requestKey,
         }),
       })
-      const data = await response.json().catch(() => ({}))
+      let data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setRemindError(data?.detail || 'Failed to send validation reminder.')
+        setRemindError(Array.isArray(data?.detail) ? data.detail.map((item) => item.msg).join('; ') : data?.detail || 'Failed to send validation reminder.')
         return
       }
 
+      for (let attempt = 0; attempt < 15 && ['pending', 'processing'].includes(data.state); attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000))
+        const statusResponse = await fetch(`${API_BASE_URL}/bookings/validation-reminders/operations/${data.operation_id}`, { credentials: 'include' })
+        if (!statusResponse.ok) throw new Error('Could not check reminder status')
+        data = await statusResponse.json()
+      }
+      if (data.state === 'pending' || data.state === 'processing') {
+        setRemindError('Reminder is still being processed. Please retry to check its status.')
+        return
+      }
+      if (data.state === 'failed') {
+        sessionStorage.removeItem(storageKey)
+        setRemindError(data.error || 'No reminders could be sent. Please refresh and try again.')
+        return
+      }
+      sessionStorage.removeItem(storageKey)
+
       const remindedCount = Number(data?.reminded_bookings ?? remindModal.bookings.length)
       const recipientCount = Number(data?.notified_recipients ?? remindRecipientSummary.length)
+      const skippedDetails = (data.skipped_details || []).map((item) => `${item.request_id}: ${item.reason}`).join('; ')
       setRemindModal(null)
       setActionMessage(
-        `Validation reminder sent for ${remindedCount} booking${remindedCount === 1 ? '' : 's'} (${recipientCount} recipient${recipientCount === 1 ? '' : 's'}).`,
+        `Reminder processing completed for ${remindedCount} booking${remindedCount === 1 ? '' : 's'} (${recipientCount} recipient${recipientCount === 1 ? '' : 's'}). Email and push delivery depend on their availability and settings.${data.skipped_bookings ? ` ${data.skipped_bookings} booking(s) skipped: ${skippedDetails}` : ''}`,
       )
       await loadBookings(activeRange, true)
       window.dispatchEvent(new Event('notifications:refresh'))
@@ -1735,10 +1766,17 @@ function OfficeDriverHistory() {
                 <div className="admin-settings__preview">
                   <i className="bi bi-bell" aria-hidden="true" />
                   <span>
-                    Sends <strong>1 email + 1 push notification</strong> per recipient right now (no duplicate spam), and displays an in-app validation popup each time the user opens the app until{' '}
-                    <strong>{remindExpiryPreview}</strong> or until validated.
+                    Each recipient receives one combined reminder per send. Email is queued when email delivery is available.
+                    Push is queued for each enabled device when FCM is available. Linked users see an in-app popup each time they open or refresh the app until{' '}
+                    <strong>{remindExpiryPreview}</strong> or until validated. Recipients without a linked account receive email only.
                   </span>
                 </div>
+
+                {remindModal.bookings.length > MAX_REMINDER_BOOKINGS ? (
+                  <p className="error-text" role="alert">
+                    This view contains more than {MAX_REMINDER_BOOKINGS.toLocaleString()} bookings. Adjust the filters before sending.
+                  </p>
+                ) : null}
 
                 <div className="validation-remind-modal__duration">
                   <label className="form-field">
@@ -1769,7 +1807,7 @@ function OfficeDriverHistory() {
 
                 <div className="validation-remind-modal__summary">
                   <strong>
-                    Recipients ({remindRecipientSummary.length} user{remindRecipientSummary.length === 1 ? '' : 's'} &bull;{' '}
+                    Estimated recipients ({remindRecipientSummary.length} user{remindRecipientSummary.length === 1 ? '' : 's'} &bull;{' '}
                     {remindModal.bookings.length} booking{remindModal.bookings.length === 1 ? '' : 's'})
                   </strong>
                   <div className="validation-remind-modal__recipients">
@@ -1788,7 +1826,7 @@ function OfficeDriverHistory() {
                 </div>
 
                 <div className="modal-actions">
-                  <button type="submit" className="btn btn-primary" disabled={remindSending}>
+                  <button type="submit" className="btn btn-primary" disabled={remindSending || remindModal.bookings.length > MAX_REMINDER_BOOKINGS}>
                     <i className="bi bi-send" aria-hidden="true" />
                     {remindSending ? 'Sending...' : 'Send Reminder'}
                   </button>
